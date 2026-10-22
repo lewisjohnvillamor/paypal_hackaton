@@ -10,7 +10,11 @@ Verified through the real UI with `scripts/e2e-sandbox.js` (Playwright, sandbox 
 
 A fourth live run got an item-match score of 0.79, just under the 0.8 threshold, so the case went to "needs your judgment" and approval required a written reason. That is the intended behaviour; see `GATE2_PROBE.md`.
 
-Screenshots of the latest run are in `hackathon/screenshots/`.
+Screenshots of the latest run are in `hackathon/screenshots/` (desktop and `m-*` mobile, light and dark), with the pre-redesign set in `hackathon/screenshots/before/`.
+
+## UI
+
+Apple-style redesign across store, claim, tracking and merchant screens (PR #2). Tokens and rationale: `DESIGN.md`. axe WCAG AA: 0 violations on store, inbox and case pages in both themes. The walkthrough video was re-recorded with the new UI.
 
 ## Gates
 
@@ -25,7 +29,7 @@ Screenshots of the latest run are in `hackathon/screenshots/`.
 - No hosted demo yet; Render is the candidate (it has a sponsor prize). The upload folder and SQLite file need a persistent disk.
 - Judge access: decide whether to publish a sandbox buyer login and a merchant password, with rate and amount caps.
 - Verified webhooks are not implemented. Reconciliation polls PayPal every 60 s and on server start.
-- No video yet.
+- Walkthrough video re-recorded with the new UI (101 s, captioned); the final judged video (spec section 15) is still to do.
 
 ## Next executable task
 
