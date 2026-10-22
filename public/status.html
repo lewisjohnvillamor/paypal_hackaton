@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Request status</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header class="top"><a class="brand" href="/">Refund <span>Relay</span></a></header>
+  <main class="narrow">
+    <h1>Your refund request</h1>
+    <div id="error" class="notice bad hidden"></div>
+    <div id="card" class="card hidden"></div>
+    <form id="more" class="card hidden">
+      <h2>Add photos</h2>
+      <input id="photos" name="photos" type="file" accept="image/jpeg,image/png" multiple required>
+      <p><button class="primary" type="submit" id="send">Send photos</button></p>
+    </form>
+  </main>
+  <script type="module">
+    import { api, usd, esc, hashToken, pill, when } from "/app.js";
+    const claimId = new URLSearchParams(location.search).get("claim");
+    const token = hashToken();
+    const $ = (id) => document.getElementById(id);
+    const fail = (msg) => { $("error").textContent = msg; $("error").classList.remove("hidden"); };
+
+    function render(s) {
+      $("card").innerHTML = `
+        <div class="row spread"><b>${esc(s.ref)}</b>${pill(s.status)}</div>
+        <p style="font-size:18px">${esc(s.message)}</p>
+        <dl class="kv"><dt>Item</dt><dd>${esc(s.item)} × ${s.quantity}</dd><dt>Sent</dt><dd>${when(s.createdAt)}</dd>
+        ${s.refund ? `<dt>Refund</dt><dd>${usd(s.refund.amountCents)} USD, ${s.refund.state === "issued" ? "issued by the merchant through PayPal" : "processing"}</dd>` : ""}
+        ${s.refund?.refundId ? `<dt>PayPal refund</dt><dd class="mono">${esc(s.refund.refundId)}</dd>` : ""}</dl>
+        ${s.infoRequest ? `<div class="notice warn"><b>The shop asks:</b> ${esc(s.infoRequest)}</div>` : ""}
+        ${s.closeReason ? `<div class="notice">Reason: ${esc(s.closeReason)}. You can still use PayPal's own resolution options.</div>` : ""}
+        ${s.refund?.state === "issued" ? `<p class="small muted">Refunds can take a few days to appear, depending on how you paid.</p>` : ""}`;
+      $("card").classList.remove("hidden");
+      $("more").classList.toggle("hidden", s.status !== "needs_info");
+    }
+    const load = () => api(`/api/claims/${encodeURIComponent(claimId)}/status`, { token }).then(render, (e) => fail(e.message));
+    await load();
+    setInterval(load, 15000);
+
+    $("more").onsubmit = async (e) => {
+      e.preventDefault();
+      $("send").disabled = true;
+      try { render(await api(`/api/claims/${encodeURIComponent(claimId)}/evidence`, { method: "POST", form: new FormData($("more")), token })); }
+      catch (err) { fail(err.message); }
+      $("send").disabled = false;
+    };
+  </script>
+</body>
+</html>

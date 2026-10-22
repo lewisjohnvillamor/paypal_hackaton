@@ -1,0 +1,629 @@
+{
+  "summary": {
+    "ranAt": "2026-10-22T10:07:56.497Z",
+    "model": "jev-1.14.0",
+    "templateVersion": "evidence-v1",
+    "cases": 18,
+    "errors": 0,
+    "latencyMs": {
+      "median": 194,
+      "max": 472
+    },
+    "inputTokens": 87034,
+    "outputTokens": 3035,
+    "visible_breakage": {
+      "n": 10,
+      "right": 7,
+      "wrong": 1,
+      "abstain": 2
+    },
+    "product_consistency": {
+      "n": 13,
+      "right": 8,
+      "wrong": 0,
+      "abstain": 5
+    },
+    "evidence_usable": {
+      "n": 15,
+      "right": 14,
+      "wrong": 0,
+      "abstain": 1
+    }
+  },
+  "rows": [
+    {
+      "id": "broken-handle-white",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent"
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "uncertain",
+        "damage_kind": "shattered",
+        "signals": {
+          "evidence_usable": 0.98,
+          "visible_breakage": 0.99,
+          "same_kind_as_catalog": 0.77,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.93
+          },
+          "damage_kind": {
+            "choice": "shattered",
+            "confidence": 0.95
+          }
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4715,
+        "output_tokens": 169
+      },
+      "latencyMs": 472
+    },
+    {
+      "id": "broken-rocket-mug",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent"
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "damage_kind": "shattered",
+        "signals": {
+          "evidence_usable": 0.97,
+          "visible_breakage": 0.99,
+          "same_kind_as_catalog": 0.83,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.93
+          },
+          "damage_kind": {
+            "choice": "shattered",
+            "confidence": 0.76
+          }
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4720,
+        "output_tokens": 169
+      },
+      "latencyMs": 156
+    },
+    {
+      "id": "broken-in-packing",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent"
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "uncertain",
+        "damage_kind": "shattered",
+        "signals": {
+          "evidence_usable": 0.98,
+          "visible_breakage": 0.99,
+          "same_kind_as_catalog": 0.48,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.63
+          },
+          "damage_kind": {
+            "choice": "shattered",
+            "confidence": 1
+          }
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4495,
+        "output_tokens": 169
+      },
+      "latencyMs": 229
+    },
+    {
+      "id": "broken-shards-bubblewrap",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent"
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "uncertain",
+        "damage_kind": "shattered",
+        "signals": {
+          "evidence_usable": 0.98,
+          "visible_breakage": 0.98,
+          "same_kind_as_catalog": 0.58,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.56
+          },
+          "damage_kind": {
+            "choice": "shattered",
+            "confidence": 1
+          }
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4498,
+        "output_tokens": 169
+      },
+      "latencyMs": 248
+    },
+    {
+      "id": "broken-glass-mug",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "ambiguous"
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "inconsistent",
+        "damage_kind": "crack_or_chip",
+        "signals": {
+          "evidence_usable": 0.93,
+          "visible_breakage": 0.96,
+          "same_kind_as_catalog": 0.1,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.49
+          },
+          "damage_kind": {
+            "choice": "crack_or_chip",
+            "confidence": 0.69
+          }
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4723,
+        "output_tokens": 170
+      },
+      "latencyMs": 380
+    },
+    {
+      "id": "intact-blue-mug",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent"
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "uncertain",
+        "product_consistency": "consistent",
+        "damage_kind": "crack_or_chip",
+        "signals": {
+          "evidence_usable": 0.8,
+          "visible_breakage": 0.56,
+          "same_kind_as_catalog": 0.88,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.83
+          },
+          "damage_kind": {
+            "choice": "crack_or_chip",
+            "confidence": 0.71
+          }
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4724,
+        "output_tokens": 170
+      },
+      "latencyMs": 177
+    },
+    {
+      "id": "intact-milkglass-mug",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent"
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent",
+        "damage_kind": "none_visible",
+        "signals": {
+          "evidence_usable": 0.89,
+          "visible_breakage": 0.08,
+          "same_kind_as_catalog": 0.97,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 1
+          },
+          "damage_kind": {
+            "choice": "none_visible",
+            "confidence": 0.81
+          }
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 5240,
+        "output_tokens": 168
+      },
+      "latencyMs": 167
+    },
+    {
+      "id": "intact-cartoon-mug",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent"
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "uncertain",
+        "product_consistency": "consistent",
+        "damage_kind": "none_visible",
+        "signals": {
+          "evidence_usable": 0.9,
+          "visible_breakage": 0.31,
+          "same_kind_as_catalog": 0.97,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 1
+          },
+          "damage_kind": {
+            "choice": "none_visible",
+            "confidence": 0.33
+          }
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 5091,
+        "output_tokens": 168
+      },
+      "latencyMs": 141
+    },
+    {
+      "id": "intact-cafe-mug",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent"
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent",
+        "damage_kind": "none_visible",
+        "signals": {
+          "evidence_usable": 0.82,
+          "visible_breakage": 0.05,
+          "same_kind_as_catalog": 0.97,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 1
+          },
+          "damage_kind": {
+            "choice": "none_visible",
+            "confidence": 0.85
+          }
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4720,
+        "output_tokens": 168
+      },
+      "latencyMs": 194
+    },
+    {
+      "id": "chipped-closeup",
+      "expected": {
+        "evidence_usable": "ambiguous",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "consistent"
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "damage_kind": "crack_or_chip",
+        "signals": {
+          "evidence_usable": 0.93,
+          "visible_breakage": 0.82,
+          "same_kind_as_catalog": 0.91,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.97
+          },
+          "damage_kind": {
+            "choice": "crack_or_chip",
+            "confidence": 0.92
+          }
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4646,
+        "output_tokens": 170
+      },
+      "latencyMs": 213
+    },
+    {
+      "id": "damage-not-shown",
+      "expected": {
+        "evidence_usable": "ambiguous",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "consistent"
+      },
+      "got": {
+        "evidence_usable": "uncertain",
+        "visible_breakage": "uncertain",
+        "product_consistency": "uncertain",
+        "damage_kind": "handle_off",
+        "signals": {
+          "evidence_usable": 0.29,
+          "visible_breakage": 0.37,
+          "same_kind_as_catalog": 0.55,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.51
+          },
+          "damage_kind": {
+            "choice": "handle_off",
+            "confidence": 0.24
+          }
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4204,
+        "output_tokens": 168
+      },
+      "latencyMs": 143
+    },
+    {
+      "id": "tea-top-down",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "consistent"
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "uncertain",
+        "product_consistency": "consistent",
+        "damage_kind": "none_visible",
+        "signals": {
+          "evidence_usable": 0.84,
+          "visible_breakage": 0.23,
+          "same_kind_as_catalog": 0.95,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.97
+          },
+          "damage_kind": {
+            "choice": "none_visible",
+            "confidence": 0.53
+          }
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 5387,
+        "output_tokens": 168
+      },
+      "latencyMs": 292
+    },
+    {
+      "id": "mug-too-far-away",
+      "expected": {
+        "evidence_usable": "no",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "ambiguous"
+      },
+      "got": {
+        "evidence_usable": "uncertain",
+        "visible_breakage": "uncertain",
+        "product_consistency": "consistent",
+        "damage_kind": "crack_or_chip",
+        "signals": {
+          "evidence_usable": 0.64,
+          "visible_breakage": 0.46,
+          "same_kind_as_catalog": 0.96,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.96
+          },
+          "damage_kind": {
+            "choice": "crack_or_chip",
+            "confidence": 0.35
+          }
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4721,
+        "output_tokens": 170
+      },
+      "latencyMs": 176
+    },
+    {
+      "id": "dark-panorama",
+      "expected": {
+        "evidence_usable": "no",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "ambiguous"
+      },
+      "got": {
+        "evidence_usable": "no",
+        "visible_breakage": "no",
+        "product_consistency": "inconsistent",
+        "damage_kind": "none_visible",
+        "signals": {
+          "evidence_usable": 0.04,
+          "visible_breakage": 0.06,
+          "same_kind_as_catalog": 0.1,
+          "item_kind": {
+            "choice": "other_object",
+            "confidence": 0.44
+          },
+          "damage_kind": {
+            "choice": "none_visible",
+            "confidence": 0.87
+          }
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 5385,
+        "output_tokens": 165
+      },
+      "latencyMs": 287
+    },
+    {
+      "id": "wrong-item-broken-plate",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "inconsistent"
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "inconsistent",
+        "damage_kind": "shattered",
+        "signals": {
+          "evidence_usable": 0.99,
+          "visible_breakage": 0.13,
+          "same_kind_as_catalog": 0.03,
+          "item_kind": {
+            "choice": "other_tableware",
+            "confidence": 1
+          },
+          "damage_kind": {
+            "choice": "shattered",
+            "confidence": 0.6
+          }
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4945,
+        "output_tokens": 168
+      },
+      "latencyMs": 178
+    },
+    {
+      "id": "wrong-item-pottery-shard",
+      "expected": {
+        "evidence_usable": "ambiguous",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "inconsistent"
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "uncertain",
+        "product_consistency": "uncertain",
+        "damage_kind": "crack_or_chip",
+        "signals": {
+          "evidence_usable": 0.85,
+          "visible_breakage": 0.79,
+          "same_kind_as_catalog": 0.73,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.71
+          },
+          "damage_kind": {
+            "choice": "crack_or_chip",
+            "confidence": 0.65
+          }
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 5013,
+        "output_tokens": 170
+      },
+      "latencyMs": 152
+    },
+    {
+      "id": "blurred-broken-mug",
+      "expected": {
+        "evidence_usable": "no",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "ambiguous"
+      },
+      "got": {
+        "evidence_usable": "no",
+        "visible_breakage": "uncertain",
+        "product_consistency": "uncertain",
+        "damage_kind": "handle_off",
+        "signals": {
+          "evidence_usable": 0.06,
+          "visible_breakage": 0.56,
+          "same_kind_as_catalog": 0.71,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.59
+          },
+          "damage_kind": {
+            "choice": "handle_off",
+            "confidence": 0.25
+          }
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4716,
+        "output_tokens": 168
+      },
+      "latencyMs": 259
+    },
+    {
+      "id": "blurred-intact-mug",
+      "expected": {
+        "evidence_usable": "no",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "ambiguous"
+      },
+      "got": {
+        "evidence_usable": "no",
+        "visible_breakage": "no",
+        "product_consistency": "consistent",
+        "damage_kind": "none_visible",
+        "signals": {
+          "evidence_usable": 0.09,
+          "visible_breakage": 0.07,
+          "same_kind_as_catalog": 0.96,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.99
+          },
+          "damage_kind": {
+            "choice": "none_visible",
+            "confidence": 0.77
+          }
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 5091,
+        "output_tokens": 168
+      },
+      "latencyMs": 149
+    }
+  ]
+}

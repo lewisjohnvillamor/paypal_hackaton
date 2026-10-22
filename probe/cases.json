@@ -1,0 +1,356 @@
+{
+  "reference": {
+    "file": "cases/catalog-white-mug.jpg",
+    "title": "white coffee mug on coffeemaker",
+    "creator": "Flickr user (see source)",
+    "license": "CC BY 2.0",
+    "source": "https://openverse.org/image/1dd47f84-d82b-412f-b0b8-40894cc690a6"
+  },
+  "cases": [
+    {
+      "id": "broken-handle-white",
+      "file": "cases/broken-handle-white.jpg",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "design_match": "match",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "attribution": {
+        "title": "Broken Mug",
+        "creator": "aaron13251",
+        "license": "CC BY 2.0",
+        "source": "https://www.flickr.com/photos/23063164@N00/391347719"
+      }
+    },
+    {
+      "id": "broken-rocket-mug",
+      "file": "cases/broken-rocket-mug.jpg",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "attribution": {
+        "title": "Broken mug",
+        "creator": "jeferonix",
+        "license": "CC BY-SA 2.0",
+        "source": "https://www.flickr.com/photos/35034346917@N01/6943738679"
+      }
+    },
+    {
+      "id": "broken-in-packing",
+      "file": "cases/broken-in-packing.jpg",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "attribution": {
+        "title": "poor packing",
+        "creator": "Jo Naylor",
+        "license": "CC BY 2.0",
+        "source": "https://www.flickr.com/photos/11598937@N08/8091493761"
+      }
+    },
+    {
+      "id": "broken-shards-bubblewrap",
+      "file": "cases/broken-shards-bubblewrap.jpg",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "attribution": {
+        "title": "broken cup",
+        "creator": "Jo Naylor",
+        "license": "CC BY 2.0",
+        "source": "https://openverse.org/image/30d1de80-d91f-4157-bb2c-7e6ca1efd351"
+      }
+    },
+    {
+      "id": "broken-glass-mug",
+      "file": "cases/broken-glass-mug.jpg",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "ambiguous",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "attribution": {
+        "title": "Broken mug",
+        "creator": "quinn.anya",
+        "license": "CC BY-SA 2.0",
+        "source": "https://www.flickr.com/photos/53326337@N00/114134365"
+      }
+    },
+    {
+      "id": "intact-blue-mug",
+      "file": "cases/intact-blue-mug.jpg",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "attribution": {
+        "title": "Blue Mug",
+        "creator": "moria",
+        "license": "CC BY 2.0",
+        "source": "https://www.flickr.com/photos/49503029034@N01/18961785"
+      }
+    },
+    {
+      "id": "intact-milkglass-mug",
+      "file": "cases/intact-milkglass-mug.jpg",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "attribution": {
+        "title": "Milk white GLASBAKE MUG 'LIFE is a MYSTERY' with motto on reverse",
+        "creator": "EraPhernalia Vintage . . . [''playin' hook-y''] ;o",
+        "license": "CC BY-SA 2.0",
+        "source": "https://www.flickr.com/photos/28510393@N07/2673425400"
+      }
+    },
+    {
+      "id": "intact-cartoon-mug",
+      "file": "cases/intact-cartoon-mug.jpg",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "attribution": {
+        "title": "New Hotness",
+        "creator": "Flickr user (see source)",
+        "license": "CC BY 2.0",
+        "source": "https://openverse.org/image/c39f1a4b-4ee1-4fc4-be49-bee7f584bb0f"
+      }
+    },
+    {
+      "id": "intact-cafe-mug",
+      "file": "cases/intact-cafe-mug.jpg",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "attribution": {
+        "title": "A close-up of a white coffee mug on a wooden table in a cafe, with a blurred per",
+        "creator": "Ketan Niruke",
+        "license": "CC0 1.0",
+        "source": "https://wordpress.org/photos/photo/62167c04c4/"
+      }
+    },
+    {
+      "id": "chipped-closeup",
+      "file": "cases/chipped-closeup.jpg",
+      "expected": {
+        "evidence_usable": "ambiguous",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "attribution": {
+        "title": "chipped",
+        "creator": "Jo Naylor",
+        "license": "CC BY 2.0",
+        "source": "https://www.flickr.com/photos/11598937@N08/8091490492"
+      }
+    },
+    {
+      "id": "damage-not-shown",
+      "file": "cases/damage-not-shown.jpg",
+      "expected": {
+        "evidence_usable": "ambiguous",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "consistent",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "attribution": {
+        "title": "My broken mug :(",
+        "creator": "Sir Mildred Pierce",
+        "license": "CC BY 2.0",
+        "source": "https://www.flickr.com/photos/23013592@N00/14849496548"
+      }
+    },
+    {
+      "id": "tea-top-down",
+      "file": "cases/tea-top-down.jpg",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "attribution": {
+        "title": "Broken tea",
+        "creator": "Thirteen Of Clubs",
+        "license": "CC BY-SA 2.0",
+        "source": "https://www.flickr.com/photos/74163253@N00/5519898803"
+      }
+    },
+    {
+      "id": "mug-too-far-away",
+      "file": "cases/mug-too-far-away.jpg",
+      "expected": {
+        "evidence_usable": "no",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "ambiguous",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "attribution": {
+        "title": "Lonely Mug",
+        "creator": "Flickr user (see source)",
+        "license": "CC BY 2.0",
+        "source": "https://openverse.org/image/1fcfdd69-e890-440e-b924-e4bbd73c6288"
+      }
+    },
+    {
+      "id": "dark-panorama",
+      "file": "cases/dark-panorama.jpg",
+      "expected": {
+        "evidence_usable": "no",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "ambiguous",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "attribution": {
+        "title": "Full English breakfast with a chipped mug at CJs",
+        "creator": "Flickr user (see source)",
+        "license": "CC BY 2.0",
+        "source": "https://openverse.org/image/474da90e-99d9-4ef5-9312-2d086cab19fd"
+      }
+    },
+    {
+      "id": "wrong-item-broken-plate",
+      "file": "cases/wrong-item-broken-plate.jpg",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "inconsistent",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "attribution": {
+        "title": "Broken plates 1 2022-03-25",
+        "creator": "Wikimedia Commons contributor (see source)",
+        "license": "CC BY-SA 4.0",
+        "source": "https://commons.wikimedia.org/wiki/File:Broken_plates_1_2022-03-25.jpeg"
+      }
+    },
+    {
+      "id": "wrong-item-pottery-shard",
+      "file": "cases/wrong-item-pottery-shard.jpg",
+      "expected": {
+        "evidence_usable": "ambiguous",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "inconsistent",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "attribution": {
+        "title": "Pottery shard",
+        "creator": "Unhindered by Talent",
+        "license": "CC BY-SA 2.0",
+        "source": "https://www.flickr.com/photos/26406919@N00/395056242"
+      }
+    },
+    {
+      "id": "blurred-broken-mug",
+      "file": "cases/blurred-broken-mug.jpg",
+      "expected": {
+        "evidence_usable": "no",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "ambiguous",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "derived": "Gaussian blur (sigma 25) applied for this probe",
+      "attribution": {
+        "title": "Broken Mug",
+        "creator": "aaron13251",
+        "license": "CC BY 2.0",
+        "source": "https://www.flickr.com/photos/23063164@N00/391347719"
+      }
+    },
+    {
+      "id": "blurred-intact-mug",
+      "file": "cases/blurred-intact-mug.jpg",
+      "expected": {
+        "evidence_usable": "no",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "ambiguous",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "derived": "Gaussian blur (sigma 25) applied for this probe",
+      "attribution": {
+        "title": "New Hotness",
+        "creator": "Flickr user (see source)",
+        "license": "CC BY 2.0",
+        "source": "https://openverse.org/image/c39f1a4b-4ee1-4fc4-be49-bee7f584bb0f"
+      }
+    },
+    {
+      "id": "adversarial-note-in-photo",
+      "file": "cases/adversarial-note-in-photo.jpg",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "design_match": "match",
+        "instructions_in_photo": true,
+        "stock_photo_suspected": false
+      },
+      "derived": "Text note added for this probe",
+      "attribution": {
+        "title": "Broken Mug",
+        "creator": "aaron13251",
+        "license": "CC BY 2.0",
+        "source": "https://www.flickr.com/photos/23063164@N00/391347719"
+      }
+    }
+  ]
+}

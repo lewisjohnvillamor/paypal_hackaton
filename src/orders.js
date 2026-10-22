@@ -1,0 +1,75 @@
+// Demo purchase: server-priced PayPal order, server-side capture, verified and persisted.
+import { randomUUID } from "node:crypto";
+import { audit, now, tx } from "./db.js";
+import { DEMO_CART, PRODUCTS } from "./catalog.js";
+import { toCents, toDecimal } from "./money.js";
+import { hashToken, newToken } from "./auth.js";
+
+const CLAIM_LINK_DAYS = 14;
+
+export class OrderError extends Error {
+  constructor(code, message, status = 502, debugId = null) {
+    super(message);
+    this.code = code;
+    this.status = status;
+    this.debugId = debugId;
+  }
+}
+
+export async function startOrder(db, paypal) {
+  const lines = DEMO_CART.map(({ sku, quantity }) => ({ ...PRODUCTS[sku], quantity }));
+  const totalCents = lines.reduce((s, l) => s + l.unitCents * l.quantity, 0);
+  const id = randomUUID();
+  const res = await paypal.createOrder({
+    customId: id,
+    totalValue: toDecimal(totalCents),
+    lines: lines.map((l) => ({ sku: l.sku, title: l.title, quantity: l.quantity, unitValue: toDecimal(l.unitCents) })),
+  });
+  if (res.status !== 201) throw new OrderError("PAYPAL_ORDER_FAILED", "PayPal did not create the order.", 502, res.debugId);
+
+  tx(db, () => {
+    db.prepare(`INSERT INTO orders (id, paypal_order_id, amount_cents, currency, capture_status, created_at)
+      VALUES (?, ?, ?, 'USD', 'CREATED', ?)`).run(id, res.body.id, totalCents, now());
+    for (const l of lines) {
+      db.prepare("INSERT INTO order_lines (id, order_id, sku, title, quantity, unit_cents, ref_image) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .run(randomUUID(), id, l.sku, l.title, l.quantity, l.unitCents, l.refImage);
+    }
+  });
+  return { id, paypalOrderId: res.body.id, approveUrl: res.body.links?.find((l) => l.rel === "approve")?.href };
+}
+
+export async function captureOrder(db, paypal, paypalOrderId) {
+  const order = db.prepare("SELECT * FROM orders WHERE paypal_order_id = ?").get(paypalOrderId);
+  if (!order) throw new OrderError("NOT_FOUND", "Unknown order.", 404);
+  if (order.capture_status === "COMPLETED") return { order, claimToken: null, alreadyCaptured: true };
+
+  // Request ID tied to the order so a retried capture cannot capture twice.
+  const res = await paypal.captureOrder(paypalOrderId, `capture-${order.id}`);
+  const cap = res.body?.purchase_units?.[0]?.payments?.captures?.[0];
+  if (res.status >= 300 || !cap) throw new OrderError("PAYPAL_CAPTURE_FAILED", "PayPal did not capture the payment.", 502, res.debugId);
+
+  // Verify what PayPal says actually happened before we trust it.
+  const problems = [];
+  if (cap.status !== "COMPLETED") problems.push(`capture status ${cap.status}`);
+  if (cap.amount?.currency_code !== "USD") problems.push(`currency ${cap.amount?.currency_code}`);
+  if (toCents(cap.amount?.value ?? "0") !== order.amount_cents) problems.push(`amount ${cap.amount?.value}`);
+  const payee = res.body.purchase_units[0].payee?.merchant_id ?? null;
+  const expectedPayee = process.env.PAYPAL_MERCHANT_ID;
+  if (expectedPayee && payee !== expectedPayee) problems.push("payee does not match configured merchant");
+
+  const token = newToken();
+  const ts = now();
+  tx(db, () => {
+    db.prepare(`UPDATE orders SET capture_id = ?, capture_status = ?, payee_merchant_id = ?, buyer_email = ?,
+      delivered_at = ?, delivery_source = 'synthetic demo fixture (delivered at capture time)' WHERE id = ?`)
+      .run(cap.id, problems.length ? `MISMATCH: ${problems.join("; ")}` : "COMPLETED", payee,
+        res.body.payer?.email_address ?? null, ts, order.id);
+    if (!problems.length) {
+      db.prepare("INSERT OR REPLACE INTO claim_links (order_id, token_hash, expires_at) VALUES (?, ?, ?)")
+        .run(order.id, hashToken(token), new Date(Date.now() + CLAIM_LINK_DAYS * 86400e3).toISOString());
+    }
+    audit(db, { actor: "buyer", type: "order.captured", payload: { orderId: order.id, captureId: cap.id, problems } });
+  });
+  if (problems.length) throw new OrderError("CAPTURE_NOT_VERIFIED", `Capture failed verification: ${problems.join("; ")}`, 502);
+  return { order: db.prepare("SELECT * FROM orders WHERE id = ?").get(order.id), claimToken: token, alreadyCaptured: false };
+}
