@@ -5,7 +5,7 @@ import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:8888";
-const photo = process.argv[2] || "probe/cases/broken-rocket-mug.jpg";
+const photo = process.argv[2] || "probe/cases/broken-handle-white.jpg";
 const shots = process.env.SHOTS_DIR || "hackathon/screenshots";
 mkdirSync(shots, { recursive: true });
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);

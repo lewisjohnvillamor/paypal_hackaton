@@ -100,7 +100,7 @@
           <div class="total">${proposal.route === "request_info" ? "—" : usd(proposal.amountCents)}${proposal.route === "request_info" ? "" : " <small>USD</small>"}</div>
           <div class="small muted">${proposal.route === "request_info" ? "No amount until clearer photos arrive." : `${c.quantity} × ${usd(c.unitCents)} unit price paid`}</div>
         </div>
-        ${proposal.reasons.length ? `<ul class="reasons">${proposal.reasons.map((r) => `<li>${esc(REASON[r] || r)}</li>`).join("")}</ul>` : ""}
+        ${proposal.reasons.length ? `<ul class="reasons">${proposal.reasons.map((r) => `<li>${esc(proposal.reasonText?.[r] || REASON[r] || r)}</li>`).join("")}</ul>` : ""}
         <label for="amount">Refund amount <span class="hint">Up to ${usd(payment.refundableCents)} left on this payment · ${esc(proposal.policyVersion)}</span></label>
         <input id="amount" type="number" inputmode="decimal" min="0.01" step="0.01" max="${(payment.refundableCents / 100).toFixed(2)}" value="${(suggested / 100).toFixed(2)}">
         <div id="reason-wrap" class="${proposal.route === "propose" ? "hidden" : ""}">

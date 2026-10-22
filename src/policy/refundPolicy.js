@@ -1,6 +1,6 @@
-// Refund policy v1: a pure function from recorded facts to a draft proposal. No I/O, no model calls.
+// Refund policy v2: a pure function from recorded facts to a draft proposal. No I/O, no model calls.
 // The merchant always decides; this only drafts and explains.
-export const POLICY_VERSION = "policy-v1";
+export const POLICY_VERSION = "policy-v2";
 export const CLAIM_WINDOW_DAYS = 14;
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -8,8 +8,10 @@ const DAY = 24 * 60 * 60 * 1000;
 // route: "propose"      clear evidence, draft the unit refund for one-click approval
 //        "manual_review" a person must look; the unit amount is shown as a starting point only
 //        "request_info"  photos are not usable; ask the buyer for better ones
-export function draftProposal({ line, quantity, findings, deliveredAt, claimedAt, refundableCents }) {
-  const reasons = [];
+// flags: record-based risk signals (photo reuse, repeat claimant, ...). Any flag or doubtful
+// finding means manual review; nothing here ever produces a denial.
+export function draftProposal({ line, quantity, findings, deliveredAt, claimedAt, refundableCents, flags = [] }) {
+  const reasons = [...flags];
   const unitCents = line.unit_cents;
   const claimed = Math.min(quantity, line.quantity);
   const grossCents = unitCents * claimed;
@@ -34,6 +36,9 @@ export function draftProposal({ line, quantity, findings, deliveredAt, claimedAt
     if (findings.visible_breakage === "uncertain") reasons.push("BREAKAGE_UNCERTAIN");
     if (findings.product_consistency === "inconsistent") reasons.push("ITEM_MAY_NOT_MATCH_ORDER");
     if (findings.product_consistency === "uncertain") reasons.push("ITEM_MATCH_UNCERTAIN");
+    if (findings.design_match === "mismatch") reasons.push("DESIGN_MISMATCH");
+    if (findings.stock_photo_suspected) reasons.push("STOCK_PHOTO_SUSPECTED");
+    if (findings.instructions_in_photo) reasons.push("INSTRUCTIONS_IN_PHOTO");
     const clear = findings.evidence_usable === "yes" && findings.visible_breakage === "yes" &&
       findings.product_consistency === "consistent";
     route = clear && reasons.length === 0 ? "propose" : "manual_review";

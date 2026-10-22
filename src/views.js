@@ -1,5 +1,6 @@
 // Read models for the UI. Buyer views expose only that buyer's safe status.
 import { refundableBalance } from "./policy/refundPolicy.js";
+import { REASON_TEXT } from "./reasons.js";
 
 const json = (s) => (s ? JSON.parse(s) : null);
 
@@ -47,6 +48,7 @@ export function caseDetail(db, claimId) {
     proposal: proposal && {
       id: proposal.id, route: proposal.route, amountCents: proposal.amount_cents, currency: proposal.currency,
       policyVersion: proposal.policy_version, current: proposal.claim_version === claim.version, ...json(proposal.calc_json),
+      reasonText: Object.fromEntries((json(proposal.calc_json).reasons ?? []).map((r) => [r, REASON_TEXT[r] ?? r])),
     },
     approvals,
     refunds: ops.filter((o) => o.claim_id === claimId).map((o) => ({

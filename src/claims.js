@@ -6,11 +6,12 @@ import { audit, now, tx } from "./db.js";
 import { hashToken, newToken } from "./auth.js";
 import { draftProposal, refundableBalance } from "./policy/refundPolicy.js";
 import { TEMPLATE_VERSION } from "./ai/jev.js";
-import { MAX_PHOTOS } from "./images.js";
+import { MAX_PHOTOS, SIMILAR_PHOTO_BITS, differenceHash, hashDistance } from "./images.js";
 import { PRODUCTS } from "./catalog.js";
 
 export const uploadDir = () => process.env.UPLOAD_DIR || "data/uploads";
 const STATUS_TOKEN_DAYS = 30;
+const REPEAT_WINDOW_DAYS = 90;
 
 export class ClaimError extends Error {
   constructor(code, message, status = 400) {
@@ -29,6 +30,12 @@ export function createClaim(db, { orderId, lineId, quantity, statement }) {
   if (!line) throw new ClaimError("INVALID", "Pick an item from this order.");
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > line.quantity) {
     throw new ClaimError("INVALID", `Quantity must be between 1 and ${line.quantity}.`);
+  }
+  // Units already refunded on earlier requests cannot be claimed again.
+  const resolved = db.prepare("SELECT COALESCE(SUM(quantity), 0) n FROM claims WHERE line_id = ? AND status = 'refunded'").get(lineId).n;
+  if (quantity > line.quantity - resolved) {
+    throw new ClaimError("UNITS_ALREADY_RESOLVED",
+      `${resolved} of ${line.quantity} were already refunded; you can report at most ${line.quantity - resolved} more.`, 409);
   }
   const token = newToken();
   const ts = now();
@@ -58,8 +65,8 @@ export function addEvidence(db, claimId, images, actor = "buyer") {
     for (const img of images) {
       const id = randomUUID();
       writeFileSync(join(dir, `${id}.jpg`), img.data, { mode: 0o600 });
-      db.prepare("INSERT INTO evidence (id, claim_id, storage_key, sha256, width, height, bytes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(id, claimId, `${claimId}/${id}.jpg`, img.sha256, img.width, img.height, img.data.length, ts);
+      db.prepare("INSERT INTO evidence (id, claim_id, storage_key, sha256, phash, width, height, bytes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(id, claimId, `${claimId}/${id}.jpg`, img.sha256, img.phash ?? null, img.width, img.height, img.data.length, ts);
     }
     // New evidence invalidates any earlier review: bump the version.
     db.prepare("UPDATE claims SET version = version + 1, status = CASE WHEN status = 'needs_info' THEN 'new' ELSE status END, updated_at = ? WHERE id = ?")
@@ -69,6 +76,31 @@ export function addEvidence(db, claimId, images, actor = "buyer") {
 }
 
 export const readEvidence = (key) => readFileSync(join(uploadDir(), key));
+
+// Signals from the shop's own records. Like the model's findings, each one sends the case to a
+// person; none of them can deny or pay a claim.
+export function riskFlags(db, claim, evidence, catalogHash) {
+  const flags = [];
+  const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(claim.order_id);
+  const others = db.prepare("SELECT phash FROM evidence WHERE claim_id != ? AND phash IS NOT NULL").all(claim.id);
+  const near = (a, b) => a && b && hashDistance(a, b) <= SIMILAR_PHOTO_BITS;
+  if (evidence.some((e) => others.some((o) => near(e.phash, o.phash)))) flags.push("PHOTO_REUSED_FROM_OTHER_CLAIM");
+  if (evidence.some((e) => near(e.phash, catalogHash))) flags.push("PHOTO_MATCHES_CATALOG");
+  if (db.prepare("SELECT 1 FROM claims WHERE order_id = ? AND id != ? AND created_at <= ?").get(claim.order_id, claim.id, claim.created_at)) {
+    flags.push("PRIOR_CLAIM_ON_ORDER");
+  }
+  // Prior requests on other orders that mark a buyer as a repeat claimant. A shared demo buyer
+  // account trips this on every run, so a hosted demo can set REPEAT_CLAIM_LIMIT=0 to turn it off.
+  const repeatLimit = Number(process.env.REPEAT_CLAIM_LIMIT ?? 1);
+  if (order.buyer_email && repeatLimit > 0) {
+    const since = new Date(Date.now() - REPEAT_WINDOW_DAYS * 86400e3).toISOString();
+    const n = db.prepare(`SELECT COUNT(*) n FROM claims c JOIN orders o ON o.id = c.order_id
+      WHERE o.buyer_email = ? AND c.order_id != ? AND c.created_at >= ?`).get(order.buyer_email, order.id, since).n;
+    if (n >= repeatLimit) flags.push("REPEAT_CLAIMANT");
+  }
+  if (claim.quantity > 1) flags.push("MULTI_UNIT_CLAIM"); // the merchant confirms how many broke
+  return flags;
+}
 
 // Run Jev on the current evidence and draft a proposal for the current claim version.
 // If Jev fails we record the error and still draft a manual-review proposal; we never invent findings.
@@ -81,6 +113,8 @@ export async function assessClaim(db, claimId, assess, actor = "system") {
   const line = db.prepare("SELECT * FROM order_lines WHERE id = ?").get(claim.line_id);
   const evidence = db.prepare("SELECT * FROM evidence WHERE claim_id = ? ORDER BY created_at").all(claimId);
   const reference = readFileSync(new URL(`../public/assets/${PRODUCTS[line.sku].refImage}`, import.meta.url));
+
+  const flags = riskFlags(db, claim, evidence, await differenceHash(reference));
 
   let result = null, error = null;
   if (evidence.length === 0) error = "No photos uploaded";
@@ -108,7 +142,7 @@ export async function assessClaim(db, claimId, assess, actor = "system") {
     const draft = draftProposal({
       line, quantity: claim.quantity, findings: result?.findings ?? null,
       deliveredAt: order.delivered_at, claimedAt: claim.created_at,
-      refundableCents: refundableBalance(order.amount_cents, ops),
+      refundableCents: refundableBalance(order.amount_cents, ops), flags,
     });
     db.prepare(`INSERT INTO proposals (id, claim_id, claim_version, assessment_id, policy_version, route, amount_cents,
       currency, calc_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)

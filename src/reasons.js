@@ -1,0 +1,21 @@
+// Plain-language explanations for proposal reason codes, shown to the merchant on the case page.
+export const REASON_TEXT = {
+  EVIDENCE_NOT_USABLE: "Photos are not usable. Ask the buyer for clearer ones.",
+  EVIDENCE_QUALITY_UNCERTAIN: "Photo quality is borderline.",
+  NO_BREAKAGE_SEEN: "The model saw no breakage. That is not a denial; look at the photos yourself.",
+  BREAKAGE_UNCERTAIN: "The model is unsure whether damage is visible.",
+  ITEM_MAY_NOT_MATCH_ORDER: "The item may not be the kind of product ordered.",
+  ITEM_MATCH_UNCERTAIN: "The model is unsure the item is the kind of product ordered.",
+  DESIGN_MISMATCH: "This looks like a different mug from the one you sold (colour, print or shape differ from your catalog photo).",
+  STOCK_PHOTO_SUSPECTED: "The photo looks like a professional or stock image, not the buyer's own snapshot.",
+  INSTRUCTIONS_IN_PHOTO: "The photo contains written text aimed at the reviewer. It was ignored; check it yourself.",
+  PHOTO_REUSED_FROM_OTHER_CLAIM: "A photo closely matches one sent with a different refund request.",
+  PHOTO_MATCHES_CATALOG: "A photo closely matches your own catalog photo.",
+  PRIOR_CLAIM_ON_ORDER: "This order already had an earlier refund request.",
+  REPEAT_CLAIMANT: "This buyer filed requests on other orders in the last 90 days.",
+  MULTI_UNIT_CLAIM: "More than one unit is claimed. Confirm how many are actually broken.",
+  OUTSIDE_CLAIM_WINDOW: "Reported more than 14 days after delivery.",
+  CAPPED_AT_REFUNDABLE_BALANCE: "Amount capped at the remaining refundable balance.",
+  QUANTITY_EXCEEDS_PURCHASED: "Claimed quantity exceeds the quantity purchased.",
+  AI_UNAVAILABLE: "AI assessment unavailable. Review the photos yourself.",
+};

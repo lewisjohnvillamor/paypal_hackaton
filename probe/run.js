@@ -23,7 +23,8 @@ for (const c of cases.filter((c) => !filter || c.id.includes(filter))) {
   console.log(last.error ? `${c.id}: ERROR ${last.error}` :
     `${c.id.padEnd(22)} usable=${last.got.evidence_usable.padEnd(9)} breakage=${last.got.visible_breakage.padEnd(9)} ` +
     `(exp ${c.expected.visible_breakage.padEnd(9)}) kind=${last.got.product_consistency.padEnd(12)} ` +
-    `(exp ${c.expected.product_consistency}) ${last.latencyMs}ms`);
+    `(exp ${c.expected.product_consistency}) design=${last.got.design_match}(exp ${c.expected.design_match ?? "-"}) ` +
+    `stock=${last.got.stock_photo_suspected} note=${last.got.instructions_in_photo} ${last.latencyMs}ms`);
 }
 
 // A definite wrong answer is the costly error. "uncertain" routes to a person, so it is tracked
@@ -32,7 +33,7 @@ function score(field) {
   let right = 0, wrong = 0, abstain = 0, n = 0;
   for (const r of rows.filter((r) => !r.error)) {
     const exp = r.expected[field], got = r.got[field];
-    if (exp === "ambiguous") continue;
+    if (exp === undefined || exp === "ambiguous") continue;
     n++;
     if (got === "uncertain") abstain++;
     else if (got === exp) right++;
@@ -55,6 +56,9 @@ const summary = {
   visible_breakage: score("visible_breakage"),
   product_consistency: score("product_consistency"),
   evidence_usable: score("evidence_usable"),
+  design_match: score("design_match"),
+  stock_photo_suspected: score("stock_photo_suspected"),
+  instructions_in_photo: score("instructions_in_photo"),
 };
 console.log(JSON.stringify(summary, null, 2));
 const stamp = summary.ranAt.replace(/[:.]/g, "-");

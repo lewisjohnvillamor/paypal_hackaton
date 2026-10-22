@@ -141,10 +141,16 @@ CREATE TABLE IF NOT EXISTS audit (
 );
 `;
 
+// Columns added after the first release; ALTER is skipped when the column already exists.
+const MIGRATIONS = ["ALTER TABLE evidence ADD COLUMN phash TEXT"];
+
 export function openDb(path = process.env.DATABASE_PATH || "data/refund-relay.db") {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
   db.exec(SCHEMA);
+  for (const sql of MIGRATIONS) {
+    try { db.exec(sql); } catch (err) { if (!/duplicate column/.test(err.message)) throw err; }
+  }
   return db;
 }
 
