@@ -3,21 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Refund request</title>
+  <meta name="theme-color" content="#f5f5f7">
+  <title>Refund request · Refund Relay</title>
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
   <header class="top">
-    <a class="brand" href="/merchant">Refund <span>Relay</span> · Merchant</a>
-    <nav><a href="/merchant">All requests</a></nav>
+    <a class="brand" href="/merchant"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span>Refund Relay <span class="ctx">Merchant</span></a>
+    <nav><a href="/merchant">‹ All requests</a></nav>
   </header>
   <main>
-    <div id="error" class="notice bad hidden"></div>
+    <div id="error" class="notice bad hidden" role="alert"></div>
     <div id="page"></div>
   </main>
-  <dialog id="zoom"><img alt="Evidence photo, enlarged"></dialog>
+  <dialog id="zoom" aria-label="Photo"><img alt="Evidence photo, enlarged"></dialog>
   <script type="module">
-    import { api, usd, esc, pill, when } from "/app.js";
+    import { api, usd, esc, pill, when, ICON, checkBadge, busy, settle } from "/app.js";
     const id = new URLSearchParams(location.search).get("id");
     const $ = (x) => document.getElementById(x);
     const fail = (msg) => { $("error").textContent = msg; $("error").classList.toggle("hidden", !msg); };
@@ -28,11 +32,12 @@
       visible_breakage: ["Visible breakage", { yes: "Yes", no: "None seen", uncertain: "Unsure" }],
       product_consistency: ["Looks like the ordered item", { consistent: "Yes", inconsistent: "No", uncertain: "Unsure" }],
     };
+    const SIGNAL = { evidence_usable: "evidence_usable", visible_breakage: "visible_breakage", product_consistency: "same_kind_as_catalog" };
     const TONE = { yes: "ok", consistent: "ok", no: "bad", inconsistent: "bad", uncertain: "warn" };
     const REASON = {
-      EVIDENCE_NOT_USABLE: "Photos are not usable; ask the buyer for clearer ones.",
+      EVIDENCE_NOT_USABLE: "Photos aren't usable. Ask the buyer for clearer ones.",
       EVIDENCE_QUALITY_UNCERTAIN: "Photo quality is borderline.",
-      NO_BREAKAGE_SEEN: "The model saw no breakage. That is not a denial; look at the photos yourself.",
+      NO_BREAKAGE_SEEN: "The model saw no breakage. That isn't a denial; look at the photos yourself.",
       BREAKAGE_UNCERTAIN: "The model is unsure whether damage is visible.",
       ITEM_MAY_NOT_MATCH_ORDER: "The item may not be the product ordered.",
       ITEM_MATCH_UNCERTAIN: "The model is unsure the item matches the product ordered.",
@@ -42,120 +47,157 @@
       AI_UNAVAILABLE: "AI assessment unavailable. Review the photos yourself.",
     };
     const ROUTE = {
-      propose: ["Policy proposes a refund", "ok"],
+      propose: ["Policy suggests a refund", "ok"],
       manual_review: ["Needs your judgment", "warn"],
-      request_info: ["Ask the buyer for more photos", "warn"],
+      request_info: ["Ask for more photos", "warn"],
     };
-    const REFUND = { COMPLETED: "ok", PENDING: "warn", SUBMITTING: "warn", UNKNOWN: "warn", FAILED: "bad" };
+    const REFUND = { COMPLETED: ["completed", "ok"], PENDING: ["pending", "warn"], SUBMITTING: ["sending", "warn"], UNKNOWN: ["status unknown", "warn"], FAILED: ["failed", "bad"] };
+    const EVENT = {
+      "claim.submitted": "Buyer reported damage",
+      "evidence.added": "Photos added",
+      "evidence.deleted_retention": "Photos deleted (retention)",
+      "assessment.completed": "Jev reviewed the photos",
+      "assessment.failed": "AI review failed",
+      "claim.info_requested": "You asked for more photos",
+      "claim.closed": "Closed without a refund",
+      "refund.approved": "You approved the refund",
+      "refund.completed": "PayPal completed the refund",
+      "refund.pending": "PayPal refund pending",
+      "refund.failed": "PayPal refund failed",
+      "refund.unknown": "PayPal refund status unknown",
+      "refund.network_error": "Network error reaching PayPal",
+    };
 
     function findingsHtml(a) {
-      if (!a) return `<p class="muted">Not assessed yet.</p>`;
-      if (a.error) return `<div class="notice warn">AI assessment failed: ${esc(a.error)}. Review the photos yourself; nothing was substituted.</div>`;
+      if (!a) return `<p class="muted">Not reviewed yet.</p>`;
+      if (a.error) return `<div class="notice warn">${ICON.info}<span>The AI review failed (${esc(a.error)}). Look at the photos yourself; nothing was filled in for you.</span></div>`;
       const f = a.findings;
-      return Object.entries(FINDING).map(([k, [label, values]]) =>
-        `<div class="finding"><span>${label}</span><span><span class="pill ${TONE[f[k]] || ""}">${values[f[k]] || f[k]}</span>
-          <span class="small muted" title="Model probability">${k === "product_consistency" ? "" : `p=${f.signals[k].toFixed(2)}`}</span></span></div>`).join("") +
+      return Object.entries(FINDING).map(([k, [label, values]]) => {
+        const p = f.signals?.[SIGNAL[k]];
+        const tone = TONE[f[k]] || "";
+        return `<div class="finding"><span>${label}</span><span class="val">
+          ${typeof p === "number" ? `<span class="meter" role="img" style="color:var(--${tone === "ok" ? "green-fill" : tone === "bad" ? "red" : "orange"})" title="Model confidence ${p.toFixed(2)}" aria-label="Confidence ${Math.round(p * 100)} percent"><i style="width:${Math.round(p * 100)}%"></i></span>` : ""}
+          <span class="pill ${tone}">${values[f[k]] || esc(f[k])}</span></span></div>`;
+      }).join("") +
         `<div class="finding"><span>Damage type</span><span class="muted">${esc(f.damage_kind.replace("_", " "))}</span></div>
-         <p class="small muted" style="margin:8px 0 0">${esc(a.model)} · ${esc(a.templateVersion)} · ${a.latencyMs} ms · ${a.photosTotal > a.photosSent ? `looked at the ${a.photosSent} clearest of ${a.photosTotal} photos · ` : ""}photos only, the buyer's text is not sent to the model.</p>`;
+         <p class="footnote" style="margin:12px 0 0">${esc(a.model)} · ${esc(a.templateVersion)} · ${a.latencyMs} ms · ${a.photosTotal > a.photosSent ? `Looked at the ${a.photosSent} clearest of ${a.photosTotal} photos. ` : ""}Photos only. The buyer's words are never sent to the model.</p>`;
     }
 
     function actionsHtml() {
       const { claim, proposal, payment } = d;
       if (["refunded", "closed", "refund_processing"].includes(claim.status)) return "";
+      const head = `<div class="voice merchant" style="margin-bottom:16px"><span class="avatar">${ICON.check}</span><div><div class="tag">Your decision</div><div class="small muted">Nothing moves until you approve.</div></div></div>`;
       if (claim.status === "new" && (!proposal || !proposal.current) && polls < 40) {
         // Assessment runs in the background queue; check back until it lands (about a minute at most).
         polls++;
         setTimeout(refresh, 1500);
-        return `<div class="card"><h2>Decision</h2><p class="muted">Checking the photos with Jev…</p></div>`;
+        return `<div class="card">${head}<p class="muted">Checking the photos with Jev…</p></div>`;
       }
       if (!proposal || !proposal.current) {
-        return `<div class="card"><h2>Decision</h2><p class="muted">Evidence changed since the last assessment.</p><button id="assess" class="primary">Assess current photos</button></div>`;
+        return `<div class="card">${head}<p class="muted">The photos changed since the last review.</p><button id="assess" class="primary lg">Review current photos</button></div>`;
       }
       const [routeLabel, tone] = ROUTE[proposal.route];
       const c = proposal.calculation;
       const suggested = proposal.amountCents || c.grossCents;
       return `<div class="card">
-        <div class="row spread"><h2 style="margin:0">Decision</h2><span class="pill ${tone}">${routeLabel}</span></div>
-        <div class="calc" style="margin-top:12px">
-          ${c.quantity} × ${usd(c.unitCents)} unit price paid = <b>${usd(c.grossCents)}</b><br>
-          <span class="small muted">Refundable balance on this payment: ${usd(payment.refundableCents)} · ${esc(proposal.policyVersion)}</span>
-          <div class="total">${proposal.route === "request_info" ? "No amount until better photos arrive" : usd(proposal.amountCents) + " USD"}</div>
+        ${head}
+        <div class="calc">
+          <span class="pill ${tone}">${routeLabel}</span>
+          <div class="total">${proposal.route === "request_info" ? "—" : usd(proposal.amountCents)}${proposal.route === "request_info" ? "" : " <small>USD</small>"}</div>
+          <div class="small muted">${proposal.route === "request_info" ? "No amount until clearer photos arrive." : `${c.quantity} × ${usd(c.unitCents)} unit price paid`}</div>
         </div>
-        ${proposal.reasons.length ? `<ul class="small">${proposal.reasons.map((r) => `<li>${esc(proposal.reasonText?.[r] || REASON[r] || r)}</li>`).join("")}</ul>` : ""}
-        <label for="amount">Refund amount (USD)</label>
-        <input id="amount" type="number" min="0.01" step="0.01" max="${(payment.refundableCents / 100).toFixed(2)}" value="${(suggested / 100).toFixed(2)}">
+        ${proposal.reasons.length ? `<ul class="reasons">${proposal.reasons.map((r) => `<li>${esc(proposal.reasonText?.[r] || REASON[r] || r)}</li>`).join("")}</ul>` : ""}
+        <label for="amount">Refund amount <span class="hint">Up to ${usd(payment.refundableCents)} left on this payment · ${esc(proposal.policyVersion)}</span></label>
+        <input id="amount" type="number" inputmode="decimal" min="0.01" step="0.01" max="${(payment.refundableCents / 100).toFixed(2)}" value="${(suggested / 100).toFixed(2)}">
         <div id="reason-wrap" class="${proposal.route === "propose" ? "hidden" : ""}">
-          <label for="reason">Reason for your decision (recorded)</label>
-          <input id="reason" placeholder="e.g. Photo 2 clearly shows the snapped handle">
+          <label for="reason">Why? <span class="hint">Saved with your approval.</span></label>
+          <input id="reason" placeholder="For example: photo 2 clearly shows the snapped handle">
         </div>
-        <p><button id="approve" class="approve"></button></p>
-        <details><summary class="small">Other actions</summary>
+        <button id="approve" class="approve" style="margin-top:20px"></button>
+        <p class="footnote center" style="margin:10px 0 0">Sends one partial refund to PayPal against the original capture.</p>
+        <details class="more"><summary>More options</summary>
           <label for="info">Ask the buyer for more photos</label>
-          <div class="row"><input id="info" placeholder="Please photograph the handle and the box." style="flex:1"><button id="request-info">Send request</button></div>
+          <div class="row"><input id="info" placeholder="Please photograph the handle and the box." style="flex:1"><button id="request-info">Ask</button></div>
           <label for="close-reason">Close without a refund</label>
-          <div class="row"><input id="close-reason" placeholder="Reason shown to the buyer" style="flex:1"><button id="close" class="danger">Close</button></div>
-          <p><button id="assess">Re-run AI assessment</button></p>
+          <div class="row"><input id="close-reason" placeholder="Reason the buyer will see" style="flex:1"><button id="close" class="danger">Close</button></div>
+          <p style="margin:16px 0 0"><button id="assess" class="plain">Run the AI review again</button></p>
         </details>
       </div>`;
     }
 
     function refundsHtml() {
       if (!d.refunds.length) return "";
-      return `<div class="card"><h2>PayPal refund</h2>${d.refunds.map((r) => `
-        <div class="row spread"><b>${usd(r.amountCents)} USD</b><span class="pill ${REFUND[r.status]}">${esc(r.status)}</span></div>
-        <dl class="kv" style="margin-top:8px">
-          <dt>Refund ID</dt><dd class="mono">${esc(r.providerRefundId || "not yet known")}</dd>
-          <dt>PayPal status</dt><dd>${esc(r.providerStatus || "—")}</dd>
-          <dt>Request ID</dt><dd class="mono">${esc(r.requestId)}</dd>
-          ${r.debugId ? `<dt>Debug ID</dt><dd class="mono">${esc(r.debugId)}</dd>` : ""}
-          ${r.error ? `<dt>Error</dt><dd>${esc(r.error)}</dd>` : ""}
-          <dt>Attempts</dt><dd>${r.attempts}</dd>
-        </dl>
-        ${["PENDING", "UNKNOWN", "SUBMITTING"].includes(r.status) ? `<p><button data-reconcile="${esc(r.id)}">Refresh from PayPal</button></p>` : ""}`).join("<hr>")}</div>`;
+      return d.refunds.map((r) => {
+        const [word, tone] = REFUND[r.status] || [r.status.toLowerCase(), ""];
+        return `<div class="card">
+          <div class="hero" style="padding:8px 0 20px">
+            ${r.status === "COMPLETED" ? checkBadge() : ""}
+            <h2 style="margin:0">PayPal refund ${word}</h2>
+            <div class="big amount">${usd(r.amountCents)}</div>
+          </div>
+          <div class="kv-row"><span>PayPal status</span><span class="pill ${tone}">${esc(r.providerStatus || r.status)}</span></div>
+          <div class="kv-row"><span>Refund ID</span><span class="mono">${esc(r.providerRefundId || "Not known yet")}</span></div>
+          <div class="kv-row"><span>Idempotency key</span><span class="mono">${esc(r.requestId)}</span></div>
+          ${r.debugId ? `<div class="kv-row"><span>Debug ID</span><span class="mono">${esc(r.debugId)}</span></div>` : ""}
+          ${r.error ? `<div class="kv-row"><span>Error</span><span>${esc(r.error)}</span></div>` : ""}
+          <div class="kv-row"><span>Attempts</span><span>${r.attempts}</span></div>
+          ${["PENDING", "UNKNOWN", "SUBMITTING"].includes(r.status) ? `<button class="lg" style="margin-top:12px" data-reconcile="${esc(r.id)}">Check status with PayPal</button>` : ""}
+        </div>`;
+      }).join("");
+    }
+
+    function historyHtml(history) {
+      return `<div class="card"><h2>Activity</h2><ol class="timeline">${history.map((h) => {
+        const extra = h.payload?.reason || h.payload?.message || h.payload?.overrideReason;
+        return `<li class="${esc(h.actor)}"><div>${esc(EVENT[h.type] || h.type)}</div><div class="when">${when(h.at)}${extra ? " · " + esc(extra) : ""}</div></li>`;
+      }).join("")}</ol></div>`;
     }
 
     function render() {
       const { claim, payment, line, evidence, assessment, history } = d;
       $("page").innerHTML = `
-        <div class="row spread"><h1>${esc(claim.ref)}</h1>${pill(claim.status)}</div>
-        <p class="lede">${esc(line.title)} × ${claim.quantity} · received ${when(claim.createdAt)} · case version ${claim.version}</p>
+        <p class="eyebrow">${esc(line.title)} × ${claim.quantity} · ${when(claim.createdAt)}</p>
+        <div class="row" style="gap:14px;margin-bottom:28px"><h1 style="margin:0">${esc(claim.ref)}</h1>${pill(claim.status)}</div>
         <div class="grid case">
           <div>
             <div class="card">
-              <div class="who buyer"><div class="tag">Customer says</div><div>${esc(claim.statement)}</div></div>
-              <h3 style="margin-top:14px">Customer photos</h3>
-              <div class="thumbs">${evidence.map((e, i) => `<img src="${e.url}" alt="Evidence photo ${i + 1}${e.sentToAi && evidence.length > 8 ? " (checked by Jev)" : ""}" loading="lazy" data-zoom>`).join("")}</div>
-              <h3 style="margin-top:14px">Your catalog photo</h3>
-              <div class="thumbs"><img src="${line.refImage}" alt="Catalog photo" data-zoom></div>
+              <div class="voice buyer"><span class="avatar">${ICON.person}</span><div style="flex:1">
+                <div class="tag">Customer says</div>
+                <div class="bubble">${esc(claim.statement)}</div>
+              </div></div>
+              <div class="row" style="align-items:flex-start;gap:16px;margin-top:20px;flex-wrap:wrap">
+                ${evidence.map((e, i) => `<figure class="figure thumbs" style="margin:0"><button type="button" data-zoom="${e.url}" aria-label="Enlarge customer photo ${i + 1}"><img src="${e.url}" alt="Customer photo ${i + 1}" loading="lazy"></button><figcaption>Customer photo${evidence.length > 1 ? " " + (i + 1) : ""}${e.sentToAi && evidence.length > 8 ? " · checked by Jev" : ""}</figcaption></figure>`).join("")}
+                <figure class="figure thumbs" style="margin:0"><button type="button" data-zoom="${line.refImage}" aria-label="Enlarge your catalog photo"><img src="${line.refImage}" alt="Your catalog photo"></button><figcaption>Your catalog photo</figcaption></figure>
+              </div>
             </div>
             <div class="card">
-              <div class="who model"><div class="tag">Model observations</div>${findingsHtml(assessment)}</div>
+              <div class="voice model"><span class="avatar">${ICON.sparkle}</span><div style="flex:1">
+                <div class="tag">What Jev saw in the photos</div>
+                ${findingsHtml(assessment)}
+              </div></div>
             </div>
             <div class="card">
-              <h2>PayPal payment</h2>
-              <dl class="kv">
-                <dt>Captured</dt><dd>${usd(payment.amountCents)} ${esc(payment.currency)} · <span class="pill ${payment.captureStatus === "COMPLETED" ? "ok" : "bad"}">${esc(payment.captureStatus)}</span></dd>
-                <dt>Capture ID</dt><dd class="mono">${esc(payment.captureId)}</dd>
-                <dt>Order ID</dt><dd class="mono">${esc(payment.paypalOrderId)}</dd>
-                <dt>Refundable now</dt><dd>${usd(payment.refundableCents)}</dd>
-                <dt>Unit price paid</dt><dd>${usd(line.unitCents)} × ${line.quantity}</dd>
-                <dt>Delivered</dt><dd>${when(payment.deliveredAt)} <span class="small muted">(${esc(payment.deliverySource)})</span></dd>
-              </dl>
+              <div class="card-head"><h2>PayPal payment</h2><span class="pill ${payment.captureStatus === "COMPLETED" ? "ok" : "bad"}">${esc(payment.captureStatus === "COMPLETED" ? "Captured" : payment.captureStatus)}</span></div>
+              <div class="kv-row"><span>Amount</span><span class="amount">${usd(payment.amountCents)} ${esc(payment.currency)}</span></div>
+              <div class="kv-row"><span>Refundable now</span><span class="amount"><b>${usd(payment.refundableCents)}</b></span></div>
+              <div class="kv-row"><span>Unit price paid</span><span>${usd(line.unitCents)} × ${line.quantity}</span></div>
+              <div class="kv-row"><span>Capture ID</span><span class="mono">${esc(payment.captureId)}</span></div>
+              <div class="kv-row"><span>Order ID</span><span class="mono">${esc(payment.paypalOrderId)}</span></div>
+              <div class="kv-row"><span>Delivered</span><span>${when(payment.deliveredAt)}<div class="footnote">${esc(payment.deliverySource)}</div></span></div>
             </div>
           </div>
-          <div>
-            <div class="who merchant" style="margin-top:0"><div class="tag">Your decision</div></div>
-            ${actionsHtml()}
+          <div class="sticky-col">
             ${refundsHtml()}
-            <div class="card"><h2>History</h2><ol class="timeline">${history.map((h) =>
-              `<li><b>${esc(h.type)}</b> <span class="muted">by ${esc(h.actor)}</span><div class="small muted">${when(h.at)}${h.payload?.reason ? " · " + esc(h.payload.reason) : ""}${h.payload?.message ? " · " + esc(h.payload.message) : ""}${h.payload?.overrideReason ? " · " + esc(h.payload.overrideReason) : ""}</div></li>`).join("")}</ol></div>
+            ${actionsHtml()}
+            ${historyHtml(history)}
+            <p class="footnote center" style="margin-top:12px">Case version ${claim.version}. Approvals are tied to this version.</p>
           </div>
         </div>`;
       wire();
     }
 
     function wire() {
-      document.querySelectorAll("[data-zoom]").forEach((img) => (img.onclick = () => { $("zoom").querySelector("img").src = img.src; $("zoom").showModal(); }));
+      document.querySelectorAll("[data-zoom]").forEach((b) => (b.onclick = () => { $("zoom").querySelector("img").src = b.dataset.zoom; $("zoom").showModal(); }));
       $("zoom").onclick = () => $("zoom").close();
       const amount = $("amount"), approve = $("approve");
       if (amount && approve) {
@@ -170,27 +212,27 @@
         approve.onclick = () => act(`/api/merchant/claims/${id}/approve-refund`, {
           claimVersion: d.claim.version, proposalId: d.proposal.id,
           amountCents: Math.round(Number(amount.value) * 100), reason: $("reason")?.value,
-        }, approve);
+        }, approve, "Refunding with PayPal…");
       }
-      $("assess") && ($("assess").onclick = (e) => act(`/api/merchant/claims/${id}/assess`, {}, e.target));
-      $("request-info") && ($("request-info").onclick = (e) => act(`/api/merchant/claims/${id}/request-info`, { message: $("info").value }, e.target));
-      $("close") && ($("close").onclick = (e) => act(`/api/merchant/claims/${id}/close`, { reason: $("close-reason").value }, e.target));
-      document.querySelectorAll("[data-reconcile]").forEach((b) => (b.onclick = () => act(`/api/merchant/refunds/${b.dataset.reconcile}/reconcile`, {}, b)));
+      $("assess") && ($("assess").onclick = (e) => act(`/api/merchant/claims/${id}/assess`, {}, e.currentTarget, "Reviewing…"));
+      $("request-info") && ($("request-info").onclick = (e) => act(`/api/merchant/claims/${id}/request-info`, { message: $("info").value }, e.currentTarget));
+      $("close") && ($("close").onclick = (e) => act(`/api/merchant/claims/${id}/close`, { reason: $("close-reason").value }, e.currentTarget));
+      document.querySelectorAll("[data-reconcile]").forEach((b) => (b.onclick = () => act(`/api/merchant/refunds/${b.dataset.reconcile}/reconcile`, {}, b, "Checking…")));
     }
 
-    async function act(path, body, btn) {
-      btn.disabled = true;
+    async function act(path, body, btn, label) {
+      busy(btn, true, label);
       fail("");
-      try { d = await api(path, { method: "POST", body, merchant: true }); render(); }
+      try { d = await api(path, { method: "POST", body, merchant: true }); render(); window.scrollTo({ top: 0, behavior: "smooth" }); }
       catch (e) {
         if (e.data?.claim) { d = e.data; render(); }
-        fail(e.data?.duplicate ? "This approval was already submitted. Showing the existing refund." : e.message);
-        btn.disabled = false;
+        fail(e.data?.duplicate ? "You already approved this. Showing the existing refund." : e.message);
+        if (btn.isConnected) busy(btn, false);
       }
     }
 
     async function refresh() {
-      try { d = await api(`/api/merchant/claims/${encodeURIComponent(id)}`); render(); }
+      try { d = await api(`/api/merchant/claims/${encodeURIComponent(id)}`); render(); settle(); }
       catch (e) { if (e.status === 401) location.href = "/merchant"; else fail(e.message); }
     }
     await refresh();

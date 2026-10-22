@@ -3,72 +3,135 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Report a problem</title>
+  <meta name="theme-color" content="#f5f5f7">
+  <title>Report a problem · Juniper Clay Co.</title>
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
-  <header class="top"><a class="brand" href="/">Refund <span>Relay</span></a></header>
+  <header class="top">
+    <a class="brand" href="/"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span>Refund Relay</a>
+  </header>
   <main class="narrow">
-    <h1>Report a problem with your order</h1>
-    <p class="lede" id="order-summary">Loading your order…</p>
-    <div id="error" class="notice bad hidden"></div>
+    <div id="intro">
+      <p class="eyebrow">Juniper Clay Co.</p>
+      <h1>Something wrong?<br>Let's fix it.</h1>
+      <p class="lede" id="order-summary">Loading your order…</p>
+    </div>
+    <div id="error" class="notice bad hidden" role="alert"></div>
 
-    <form id="form" class="card hidden">
-      <label for="line">Which item?</label>
-      <select id="line" name="lineId" required></select>
-      <label for="quantity">How many arrived damaged?</label>
-      <input id="quantity" name="quantity" type="number" min="1" value="1" required>
-      <label for="statement">What happened?</label>
-      <textarea id="statement" name="statement" maxlength="1000" required placeholder="One mug arrived with the handle snapped off."></textarea>
-      <label for="photos">Photos of the damage (up to 100, JPEG or PNG)</label>
-      <input id="photos" name="photos" type="file" accept="image/jpeg,image/png" multiple required>
-      <div class="thumbs" id="previews" style="margin-top:10px"></div>
-      <p class="small muted">Your photos are processed by an AI model (Jev, by TypeSafe) to help the shop review them. The shop decides every refund. Asking the shop is optional: PayPal's own resolution options stay open to you.</p>
-      <button class="primary" type="submit" id="submit">Send to the shop</button>
+    <form id="form" class="hidden" novalidate>
+      <div class="card">
+        <div class="product" id="item-card"></div>
+        <select id="line" name="lineId" required class="hidden" aria-label="Which item?"></select>
+        <hr>
+        <div class="row spread">
+          <div id="qty-label"><b>How many arrived damaged?</b></div>
+          <div class="stepper" role="group" aria-labelledby="qty-label">
+            <button type="button" id="qty-minus" aria-label="One fewer">−</button>
+            <output id="qty-out" aria-live="polite">1</output>
+            <button type="button" id="qty-plus" aria-label="One more">+</button>
+          </div>
+          <input id="quantity" name="quantity" type="hidden" value="1">
+        </div>
+      </div>
+
+      <div class="card">
+        <label for="statement">What happened?</label>
+        <textarea id="statement" name="statement" maxlength="1000" required placeholder="For example: one mug arrived with the handle snapped off."></textarea>
+
+        <label for="photos">Add photos <span class="hint">Up to 100 · JPEG or PNG. Show the damage and the item.</span></label>
+        <div class="dropzone" id="drop">
+          <span data-icon="photo"></span>
+          <span id="drop-text"><strong>Choose photos</strong> or drag them here</span>
+          <div class="thumbs sm" id="previews"></div>
+          <input id="photos" name="photos" type="file" accept="image/jpeg,image/png" multiple required>
+        </div>
+      </div>
+
+      <p class="footnote" style="margin:16px 4px">An AI model (Jev, by TypeSafe) looks at your photos to help the shop review them. It never sees your written description. The shop makes every refund decision, and PayPal's own resolution options stay open to you.</p>
+      <button class="primary lg" type="submit" id="submit">Send to the shop</button>
     </form>
 
-    <div id="sent" class="card hidden">
-      <h2>Request sent</h2>
-      <p>Your reference is <b id="ref"></b>. The shop will review your photos.</p>
-      <p><a id="status-link" class="button primary" href="#">Track this request</a></p>
-      <p class="small muted">Bookmark the tracking link; it is private to you.</p>
+    <div id="sent" class="hidden">
+      <div class="card hero">
+        <div id="sent-check"></div>
+        <h1>Request sent.</h1>
+        <p class="muted" style="margin:0">Reference <b id="ref"></b></p>
+        <ol class="tracker" style="--n:3;margin:28px 0 28px">
+          <li class="done">Sent</li><li class="now">Shop reviews</li><li>Refund</li>
+        </ol>
+        <a id="status-link" class="button primary lg" href="#">Track your request</a>
+        <p class="footnote" style="margin:12px 0 0">Bookmark this link. It's private to you.</p>
+      </div>
     </div>
   </main>
   <script type="module">
-    import { api, usd, esc, hashToken } from "/app.js";
+    import { api, usd, esc, hashToken, ICON, checkBadge, busy } from "/app.js";
     import { shrinkPhotos } from "/photos.js";
+    document.querySelectorAll("[data-icon]").forEach((el) => (el.outerHTML = ICON[el.dataset.icon]));
     const orderId = new URLSearchParams(location.search).get("order");
     const token = hashToken();
     const $ = (id) => document.getElementById(id);
-    const fail = (msg) => { $("error").textContent = msg; $("error").classList.remove("hidden"); };
+    const fail = (msg) => { $("error").textContent = msg; $("error").classList.toggle("hidden", !msg); };
+    let max = 1;
+
+    function setQty(n) {
+      n = Math.min(Math.max(1, n), max);
+      $("quantity").value = n; $("qty-out").textContent = n;
+      $("qty-minus").disabled = n <= 1; $("qty-plus").disabled = n >= max;
+    }
+    function showLine(opt) {
+      max = Number(opt.dataset.max);
+      $("item-card").innerHTML = `<img src="/assets/${esc(opt.dataset.img)}" alt="">
+        <div><h2>${esc(opt.dataset.title)}</h2><div class="muted small">${max} × ${esc(opt.dataset.price)} in this order</div></div>`;
+      setQty(1);
+    }
 
     try {
       const o = await api(`/api/claim-link/${encodeURIComponent(orderId)}`, { token });
-      $("order-summary").textContent = `Order of ${usd(o.amountCents)} paid with PayPal on ${new Date(o.capturedAt).toLocaleDateString()}.`;
-      if (o.openClaimRef) fail(`There is already an open request (${o.openClaimRef}) for this order.`);
-      $("line").innerHTML = o.lines.map((l) => `<option value="${esc(l.id)}" data-max="${l.quantity}">${esc(l.title)} (${l.quantity} × ${usd(l.unit_cents)})</option>`).join("");
-      $("quantity").max = o.lines[0].quantity;
+      $("order-summary").textContent = `Your ${usd(o.amountCents)} order, paid with PayPal on ${new Date(o.capturedAt).toLocaleDateString(undefined, { dateStyle: "long" })}. Tell the shop what happened and add a photo.`;
+      if (o.openClaimRef) fail(`You already have an open request for this order (${o.openClaimRef}).`);
+      $("line").innerHTML = o.lines.map((l) => `<option value="${esc(l.id)}" data-max="${l.quantity}" data-title="${esc(l.title)}" data-price="${usd(l.unit_cents)}" data-img="${esc(l.ref_image)}">${esc(l.title)} (${l.quantity} × ${usd(l.unit_cents)})</option>`).join("");
+      if (o.lines.length > 1) $("line").classList.remove("hidden");
+      showLine($("line").selectedOptions[0]);
       $("form").classList.remove("hidden");
     } catch (e) { $("order-summary").textContent = ""; fail(e.message); }
 
-    $("line").onchange = (e) => { $("quantity").max = e.target.selectedOptions[0].dataset.max; };
+    $("line").onchange = (e) => showLine(e.target.selectedOptions[0]);
+    $("qty-minus").onclick = () => setQty(Number($("quantity").value) - 1);
+    $("qty-plus").onclick = () => setQty(Number($("quantity").value) + 1);
+
     $("photos").onchange = (e) => {
       const files = [...e.target.files];
-      if (files.length > 100) { fail("Choose up to 100 photos."); e.target.value = ""; return; }
+      if (files.length > 100) { fail("You can add up to 100 photos."); e.target.value = ""; return; }
+      fail("");
       $("previews").innerHTML = "";
       for (const f of files) { const img = new Image(); img.loading = "lazy"; img.src = URL.createObjectURL(f); img.alt = f.name; $("previews").append(img); }
+      $("drop").classList.toggle("has-files", files.length > 0);
+      $("drop-text").innerHTML = files.length ? `${files.length} photo${files.length > 1 ? "s" : ""} added · <strong>Change</strong>` : `<strong>Choose photos</strong> or drag them here`;
     };
+    for (const ev of ["dragenter", "dragover"]) $("drop").addEventListener(ev, () => $("drop").classList.add("over"));
+    for (const ev of ["dragleave", "drop"]) $("drop").addEventListener(ev, () => $("drop").classList.remove("over"));
+
     $("form").onsubmit = async (e) => {
       e.preventDefault();
-      $("submit").disabled = true; $("submit").textContent = "Sending…";
+      if (!$("statement").value.trim()) { fail("Tell the shop what happened."); $("statement").focus(); return; }
+      if (!$("photos").files.length) { fail("Add at least one photo of the damage."); $("photos").focus(); return; }
+      fail("");
+      busy($("submit"), true, "Sending…");
       const form = await shrinkPhotos(new FormData($("form")));
       form.set("orderId", orderId);
       try {
         const r = await api("/api/claims", { method: "POST", form, token });
         $("ref").textContent = r.ref;
         $("status-link").href = r.statusUrl;
-        $("form").classList.add("hidden"); $("error").classList.add("hidden"); $("sent").classList.remove("hidden");
-      } catch (err) { fail(err.message); $("submit").disabled = false; $("submit").textContent = "Send to the shop"; }
+        $("sent-check").innerHTML = checkBadge("blue");
+        $("form").classList.add("hidden"); $("intro").classList.add("hidden"); $("sent").classList.remove("hidden");
+        window.scrollTo({ top: 0 });
+      } catch (err) { fail(err.message); busy($("submit"), false); }
     };
   </script>
 </body>

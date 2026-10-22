@@ -9,7 +9,7 @@ const json = (s) => (s ? JSON.parse(s) : null);
 export function inbox(db, { limit = 100, before = null } = {}) {
   const n = Math.min(Math.max(Number(limit) || 100, 1), 500);
   return db.prepare(`
-    SELECT c.id, c.ref, c.status, c.quantity, c.created_at, c.updated_at, l.title, o.amount_cents,
+    SELECT c.id, c.ref, c.status, c.quantity, c.created_at, c.updated_at, l.title, l.ref_image, o.amount_cents,
       (SELECT route FROM proposals p WHERE p.claim_id = c.id ORDER BY p.created_at DESC LIMIT 1) AS route,
       (SELECT amount_cents FROM proposals p WHERE p.claim_id = c.id ORDER BY p.created_at DESC LIMIT 1) AS proposed_cents
     FROM claims c JOIN order_lines l ON l.id = c.line_id JOIN orders o ON o.id = c.order_id
@@ -66,12 +66,12 @@ export function caseDetail(db, claimId) {
 }
 
 const BUYER_WORDING = {
-  new: "Received. The merchant will review it.",
-  ready: "With the merchant for review.",
-  needs_info: "The merchant needs more photos.",
-  refund_processing: "Refund processing.",
-  refunded: "Merchant issued a refund.",
-  closed: "Closed by the merchant without a refund.",
+  new: "Received. The shop will look at it soon.",
+  ready: "The shop is reviewing your photos.",
+  needs_info: "The shop needs another photo.",
+  refund_processing: "Your refund is on its way.",
+  refunded: "The shop refunded you through PayPal.",
+  closed: "The shop closed this request without a refund.",
 };
 
 export function buyerStatus(db, claim) {
