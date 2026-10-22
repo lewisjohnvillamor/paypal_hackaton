@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Refund Relay demo store</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/">Refund <span>Relay</span></a>
+    <nav><a href="/merchant">Merchant console</a></nav>
+  </header>
+  <main class="narrow">
+    <span class="pill info">PayPal sandbox demo</span>
+    <h1>Juniper Clay Co.</h1>
+    <p class="lede">A tiny mug shop. Buy four mugs with a sandbox PayPal account, then report one as broken and watch the merchant review and refund it.</p>
+
+    <div class="card">
+      <div class="product">
+        <img src="/assets/catalog-mug.jpg" alt="Classic white ceramic mug">
+        <div>
+          <h2>Classic white ceramic mug</h2>
+          <div class="muted">4 × $20.00, sold individually</div>
+          <div style="font-size:22px;font-weight:700;margin-top:6px">$80.00 <span class="small muted">USD, no shipping or tax</span></div>
+        </div>
+      </div>
+      <div id="paypal-buttons" style="margin-top:18px"></div>
+      <p class="small muted">Use the sandbox <b>Personal</b> buyer account. No real money moves.</p>
+    </div>
+
+    <div id="done" class="card hidden">
+      <h2>Payment captured</h2>
+      <dl class="kv" id="receipt"></dl>
+      <div class="notice">Something arrive broken? <a id="claim-link" href="#">Report a problem with this order</a>. Keep this link private; it is how the shop knows the request is yours.</div>
+    </div>
+    <div id="error" class="notice bad hidden"></div>
+  </main>
+  <footer class="foot">Hackathon prototype. Sandbox only. Product photo: "white coffee mug on coffeemaker", CC BY 2.0, via Openverse.</footer>
+
+  <script type="module">
+    import { api, usd, esc } from "/app.js";
+    const fail = (msg) => { const e = document.getElementById("error"); e.textContent = msg; e.classList.remove("hidden"); };
+    const { clientId } = await api("/api/config");
+    const s = document.createElement("script");
+    s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD&intent=capture`;
+    s.onload = () => paypal.Buttons({
+      style: { layout: "vertical", shape: "rect", label: "pay" },
+      createOrder: async () => (await api("/api/demo/orders", { method: "POST" })).paypalOrderId,
+      onApprove: async ({ orderID }) => {
+        try {
+          const r = await api(`/api/demo/orders/${orderID}/capture`, { method: "POST" });
+          document.getElementById("receipt").innerHTML = `
+            <dt>Amount</dt><dd>${usd(r.amount)} USD</dd>
+            <dt>PayPal order</dt><dd class="mono">${esc(orderID)}</dd>
+            <dt>Capture</dt><dd class="mono">${esc(r.captureId)}</dd>`;
+          if (r.claimUrl) document.getElementById("claim-link").href = r.claimUrl;
+          document.getElementById("paypal-buttons").classList.add("hidden");
+          document.getElementById("done").classList.remove("hidden");
+        } catch (e) { fail(e.message); }
+      },
+      onError: (err) => fail("PayPal reported an error: " + err),
+    }).render("#paypal-buttons");
+    s.onerror = () => fail("Could not load PayPal Checkout.");
+    document.head.appendChild(s);
+  </script>
+</body>
+</html>

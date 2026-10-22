@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Refund requests</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/merchant">Refund <span>Relay</span> · Merchant</a>
+    <nav><a href="/">Store</a><a href="#" id="logout" class="hidden">Sign out</a></nav>
+  </header>
+  <main>
+    <form id="login" class="card hidden" style="max-width:380px">
+      <h2>Merchant sign in</h2>
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <p><button class="primary" type="submit">Sign in</button></p>
+      <div id="login-error" class="notice bad hidden"></div>
+    </form>
+
+    <section id="inbox" class="hidden">
+      <h1>Refund requests</h1>
+      <p class="lede">Damaged-item requests against your PayPal orders. Nothing is refunded until you approve it.</p>
+      <div class="row" id="filters" style="margin-bottom:12px"></div>
+      <div class="card" style="padding:0;overflow-x:auto"><table>
+        <thead><tr><th>Request</th><th>Item</th><th>Status</th><th>Suggested</th><th>Received</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table></div>
+    </section>
+  </main>
+  <script type="module">
+    import { api, usd, esc, pill, when, STATUS } from "/app.js";
+    const $ = (id) => document.getElementById(id);
+    let filter = "all", rows = [];
+    const ROUTE = { propose: "Policy proposal", manual_review: "Needs your judgment", request_info: "Ask for photos" };
+
+    function draw() {
+      const counts = Object.fromEntries(Object.keys(STATUS).map((k) => [k, rows.filter((r) => r.status === k).length]));
+      $("filters").innerHTML = ["all", ...Object.keys(STATUS)].map((k) =>
+        `<button data-f="${k}" class="${k === filter ? "primary" : ""}">${k === "all" ? "All" : STATUS[k][0]} (${k === "all" ? rows.length : counts[k]})</button>`).join("");
+      $("filters").querySelectorAll("button").forEach((b) => (b.onclick = () => { filter = b.dataset.f; draw(); }));
+      const shown = rows.filter((r) => filter === "all" || r.status === filter);
+      $("rows").innerHTML = shown.length ? shown.map((r) => `
+        <tr class="link" data-id="${esc(r.id)}">
+          <td><b>${esc(r.ref)}</b></td><td>${esc(r.title)} × ${r.quantity}</td><td>${pill(r.status)}</td>
+          <td>${r.route ? `${r.proposed_cents ? usd(r.proposed_cents) : "—"} <div class="small muted">${esc(ROUTE[r.route])}</div>` : "—"}</td>
+          <td class="small">${when(r.created_at)}</td></tr>`).join("")
+        : `<tr><td colspan="5" class="muted">No requests yet. Buy the demo order in the store, then report a problem.</td></tr>`;
+      $("rows").querySelectorAll("tr.link").forEach((tr) => (tr.onclick = () => (location.href = `/merchant/case?id=${tr.dataset.id}`)));
+    }
+    async function load() {
+      try {
+        rows = await api("/api/merchant/claims");
+        $("inbox").classList.remove("hidden"); $("logout").classList.remove("hidden"); $("login").classList.add("hidden");
+        draw();
+      } catch (e) {
+        if (e.status === 401) { $("login").classList.remove("hidden"); $("inbox").classList.add("hidden"); }
+      }
+    }
+    $("login").onsubmit = async (e) => {
+      e.preventDefault();
+      try { await api("/api/merchant/login", { method: "POST", body: { password: $("password").value } }); load(); }
+      catch (err) { $("login-error").textContent = err.message; $("login-error").classList.remove("hidden"); }
+    };
+    $("logout").onclick = async (e) => { e.preventDefault(); await api("/api/merchant/logout", { method: "POST" }); location.reload(); };
+    load();
+    setInterval(() => !$("inbox").classList.contains("hidden") && load(), 10000);
+  </script>
+</body>
+</html>
