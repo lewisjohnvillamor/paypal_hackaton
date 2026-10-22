@@ -10,7 +10,6 @@ const pct = (p) => (typeof p === "number" ? ` (${Math.round(p * 100)}%)` : "");
 const ROUTE = { propose: "suggests a one-click refund", manual_review: "needs your judgment", request_info: "asks the buyer for clearer photos" };
 const WORD = { yes: "yes", no: "no", uncertain: "unsure", consistent: "yes", inconsistent: "no" };
 const DAMAGE = { shattered: "broken into pieces", handle_off: "handle snapped off", crack_or_chip: "a crack or chip", none_visible: "no damage visible" };
-const OPTION = { refund: "Full refund", repair: "Keep it and mend it with kintsugi", repair_gold: "Mend it in 24k gold leaf" };
 
 function reviewSteps(db, claimId, h, photoNumber) {
   const a = db.prepare("SELECT * FROM assessments WHERE claim_id = ? AND created_at <= ? ORDER BY created_at DESC LIMIT 1").get(claimId, h.at);
@@ -50,8 +49,9 @@ function reviewSteps(db, claimId, h, photoNumber) {
     });
     if ((calc.options ?? []).length > 1) {
       steps.push({
-        at: p.created_at, actor: "policy", title: "This damage can be mended, so the buyer could be offered a choice",
-        detail: calc.options.map((o) => `${OPTION[o.id] ?? o.id}: ${usd(o.refundCents)} back`).join(" · "),
+        at: p.created_at, actor: "jev",
+        title: `Jev matched ${calc.options.length - 1} remed${calc.options.length === 2 ? "y" : "ies"} from your library to this damage`,
+        detail: calc.options.map((o) => `${o.title}${pct(o.fit)}: ${o.refundCents ? `${usd(o.refundCents)} back` : "no refund"}`).join(" · "),
       });
     }
   }
@@ -75,7 +75,18 @@ export function agentTimeline(db, claimId) {
       case "claim.info_requested": add({ title: "You asked for more photos", detail: x.message }); break;
       case "claim.closed": add({ title: "You closed it without a refund", detail: x.reason }); break;
       case "offer.sent": add({ title: "You let the buyer choose", detail: "This approved every amount on the list." }); break;
-      case "offer.accepted": add({ title: `Buyer chose: ${OPTION[x.option] ?? x.option}`, detail: x.kit ? `$${x.refund} back; send the ${x.kit}.` : `$${x.refund} back.` }); break;
+      case "offer.accepted": add({ title: `Buyer chose: ${x.title ?? x.option}`, detail: `${x.refund === "0.00" ? "No refund" : `$${x.refund} back`}${x.kit ? `; send ${x.kit}` : ""}.` }); break;
+      case "suggestion.created":
+        steps.push({ at: h.at, actor: "claude", title: x.titles.length
+          ? `Claude Haiku suggested ${x.titles.length === 1 ? "a remedy" : `${x.titles.length} remedies`} from ${x.candidates} store listings`
+          : `Claude Haiku looked at ${x.candidates} store listings and found none that fit`,
+          detail: x.titles.length ? `${x.titles.join(" · ")}. Waiting for your approval.` : undefined,
+          meta: `${x.model} · ${x.latencyMs} ms · photos and Jev's reading only, never the buyer's words${x.dropped ? ` · ${x.dropped} failed the price check` : ""}` });
+        break;
+      case "suggestion.failed": steps.push({ at: h.at, actor: "claude", title: "Claude Haiku could not suggest a remedy", detail: x.error }); break;
+      case "suggestion.approved": add({ title: `You approved Haiku's suggestion: ${x.title}`, detail: `${x.refundUnitCents ? `$${(x.refundUnitCents / 100).toFixed(2)} back per item` : "No refund"}, plus ${x.item}.` }); break;
+      case "suggestion.dismissed": add({ title: `You dismissed Haiku's suggestion: ${x.title}` }); break;
+      case "claim.resolved": add({ title: "Sorted without a refund", detail: x.sends ? `Send ${x.sends}.` : undefined }); break;
       case "refund.approved":
         // A buyer's pick already has its own step; the reservation behind it adds nothing new.
         if (who !== "buyer") add({ title: `You approved ${usd(x.amountCents)}`, detail: x.overrideReason });

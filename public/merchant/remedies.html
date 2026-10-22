@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f5f7">
+  <title>Remedies · Refund Relay</title>
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-grid.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-theme-quartz.css">
+  <link rel="stylesheet" href="/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/ag-grid-community.min.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/merchant"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span>Refund Relay <span class="ctx">Merchant</span></a>
+    <nav><a href="/merchant">Requests</a><a href="/merchant/remedies" aria-current="page">Remedies</a></nav>
+  </header>
+  <main class="wide">
+    <section id="library" class="hidden">
+      <p class="eyebrow">Juniper Clay Co.</p>
+      <h1>Remedies</h1>
+      <p class="lede">What you can offer instead of a full refund. When a buyer reports damage, Jev compares their photos with each active remedy's "when it fits" description, and only the ones that fit go on the list you approve. A full refund is always one of the choices. When nothing here fits, Claude Haiku can suggest one of your other store listings on the case itself, and you decide whether to add it.</p>
+      <div id="notice" class="notice hidden" role="status"></div>
+      <div id="products"></div>
+    </section>
+    <div id="signin" class="card hidden center" style="max-width:400px;margin:40px auto 0;padding:32px">
+      <p style="margin:0">Sign in on the <a href="/merchant">requests page</a> first.</p>
+    </div>
+  </main>
+  <script type="module">
+    import { api, usd, esc, settle } from "/app.js";
+    const $ = (id) => document.getElementById(id);
+    const KIND = { repair_kit: "Repair kit", spare_part: "Spare part", replacement: "Replacement", other: "Other" };
+    let library = [];
+
+    function say(text, tone = "") {
+      $("notice").textContent = text;
+      $("notice").className = `notice ${tone}`;
+    }
+
+    // One editable grid per product. Every edit is saved at once; a rejected edit is put back.
+    function productGrid(p, el) {
+      const dark = matchMedia("(prefers-color-scheme: dark)");
+      const theme = () => el.classList.toggle("ag-theme-quartz-dark", dark.matches);
+      theme(); dark.addEventListener?.("change", theme);
+      const columns = [
+        { headerName: "On", field: "active", width: 72, cellDataType: "boolean", editable: true },
+        { headerName: "Offer to the buyer", field: "title", width: 240, editable: true },
+        { headerName: "What you send", field: "item", flex: 1, minWidth: 220, editable: true, wrapText: true, autoHeight: true },
+        { headerName: "When it fits (Jev reads this)", field: "fits", flex: 1.4, minWidth: 260, editable: true, wrapText: true, autoHeight: true,
+          cellEditor: "agLargeTextCellEditor", cellEditorPopup: true, cellEditorParams: { maxLength: 400, rows: 6, cols: 50 } },
+        { headerName: "Refund per item", field: "refundUnitCents", width: 140, type: "rightAligned", editable: true,
+          valueFormatter: (x) => usd(x.value), valueParser: (x) => Math.round(Number(String(x.newValue).replace(/[$,]/g, "")) * 100) },
+        { headerName: "Kind", field: "kind", width: 140, editable: true, cellEditor: "agSelectCellEditor",
+          cellEditorParams: { values: Object.keys(KIND) }, valueFormatter: (x) => KIND[x.value] ?? x.value },
+      ];
+      return agGrid.createGrid(el, {
+        columnDefs: columns, rowData: p.remedies, domLayout: "autoHeight", headerHeight: 44,
+        defaultColDef: { sortable: false, resizable: true, cellStyle: { lineHeight: "1.45", paddingTop: "10px", paddingBottom: "10px" } },
+        getRowId: (x) => x.data.id, singleClickEdit: true, stopEditingWhenCellsLoseFocus: true,
+        onCellValueChanged: async (e) => {
+          if (e.oldValue === e.newValue || e.source === "revert") return;
+          try {
+            const saved = await api(`/api/merchant/remedies/${encodeURIComponent(e.data.id)}`, { method: "PATCH", merchant: true, body: { [e.colDef.field]: e.newValue } });
+            e.node.setData(saved);
+            say(`Saved "${saved.title}".`, "ok");
+          } catch (err) {
+            e.node.setDataValue(e.colDef.field, e.oldValue, "revert");
+            say(err.message, "bad");
+          }
+        },
+      });
+    }
+
+    function addForm(p) {
+      return `<form class="remedy-add" data-sku="${esc(p.sku)}">
+        <input name="title" placeholder="Offer, e.g. Get a spare handle" required maxlength="80" aria-label="Offer to the buyer">
+        <input name="item" placeholder="What you send" required maxlength="160" aria-label="What you send">
+        <input name="fits" placeholder="When it fits, e.g. Only the handle came off" required maxlength="400" aria-label="When it fits">
+        <input name="refund" placeholder="Refund $" inputmode="decimal" required aria-label="Refund per item in dollars">
+        <select name="kind" aria-label="Kind">${Object.entries(KIND).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select>
+        <button class="primary" type="submit">Add</button>
+      </form>`;
+    }
+
+    function draw() {
+      $("products").innerHTML = library.map((p, i) => `
+        <section class="card remedy-product">
+          <div class="row" style="gap:14px;align-items:center;margin-bottom:14px">
+            <img src="${esc(p.refImage)}" alt="" width="56" height="56" style="border-radius:12px;object-fit:cover">
+            <div><h2 style="margin:0;font-size:20px">${esc(p.title)}</h2><p class="small muted" style="margin:2px 0 0">${usd(p.unitCents)} each · refunds must stay under the price paid</p></div>
+          </div>
+          ${window.agGrid ? `<div id="g${i}" class="ag-theme-quartz inbox-grid remedy-grid"></div>`
+            : `<ul>${p.remedies.map((r) => `<li>${esc(r.title)}: ${usd(r.refundUnitCents)} back, plus ${esc(r.item)}</li>`).join("")}</ul>`}
+          ${addForm(p)}
+        </section>`).join("");
+      if (window.agGrid) library.forEach((p, i) => productGrid(p, $(`g${i}`)));
+      document.querySelectorAll(".remedy-add").forEach((f) => (f.onsubmit = async (e) => {
+        e.preventDefault();
+        const v = Object.fromEntries(new FormData(f));
+        try {
+          const made = await api("/api/merchant/remedies", { method: "POST", merchant: true, body: {
+            sku: f.dataset.sku, title: v.title, item: v.item, fits: v.fits, kind: v.kind,
+            refundUnitCents: Math.round(Number(String(v.refund).replace(/[$,]/g, "")) * 100) } });
+          say(`Added "${made.title}". Jev will consider it on the next report.`, "ok");
+          await load();
+        } catch (err) { say(err.message, "bad"); }
+      }));
+    }
+
+    async function load() {
+      try {
+        library = await api("/api/merchant/remedies");
+        $("library").classList.remove("hidden");
+        if (document.readyState === "complete") draw(); else window.addEventListener("load", draw, { once: true });
+        settle();
+      } catch (e) {
+        if (e.status === 401) $("signin").classList.remove("hidden");
+        else say(e.message, "bad");
+      }
+    }
+    load();
+  </script>
+</body>
+</html>

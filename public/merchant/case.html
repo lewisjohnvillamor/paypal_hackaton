@@ -21,7 +21,7 @@
   </main>
   <dialog id="zoom" aria-label="Photo"><span class="damage-frame"><img alt="Evidence photo, enlarged"></span></dialog>
   <script type="module">
-    import { api, usd, esc, pill, when, ICON, checkBadge, busy, settle, optionText } from "/app.js";
+    import { api, usd, esc, pill, when, ICON, checkBadge, busy, settle, optionText, optionArt, optionAmount } from "/app.js";
     const id = new URLSearchParams(location.search).get("id");
     const $ = (x) => document.getElementById(x);
     const fail = (msg) => { $("error").textContent = msg; $("error").classList.toggle("hidden", !msg); };
@@ -109,6 +109,11 @@
     function actionsHtml() {
       const { claim, proposal, payment } = d;
       if (["refunded", "closed", "refund_processing"].includes(claim.status)) return "";
+      if (claim.status === "resolved") {
+        const o = d.offer?.options.find((x) => x.id === d.offer.chosen);
+        return `<div class="card"><div class="hero" style="padding:8px 0 12px">${checkBadge()}<h2 style="margin:0">Sorted without a refund</h2></div>
+          <div class="kv-row"><span>Buyer chose</span><span>${esc(o?.title ?? "")}<div class="footnote">Send: ${esc(o?.item ?? "")}</div></span></div></div>`;
+      }
       const head = `<div class="voice merchant" style="margin-bottom:16px"><span class="avatar">${ICON.check}</span><div><div class="tag">Your decision</div><div class="small muted">Nothing moves until you approve.</div></div></div>`;
       if (claim.status === "offer_sent" && d.offer) {
         return `<div class="card">${head}<p style="margin:0 0 4px"><b>Waiting for the buyer to choose.</b></p>
@@ -134,12 +139,7 @@
           <div class="small muted">${proposal.route === "request_info" ? "No amount until clearer photos arrive." : `${c.quantity} × ${usd(c.unitCents)} unit price paid`}</div>
         </div>
         ${proposal.reasons.length ? `<ul class="reasons">${proposal.reasons.map((r) => `<li>${esc(proposal.reasonText?.[r] || REASON[r] || r)}</li>`).join("")}</ul>` : ""}
-        ${proposal.options?.length > 1 ? `<div class="offer-pitch">
-          <div class="lead"><img src="/assets/kintsugi.svg" alt=""><div><b>This one can be mended</b><div class="small muted">Jev saw ${esc({ handle_off: "a snapped-off handle", crack_or_chip: "a crack or chip" }[d.assessment?.findings?.damage_kind] || "repairable damage")}. Offer a kintsugi kit and a smaller refund, or the full refund. The buyer picks.</div></div></div>
-          ${optionListHtml(proposal.options)}
-          <button id="send-offer" class="primary lg" style="margin-top:16px">Let the buyer choose</button>
-        </div>
-        <p class="small muted center" style="margin:16px 0 0">Or refund directly</p>` : ""}
+        ${offerHtml(proposal)}
         <label for="amount">Refund amount <span class="hint">Up to ${usd(payment.refundableCents)} left on this payment · ${esc(proposal.policyVersion)}</span></label>
         <input id="amount" type="number" inputmode="decimal" min="0.01" step="0.01" max="${(payment.refundableCents / 100).toFixed(2)}" value="${(suggested / 100).toFixed(2)}">
         <div id="reason-wrap" class="${proposal.route === "propose" ? "hidden" : ""}">
@@ -158,8 +158,37 @@
       </div>`;
     }
 
+    // Everything the buyer could be offered instead of the plain refund: Jev's matches from the
+    // remedy library, then Claude Haiku's suggestions from the store's listings. A suggestion only
+    // joins the list once the merchant adds it.
+    function offerHtml(proposal) {
+      const options = proposal.options ?? [], suggestions = proposal.suggestions ?? [];
+      if (options.length < 2 && !suggestions.length) return "";
+      const library = options.filter((o) => o.kind !== "refund" && o.source !== "haiku").length;
+      const head = options.length > 1
+        ? `<b>${options.length - 1} ${options.length === 2 ? "remedy" : "remedies"} ready to offer</b><div class="small muted">${library ? `Jev matched ${library} from <a href="/merchant/remedies">your remedy library</a> to the photos.` : ""}${options.length - 1 > library ? ` ${options.length - 1 - library} added from Claude Haiku's suggestions.` : ""} The buyer picks one, or the full refund.</div>`
+        : `<b>No library remedy fits this damage</b><div class="small muted">Claude Haiku looked through your store listings instead. Add a suggestion to let the buyer choose.</div>`;
+      const art = options.length > 1 ? optionArt(options[1]) : ICON.sparkle;
+      return `<div class="offer-pitch">
+          <div class="lead"><span class="art">${art}</span><div>${head}</div></div>
+          ${options.length > 1 ? optionListHtml(options) : ""}
+          ${suggestions.length ? `<div class="ai-suggest">
+            <div class="ai-head">${ICON.sparkle}<span>Claude Haiku suggests</span></div>
+            <ul>${suggestions.map((s) => `<li class="${s.status}">
+              <div class="sugg-top"><b>${esc(s.title)}</b><span class="amt">${s.refundUnitCents ? `${usd(s.refundUnitCents)} back` : "No refund"}</span></div>
+              <div class="small">Ships free: ${esc(s.item)} <span class="muted">(${usd(s.itemPriceCents)} listing)</span></div>
+              <div class="small muted">${esc(s.why)}</div>
+              <div class="sugg-act">${s.status === "pending"
+                ? `<button class="primary" data-suggest="${esc(s.id)}" data-approve="1">Add to the offer</button><button class="plain" data-suggest="${esc(s.id)}">Dismiss</button>`
+                : `<span class="pill ${s.status === "approved" ? "ok" : ""}">${s.status === "approved" ? "Added to the offer" : "Dismissed"}</span>`}</div>
+            </li>`).join("")}</ul></div>` : ""}
+          ${options.length > 1 ? `<button id="send-offer" class="primary lg" style="margin-top:16px">Let the buyer choose</button>` : ""}
+        </div>
+        ${options.length > 1 ? `<p class="small muted center" style="margin:16px 0 0">Or refund directly</p>` : ""}`;
+    }
+
     function optionListHtml(options) {
-      return `<ul class="option-list">${options.map((o) => `<li><span>${esc(optionText(o).title)}${o.kit ? ` <span class="muted">· ${esc(o.kit)}</span>` : ""}</span><span>${usd(o.refundCents)}</span></li>`).join("")}</ul>`;
+      return `<ul class="option-list">${options.map((o) => `<li><span>${esc(optionText(o).title)}${o.item ? ` <span class="muted">· ${esc(o.item)}</span>` : ""}${typeof o.fit === "number" ? ` <span class="fit" title="How well Jev judged it fits the damage">${Math.round(o.fit * 100)}% fit</span>` : ""}${o.source === "haiku" ? ` <span class="fit ai" title="Suggested by Claude Haiku, approved by you">Haiku</span>` : ""}</span><span>${optionAmount(o)}</span></li>`).join("")}</ul>`;
     }
 
     function refundsHtml() {
@@ -172,7 +201,7 @@
             <h2 style="margin:0">PayPal refund ${word}</h2>
             <div class="big amount">${usd(r.amountCents)}</div>
           </div>
-          ${d.offer?.chosen ? (() => { const o = d.offer.options.find((x) => x.id === d.offer.chosen); return `<div class="kv-row"><span>Buyer chose</span><span>${esc(optionText(o).title)}${o.kit ? `<div class="footnote">Send: ${esc(o.kit)}</div>` : ""}</span></div>`; })() : ""}
+          ${d.offer?.chosen ? (() => { const o = d.offer.options.find((x) => x.id === d.offer.chosen); return `<div class="kv-row"><span>Buyer chose</span><span>${esc(optionText(o).title)}${o.item ? `<div class="footnote">Send: ${esc(o.item)}</div>` : ""}</span></div>`; })() : ""}
           <div class="kv-row"><span>PayPal status</span><span class="pill ${tone}">${esc(r.providerStatus || r.status)}</span></div>
           <div class="kv-row"><span>Refund ID</span><span class="mono">${esc(r.providerRefundId || "Not known yet")}</span></div>
           <div class="kv-row"><span>Idempotency key</span><span class="mono">${esc(r.requestId)}</span></div>
@@ -184,7 +213,7 @@
       }).join("");
     }
 
-    const ACTOR = { buyer: "Buyer", jev: "Jev · AI", policy: "Refund policy", merchant: "You", paypal: "PayPal", system: "System" };
+    const ACTOR = { buyer: "Buyer", jev: "Jev · AI", claude: "Claude Haiku · AI", policy: "Refund policy", merchant: "You", paypal: "PayPal", system: "System" };
     // The agent timeline: who did what, in order, with what each one saw.
     function timelineHtml(steps) {
       const time = (iso) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" });
@@ -266,6 +295,7 @@
       $("send-offer") && ($("send-offer").onclick = (e) => act(`/api/merchant/claims/${id}/send-offer`, {
         claimVersion: d.claim.version, proposalId: d.proposal.id, reason: $("reason")?.value,
       }, e.currentTarget, "Sending…"));
+      document.querySelectorAll("[data-suggest]").forEach((b) => (b.onclick = () => act(`/api/merchant/claims/${id}/suggestions/${b.dataset.suggest}`, { approve: !!b.dataset.approve }, b, b.dataset.approve ? "Adding…" : "Dismissing…")));
       $("assess") && ($("assess").onclick = (e) => act(`/api/merchant/claims/${id}/assess`, {}, e.currentTarget, "Reviewing…"));
       $("request-info") && ($("request-info").onclick = (e) => act(`/api/merchant/claims/${id}/request-info`, { message: $("info").value }, e.currentTarget));
       $("close") && ($("close").onclick = (e) => act(`/api/merchant/claims/${id}/close`, { reason: $("close-reason").value }, e.currentTarget));
