@@ -102,9 +102,20 @@ export function normalize(answers) {
 
 // Where the damage is, one photo at a time: a box answer is relative to a single image, so each
 // photo gets its own small call. Only for the merchant's eyes; policy never reads it. A box is kept
-// only when the same call is confident the photo shows damage, because Jev returns a box even for
+// only when the same call is fairly sure the photo shows damage, because Jev returns a box even for
 // an intact mug. A failed call leaves that photo without a box and never fails the assessment.
 const LOCATE_CONCURRENCY = 4;
+// Per-photo damage is drawn from 0.7: over four live runs each, a real chip scored 0.85-0.87 and
+// intact mugs 0.43-0.55. A box covering almost the whole photo points at nothing, and a hairline
+// one is too thin to see, so the first is dropped and the second widened about its centre.
+const BOX_FROM = 0.7;
+const BOX_MAX_AREA = 0.85;
+const BOX_MIN_SIDE = 0.08;
+const widen = (lo, hi) => {
+  if (hi - lo >= BOX_MIN_SIDE) return [lo, hi];
+  const start = Math.min(1 - BOX_MIN_SIDE, Math.max(0, (lo + hi) / 2 - BOX_MIN_SIDE / 2));
+  return [start, start + BOX_MIN_SIDE];
+};
 
 export function buildLocateRequest(photo) {
   return {
@@ -126,9 +137,11 @@ export function normalizeLocation(answers) {
   if (typeof p !== "number" || !b) return null;
   const edges = ["top", "bottom", "left", "right"].map((k) => Math.min(1, Math.max(0, Number(b[k]))));
   if (edges.some(Number.isNaN)) return null;
-  const [top, bottom, left, right] = edges;
-  if (bottom - top < 0.01 || right - left < 0.01) return null;
-  return { damaged: p, box: p >= YES ? { top, bottom, left, right } : null };
+  if (edges[1] <= edges[0] || edges[3] <= edges[2]) return null;
+  const [top, bottom] = widen(edges[0], edges[1]);
+  const [left, right] = widen(edges[2], edges[3]);
+  const drawn = p >= BOX_FROM && (bottom - top) * (right - left) <= BOX_MAX_AREA;
+  return { damaged: p, box: drawn ? { top, bottom, left, right } : null };
 }
 
 export async function locateDamage(photos, { signal } = {}) {
