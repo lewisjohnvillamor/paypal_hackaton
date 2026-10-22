@@ -6,13 +6,19 @@ import { mkdirSync } from "node:fs";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:8888";
 const photo = process.argv[2] || "probe/cases/broken-rocket-mug.jpg";
-const shots = "hackathon/screenshots";
+const shots = process.env.SHOTS_DIR || "hackathon/screenshots";
 mkdirSync(shots, { recursive: true });
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-const shot = (name) => page.screenshot({ path: `${shots}/${name}.png`, fullPage: true });
+const shot = async (name) => { await page.waitForTimeout(800); return page.screenshot({ path: `${shots}/${name}.png`, fullPage: true }); };
+
+// 0. Store page with the PayPal button rendered.
+await page.goto(BASE);
+await page.waitForSelector("#paypal-buttons iframe", { timeout: 30_000 }).catch(() => {});
+await page.waitForTimeout(1500);
+await shot("0-store");
 
 // 1. Server creates a priced order; the sandbox buyer approves it on PayPal.
 const order = await (await fetch(`${BASE}/api/demo/orders`, { method: "POST" })).json();
@@ -47,16 +53,19 @@ await page.setInputFiles("#photos", photo);
 await shot("1-buyer-claim");
 await page.click("#submit");
 await page.waitForSelector("#sent:not(.hidden)", { timeout: 60_000 });
+await shot("1b-claim-sent");
 const statusUrl = await page.getAttribute("#status-link", "href");
 log("claim sent", await page.textContent("#ref"));
 
 // 4. Merchant signs in, reviews the case, approves the drafted refund.
 await page.goto(`${BASE}/merchant/`);
+await page.waitForSelector("#login:not(.hidden)");
+await shot("1c-merchant-login");
 await page.fill("#password", process.env.MERCHANT_PASSWORD);
 await page.click("#login button[type=submit]");
-await page.waitForSelector("#inbox:not(.hidden) tr.link");
+await page.waitForSelector("#inbox:not(.hidden) a.inbox-row");
 await shot("2-merchant-inbox");
-await page.click("tr.link");
+await page.click("a.inbox-row");
 await page.waitForSelector("#approve");
 await shot("3-merchant-case");
 log("approve button:", await page.textContent("#approve"));

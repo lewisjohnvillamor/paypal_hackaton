@@ -71,7 +71,7 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence 
 
   app.get("/api/claim-link/:orderId", wrap(async (req, res) => {
     const order = orderForClaimToken(req);
-    const lines = db.prepare("SELECT id, title, quantity, unit_cents FROM order_lines WHERE order_id = ?").all(order.id);
+    const lines = db.prepare("SELECT id, title, quantity, unit_cents, ref_image FROM order_lines WHERE order_id = ?").all(order.id);
     const open = db.prepare("SELECT id, ref FROM claims WHERE order_id = ? AND status NOT IN ('closed','refunded')").get(order.id);
     res.json({ orderId: order.id, amountCents: order.amount_cents, capturedAt: order.delivered_at, lines, openClaimRef: open?.ref ?? null });
   }));

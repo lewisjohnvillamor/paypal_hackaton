@@ -94,12 +94,12 @@ await page.waitForSelector("#login:not(.hidden)");
 await say(page, "Now the merchant's side. Refund powers sit behind a merchant sign-in.", 2800);
 await page.locator("#password").pressSequentially(process.env.MERCHANT_PASSWORD, { delay: 25 });
 await page.click("#login button[type=submit]");
-await page.waitForSelector("#inbox:not(.hidden) tr.link");
+await page.waitForSelector("#inbox:not(.hidden) a.inbox-row");
 await say(page, "The inbox shows the new request and the policy's suggested refund.", 3500);
-await page.click("tr.link");
+await page.click("a.inbox-row");
 await page.waitForSelector("#approve");
 await say(page, "Purple: what the customer says. Blue: what the model observed in the photo.", 4000);
-await scrollTo(page, ".who.model");
+await scrollTo(page, ".voice.model");
 await say(page, "Jev: photo usable, breakage visible, same kind of item as the catalog photo. The buyer's text never goes to the model.", 5000);
 await scrollTo(page, "h2:has-text('PayPal payment')");
 await say(page, "The case is tied to the real PayPal capture and its refundable balance.", 3500);
@@ -120,7 +120,7 @@ await say(page, "Refundable balance drops from $80.00 to $60.00.", 3200);
 // 6. Buyer status
 await page.goto(BASE + statusUrl);
 await page.waitForSelector("#card:not(.hidden)");
-await say(page, "The buyer's tracking page: \"Merchant issued a refund\", with the PayPal refund ID.", 4500);
+await say(page, "The buyer's tracking page: refunded through PayPal, with the refund ID.", 4500);
 await say(page, "Refund Relay: PayPal anchors the payment and the refund. AI only helps the merchant review.", 4500);
 
 const mainVideo = page.video();

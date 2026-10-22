@@ -3,51 +3,86 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Request status</title>
+  <meta name="theme-color" content="#f5f5f7">
+  <title>Your request · Juniper Clay Co.</title>
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
-  <header class="top"><a class="brand" href="/">Refund <span>Relay</span></a></header>
+  <header class="top">
+    <a class="brand" href="/"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span>Refund Relay</a>
+  </header>
   <main class="narrow">
-    <h1>Your refund request</h1>
-    <div id="error" class="notice bad hidden"></div>
-    <div id="card" class="card hidden"></div>
+    <div id="error" class="notice bad hidden" role="alert"></div>
+    <div id="card" class="hidden" aria-live="polite"></div>
     <form id="more" class="card hidden">
       <h2>Add photos</h2>
-      <input id="photos" name="photos" type="file" accept="image/jpeg,image/png" multiple required>
-      <p><button class="primary" type="submit" id="send">Send photos</button></p>
+      <div class="dropzone" id="drop">
+        <span id="drop-text"><strong>Choose photos</strong> or drag them here</span>
+        <input id="photos" name="photos" type="file" accept="image/jpeg,image/png" multiple required aria-label="Photos">
+      </div>
+      <button class="primary lg" type="submit" id="send" style="margin-top:16px">Send photos</button>
     </form>
   </main>
   <script type="module">
-    import { api, usd, esc, hashToken, pill, when } from "/app.js";
+    import { api, usd, esc, hashToken, when, checkBadge, ICON, busy, settle } from "/app.js";
     const claimId = new URLSearchParams(location.search).get("claim");
     const token = hashToken();
     const $ = (id) => document.getElementById(id);
-    const fail = (msg) => { $("error").textContent = msg; $("error").classList.remove("hidden"); };
+    const fail = (msg) => { $("error").textContent = msg; $("error").classList.toggle("hidden", !msg); };
 
+    // Three steps, like an order tracker: sent, shop reviews, outcome.
+    function steps(s) {
+      const outcome = s.status === "closed" ? "Closed" : "Refunded";
+      const at = { new: 1, ready: 1, needs_info: 1, refund_processing: 2, refunded: 3, closed: 3 }[s.status] ?? 1;
+      return ["Sent", s.status === "needs_info" ? "Photo needed" : "Shop reviews", outcome].map((label, i) => {
+        const cls = i < at ? "done" : i === at ? "now" : "";
+        return `<li class="${s.status === "closed" && i === 2 ? "stop" : cls}">${label}</li>`;
+      }).join("");
+    }
+
+    let last = "";
     function render(s) {
+      if (JSON.stringify(s) === last) return;
+      last = JSON.stringify(s);
+      const refunded = s.refund?.state === "issued";
       $("card").innerHTML = `
-        <div class="row spread"><b>${esc(s.ref)}</b>${pill(s.status)}</div>
-        <p style="font-size:18px">${esc(s.message)}</p>
-        <dl class="kv"><dt>Item</dt><dd>${esc(s.item)} × ${s.quantity}</dd><dt>Sent</dt><dd>${when(s.createdAt)}</dd>
-        ${s.refund ? `<dt>Refund</dt><dd>${usd(s.refund.amountCents)} USD, ${s.refund.state === "issued" ? "issued by the merchant through PayPal" : "processing"}</dd>` : ""}
-        ${s.refund?.refundId ? `<dt>PayPal refund</dt><dd class="mono">${esc(s.refund.refundId)}</dd>` : ""}</dl>
-        ${s.infoRequest ? `<div class="notice warn"><b>The shop asks:</b> ${esc(s.infoRequest)}</div>` : ""}
-        ${s.closeReason ? `<div class="notice">Reason: ${esc(s.closeReason)}. You can still use PayPal's own resolution options.</div>` : ""}
-        ${s.refund?.state === "issued" ? `<p class="small muted">Refunds can take a few days to appear, depending on how you paid.</p>` : ""}`;
+        <div class="card hero">
+          ${refunded ? checkBadge() : ""}
+          <p class="eyebrow" style="margin:0">Request ${esc(s.ref)}</p>
+          ${refunded ? `<div class="big amount">${usd(s.refund.amountCents)}</div>` : ""}
+          <h2 style="font-size:28px;letter-spacing:-0.03em">${esc(s.message)}</h2>
+          <ol class="tracker" style="--n:3;margin:28px 0 8px">${steps(s)}</ol>
+        </div>
+        ${s.infoRequest ? `<div class="notice warn">${ICON.info}<span><b>The shop asks:</b> ${esc(s.infoRequest)}</span></div>` : ""}
+        ${s.closeReason ? `<div class="notice">${ICON.info}<span><b>The shop's reason:</b> ${esc(s.closeReason)}. You can still use PayPal's own resolution options.</span></div>` : ""}
+        <div class="card">
+          <div class="kv-row"><span>Item</span><span>${esc(s.item)} × ${s.quantity}</span></div>
+          <div class="kv-row"><span>Sent</span><span>${when(s.createdAt)}</span></div>
+          ${s.refund ? `<div class="kv-row"><span>Refund</span><span class="amount">${usd(s.refund.amountCents)} USD · ${refunded ? "issued through PayPal" : "processing"}</span></div>` : ""}
+          ${s.refund?.refundId ? `<div class="kv-row"><span>PayPal refund ID</span><span class="mono">${esc(s.refund.refundId)}</span></div>` : ""}
+        </div>
+        ${refunded ? `<p class="footnote center" style="margin-top:16px">It goes back to how you paid. Depending on your bank, that can take a few days.</p>` : ""}`;
       $("card").classList.remove("hidden");
       $("more").classList.toggle("hidden", s.status !== "needs_info");
     }
     const load = () => api(`/api/claims/${encodeURIComponent(claimId)}/status`, { token }).then(render, (e) => fail(e.message));
     await load();
+    settle();
     setInterval(load, 15000);
 
+    $("photos").onchange = (e) => {
+      const n = e.target.files.length;
+      $("drop-text").innerHTML = n ? `${n} photo${n > 1 ? "s" : ""} added · <strong>Change</strong>` : `<strong>Choose photos</strong> or drag them here`;
+    };
     $("more").onsubmit = async (e) => {
       e.preventDefault();
-      $("send").disabled = true;
-      try { render(await api(`/api/claims/${encodeURIComponent(claimId)}/evidence`, { method: "POST", form: new FormData($("more")), token })); }
+      busy($("send"), true, "Sending…");
+      try { render(await api(`/api/claims/${encodeURIComponent(claimId)}/evidence`, { method: "POST", form: new FormData($("more")), token })); fail(""); }
       catch (err) { fail(err.message); }
-      $("send").disabled = false;
+      busy($("send"), false);
     };
   </script>
 </body>
