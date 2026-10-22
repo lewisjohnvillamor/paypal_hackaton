@@ -148,6 +148,7 @@ const MIGRATIONS = [
   "ALTER TABLE evidence ADD COLUMN phash TEXT",
   "ALTER TABLE evidence ADD COLUMN sharpness INTEGER",
   "ALTER TABLE assessments ADD COLUMN photo_ids_json TEXT",
+  "ALTER TABLE assessments ADD COLUMN marks_json TEXT",
 ];
 
 // Every lookup the app makes by foreign key or by time. Without these, each claim submission and

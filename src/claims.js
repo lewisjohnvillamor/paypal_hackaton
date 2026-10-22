@@ -159,12 +159,15 @@ export async function assessClaim(db, claimId, assess, actor = "system") {
     if (current.version !== claim.version) throw new ClaimError("STALE_CASE", "The request changed during assessment. Run it again.", 409);
     const ts = now();
     const assessmentId = randomUUID();
+    // Damage marks keyed by evidence id; photos without a confident mark are left out.
+    const marks = Object.fromEntries(sent.map((e, i) => [e.id, result?.marks?.[i]]).filter(([, m]) => m));
     db.prepare(`INSERT INTO assessments (id, claim_id, claim_version, model, template_version, findings_json, answers_json,
-      usage_json, latency_ms, error, photo_ids_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      usage_json, latency_ms, error, photo_ids_json, marks_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(assessmentId, claimId, claim.version, result?.model ?? null, TEMPLATE_VERSION,
         result ? JSON.stringify(result.findings) : null, result ? JSON.stringify(result.answers) : null,
         result ? JSON.stringify(result.usage) : null, result?.latencyMs ?? null, error,
-        evidence.length ? JSON.stringify(sent.map((e) => e.id)) : null, ts);
+        evidence.length ? JSON.stringify(sent.map((e) => e.id)) : null,
+        Object.keys(marks).length ? JSON.stringify(marks) : null, ts);
 
     const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(claim.order_id);
     const ops = db.prepare("SELECT * FROM refund_ops WHERE capture_id = ?").all(order.capture_id);

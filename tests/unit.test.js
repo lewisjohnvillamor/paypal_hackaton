@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { toCents, toDecimal } from "../src/money.js";
 import { draftProposal, refundableBalance } from "../src/policy/refundPolicy.js";
-import { normalize } from "../src/ai/jev.js";
+import { normalize, normalizeMark } from "../src/ai/jev.js";
 import { mapProviderStatus } from "../src/refunds/execute.js";
 import { clearFindings } from "./helpers.js";
 
@@ -93,4 +93,19 @@ test("unknown provider statuses are reconciled, never treated as success", () =>
   assert.equal(mapProviderStatus("CANCELLED"), "FAILED");
   assert.equal(mapProviderStatus("SOMETHING_NEW"), "UNKNOWN");
   assert.equal(mapProviderStatus(undefined), "UNKNOWN");
+});
+
+test("damage boxes become marks only when Jev is confident and the box points somewhere", () => {
+  const a = (noul, box, confidence = 0.4) => ({ damage_shown: { noul }, damage_area: { box, confidence } });
+  const chip = { top: 0.46, bottom: 0.56, left: 0.46, right: 0.63 };
+  assert.deepEqual(normalizeMark(a(0.9, chip)), { box: chip, damageShown: 0.9, confidence: 0.4 });
+  assert.equal(normalizeMark(a(0.6, chip)), null, "unsure the photo shows damage");
+  assert.equal(normalizeMark(a(0.99, { top: 0, bottom: 1, left: 0.02, right: 0.98 })), null, "box covers the whole photo");
+  assert.equal(normalizeMark(a(0.99, { top: NaN, bottom: 1, left: 0, right: 1 })), null);
+  assert.equal(normalizeMark({ damage_shown: { noul: 0.9 } }), null);
+  // Swapped edges are put in order; a hairline box is widened so it can be seen, staying in the photo.
+  const thin = normalizeMark(a(0.9, { top: 0.9, bottom: 0.1, left: 0.31, right: 0.32 }));
+  assert.deepEqual(thin.box, { top: 0.1, bottom: 0.9, left: 0.275, right: 0.355 });
+  const edge = normalizeMark(a(0.9, { top: 0.98, bottom: 1.2, left: -0.1, right: 0.01 }));
+  assert.deepEqual(edge.box, { top: 0.92, bottom: 1, left: 0, right: 0.08 });
 });

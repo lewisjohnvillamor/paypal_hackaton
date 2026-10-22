@@ -19,13 +19,17 @@
     <div id="error" class="notice bad hidden" role="alert"></div>
     <div id="page"></div>
   </main>
-  <dialog id="zoom" aria-label="Photo"><img alt="Evidence photo, enlarged"></dialog>
+  <dialog id="zoom" aria-label="Photo"><div class="frame"><img alt="Evidence photo, enlarged"></div></dialog>
   <script type="module">
     import { api, usd, esc, pill, when, ICON, checkBadge, busy, settle } from "/app.js";
     const id = new URLSearchParams(location.search).get("id");
     const $ = (x) => document.getElementById(x);
     const fail = (msg) => { $("error").textContent = msg; $("error").classList.toggle("hidden", !msg); };
-    let d, polls = 0;
+    let d, polls = 0, showMarks = true;
+
+    // Jev's damage box, drawn over the photo in fractions of its size. Purely a pointer for the
+    // merchant's eye; the decision still rests on the photo itself.
+    const markHtml = (m, label) => m ? `<span class="mark-box${m.box.top < 0.1 ? " low" : ""}" style="top:${m.box.top * 100}%;left:${m.box.left * 100}%;width:${(m.box.right - m.box.left) * 100}%;height:${(m.box.bottom - m.box.top) * 100}%">${label ? `<span class="mark-label">${label}</span>` : ""}</span>` : "";
 
     const FINDING = {
       evidence_usable: ["Photos usable for review", { yes: "Yes", no: "No", uncertain: "Unsure" }],
@@ -166,9 +170,10 @@
                 <div class="bubble">${esc(claim.statement)}</div>
               </div></div>
               <div class="row" style="align-items:flex-start;gap:16px;margin-top:20px;flex-wrap:wrap">
-                ${evidence.map((e, i) => `<figure class="figure thumbs" style="margin:0"><button type="button" data-zoom="${e.url}" aria-label="Enlarge customer photo ${i + 1}"><img src="${e.url}" alt="Customer photo ${i + 1}" loading="lazy"></button><figcaption>Customer photo${evidence.length > 1 ? " " + (i + 1) : ""}${e.sentToAi && evidence.length > 8 ? " · checked by Jev" : ""}</figcaption></figure>`).join("")}
+                ${evidence.map((e, i) => `<figure class="figure thumbs evidence" style="margin:0"><button type="button" data-zoom="${e.url}" data-mark="${i}" aria-label="Enlarge customer photo ${i + 1}${e.mark ? ", damage marked by Jev" : ""}"><span class="frame${showMarks ? "" : " marks-off"}" style="width:${Math.round(160 * e.width / e.height)}px"><img src="${e.url}" alt="Customer photo ${i + 1}" loading="lazy" width="${e.width}" height="${e.height}">${markHtml(e.mark)}</span></button><figcaption>Customer photo${evidence.length > 1 ? " " + (i + 1) : ""}${e.mark ? ` · <span class="mark-note">damage marked</span>` : ""}${e.sentToAi && evidence.length > 8 ? " · checked by Jev" : ""}</figcaption></figure>`).join("")}
                 <figure class="figure thumbs" style="margin:0"><button type="button" data-zoom="${line.refImage}" aria-label="Enlarge your catalog photo"><img src="${line.refImage}" alt="Your catalog photo"></button><figcaption>Your catalog photo</figcaption></figure>
               </div>
+              ${evidence.some((e) => e.mark) ? `<div class="row mark-bar"><span class="small muted"><span class="mark-swatch" aria-hidden="true"></span>Jev boxed the damage it found. Check the photo itself before you decide.</span><button id="toggle-marks" class="plain" aria-pressed="${showMarks}">${showMarks ? "Hide boxes" : "Show boxes"}</button></div>` : ""}
             </div>
             <div class="card">
               <div class="voice model"><span class="avatar">${ICON.sparkle}</span><div style="flex:1">
@@ -197,7 +202,16 @@
     }
 
     function wire() {
-      document.querySelectorAll("[data-zoom]").forEach((b) => (b.onclick = () => { $("zoom").querySelector("img").src = b.dataset.zoom; $("zoom").showModal(); }));
+      document.querySelectorAll("[data-zoom]").forEach((b) => (b.onclick = () => {
+        const frame = $("zoom").querySelector(".frame");
+        const mark = b.dataset.mark != null ? d.evidence[b.dataset.mark].mark : null;
+        frame.querySelector(".mark-box")?.remove();
+        frame.classList.toggle("marks-off", !showMarks);
+        frame.querySelector("img").src = b.dataset.zoom;
+        frame.insertAdjacentHTML("beforeend", markHtml(mark, "Damage"));
+        $("zoom").showModal();
+      }));
+      $("toggle-marks") && ($("toggle-marks").onclick = () => { showMarks = !showMarks; render(); $("toggle-marks").focus(); });
       $("zoom").onclick = () => $("zoom").close();
       const amount = $("amount"), approve = $("approve");
       if (amount && approve) {

@@ -25,6 +25,7 @@ export function caseDetail(db, claimId) {
   const evidence = db.prepare("SELECT id, width, height, created_at FROM evidence WHERE claim_id = ? ORDER BY created_at").all(claimId);
   const assessment = db.prepare("SELECT * FROM assessments WHERE claim_id = ? ORDER BY created_at DESC LIMIT 1").get(claimId);
   const sentToAi = new Set(json(assessment?.photo_ids_json) ?? []);
+  const marks = json(assessment?.marks_json) ?? {};
   const proposal = db.prepare("SELECT * FROM proposals WHERE claim_id = ? ORDER BY created_at DESC LIMIT 1").get(claimId);
   const ops = db.prepare("SELECT * FROM refund_ops WHERE capture_id = ? ORDER BY created_at").all(order.capture_id);
   const approvals = db.prepare("SELECT id, actor, amount_cents, override_reason, claim_version, created_at FROM approvals WHERE claim_id = ? ORDER BY created_at").all(claimId);
@@ -43,7 +44,7 @@ export function caseDetail(db, claimId) {
       refundableCents: refundableBalance(order.amount_cents, ops),
     },
     line: { title: line.title, sku: line.sku, quantity: line.quantity, unitCents: line.unit_cents, refImage: `/assets/${line.ref_image}` },
-    evidence: evidence.map((e) => ({ ...e, url: `/api/merchant/evidence/${e.id}`, sentToAi: sentToAi.has(e.id) })),
+    evidence: evidence.map((e) => ({ ...e, url: `/api/merchant/evidence/${e.id}`, sentToAi: sentToAi.has(e.id), mark: marks[e.id] ?? null })),
     assessment: assessment && {
       current: assessment.claim_version === claim.version || (proposal && proposal.claim_version === claim.version),
       model: assessment.model, templateVersion: assessment.template_version, latencyMs: assessment.latency_ms,
