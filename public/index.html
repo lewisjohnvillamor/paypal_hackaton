@@ -32,7 +32,7 @@
           <div id="paypal-buttons" aria-label="Pay with PayPal"></div>
           <div class="notice" style="margin-bottom:0">
             <span aria-hidden="true" style="color:var(--blue)" data-icon="lock"></span>
-            <span>This is the PayPal <b>sandbox</b>. Sign in with the sandbox Personal account; no real money moves.</span>
+            <span id="sandbox-note">This is the PayPal <b>sandbox</b>. Sign in with the sandbox Personal account; no real money moves.</span>
           </div>
         </div>
       </div>
@@ -50,14 +50,31 @@
       </div>
     </section>
     <div id="error" class="notice bad hidden" role="alert"></div>
+
+    <section id="mine" class="hidden" style="margin-top:32px">
+      <h2>Your orders on this device</h2>
+      <div class="card" id="mine-list"></div>
+    </section>
   </main>
   <footer class="foot">Hackathon prototype · PayPal sandbox only · Product photo “white coffee mug on coffeemaker”, CC BY 2.0, via Openverse.</footer>
 
   <script type="module">
-    import { api, usd, esc, ICON, checkBadge } from "/app.js";
+    import { api, usd, esc, ICON, checkBadge, myOrders, rememberOrder } from "/app.js";
     document.querySelectorAll("[data-icon]").forEach((el) => (el.outerHTML = ICON[el.dataset.icon]));
     const fail = (msg) => { const e = document.getElementById("error"); e.textContent = msg; e.classList.remove("hidden"); };
-    const { clientId } = await api("/api/config");
+    // Earlier purchases from this browser, with their private claim or tracking links.
+    const mine = myOrders().filter((o) => o.claimUrl || o.statusUrl);
+    if (mine.length) {
+      document.getElementById("mine-list").innerHTML = mine.map((o) => `
+        <div class="kv-row"><span>${usd(o.amount)} · ${new Date(o.at).toLocaleDateString(undefined, { dateStyle: "medium" })}${o.ref ? ` · ${esc(o.ref)}` : ""}</span>
+        <span>${o.statusUrl ? `<a href="${esc(o.statusUrl)}">Track request</a>` : `<a href="${esc(o.claimUrl)}">Report a problem</a>`}</span></div>`).join("");
+      document.getElementById("mine").classList.remove("hidden");
+    }
+    const { clientId, demo } = await api("/api/config");
+    if (demo?.buyerEmail) {
+      document.getElementById("sandbox-note").innerHTML = `This is the PayPal <b>sandbox</b>; no real money moves. Sign in to PayPal with
+        <b class="mono">${esc(demo.buyerEmail)}</b>${demo.buyerPassword ? ` / <b class="mono">${esc(demo.buyerPassword)}</b>` : ""}.`;
+    }
     const s = document.createElement("script");
     s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD&intent=capture`;
     s.onload = () => paypal.Buttons({
@@ -73,8 +90,17 @@
             <div class="kv-row"><span>Item</span><span>Classic white ceramic mug × 4</span></div>
             <div class="kv-row"><span>PayPal order</span><span class="mono">${esc(orderID)}</span></div>
             <div class="kv-row"><span>Capture</span><span class="mono">${esc(r.captureId)}</span></div>`;
-          if (r.claimUrl) document.getElementById("claim-link").href = r.claimUrl;
+          if (r.claimUrl) {
+            document.getElementById("claim-link").href = r.claimUrl;
+            rememberOrder(r.orderId, { amount: r.amount, claimUrl: r.claimUrl });
+          } else {
+            // Captured earlier (a retried approval): the private link was already handed out.
+            const known = myOrders().find((o) => o.orderId === r.orderId);
+            if (known) document.getElementById("claim-link").href = known.statusUrl || known.claimUrl;
+            else document.getElementById("claim-link").classList.add("hidden");
+          }
           document.getElementById("shop").classList.add("hidden");
+          document.getElementById("mine").classList.add("hidden");
           document.getElementById("done").classList.remove("hidden");
           window.scrollTo({ top: 0 });
         } catch (e) { fail(e.message); }

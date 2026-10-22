@@ -22,6 +22,7 @@
       <p class="muted small" style="margin:0 0 24px">Juniper Clay Co. merchant console</p>
       <label for="password" class="sr-only">Password</label>
       <input id="password" type="password" autocomplete="current-password" placeholder="Password" required>
+      <div id="demo-hint" class="notice hidden" style="text-align:left"></div>
       <div id="login-error" class="notice bad hidden" role="alert" style="text-align:left"></div>
       <button class="primary lg" type="submit" style="margin-top:16px">Sign in</button>
     </form>
@@ -71,6 +72,12 @@
         if (e.status === 401) { $("login").classList.remove("hidden"); $("inbox").classList.add("hidden"); $("password").focus(); }
       }
     }
+    // Hosted demo: show judges the sandbox merchant password.
+    api("/api/config").then(({ demo }) => {
+      if (!demo?.merchantPassword) return;
+      $("demo-hint").innerHTML = `<span>Demo sign-in: <b class="mono">${esc(demo.merchantPassword)}</b></span>`;
+      $("demo-hint").classList.remove("hidden");
+    }).catch(() => {});
     $("login").onsubmit = async (e) => {
       e.preventDefault();
       try { await api("/api/merchant/login", { method: "POST", body: { password: $("password").value } }); load(); }

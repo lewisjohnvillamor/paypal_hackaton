@@ -13,6 +13,7 @@
     "dev": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --watch src/server.js",
     "test": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 tests/*.test.js",
     "probe": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning probe/run.js",
+    "probe:stability": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning probe/stability.js",
     "cleanup": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning src/cleanup.js",
     "backup": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning src/backup.js",
     "bench": "node --disable-warning=ExperimentalWarning bench/run.js"

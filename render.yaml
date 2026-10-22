@@ -43,3 +43,10 @@ services:
         sync: false
       - key: REPEAT_CLAIM_LIMIT
         value: "0"
+      # Judges see the sandbox sign-ins on the pages; set the buyer pair to a sandbox Personal account.
+      - key: PUBLIC_DEMO
+        value: "1"
+      - key: DEMO_BUYER_EMAIL
+        sync: false
+      - key: DEMO_BUYER_PASSWORD
+        sync: false
