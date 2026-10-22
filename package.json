@@ -1,0 +1,24 @@
+{
+  "name": "refund-relay",
+  "version": "0.1.0",
+  "description": "Turn a damaged-order complaint into a merchant-approved PayPal partial refund, with photo evidence triaged by Jev.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.15"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning src/server.js",
+    "dev": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --watch src/server.js",
+    "test": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 tests/*.test.js",
+    "probe": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning probe/run.js",
+    "cleanup": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning src/cleanup.js"
+  },
+  "dependencies": {
+    "@typesafe-ai/sdk": "^0.7.0",
+    "express": "^4.22.3",
+    "multer": "^2.4.0",
+    "sharp": "^0.35.5"
+  }
+}
