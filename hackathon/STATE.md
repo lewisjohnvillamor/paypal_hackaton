@@ -28,6 +28,22 @@ Boxes are display only; policy never reads them. Live check (jev-1.14.0): snappe
 cracked glass were all outlined in the right place, intact mugs got no box, about 300-600 ms for
 the whole assessment. Screenshots: `screenshots/6-damage-boxes.png`, `6b-damage-zoom.png`.
 
+## Kintsugi repair offers (2026-10-22)
+
+When Jev reads the damage as a chip, crack or snapped handle (damage-type confidence 0.5 or more,
+visible breakage "yes"), the proposal carries three options the merchant can send instead of
+deciding alone: full refund ($20), keep it with a free kintsugi kit ($12 back), or the 24k
+gold-leaf kit ($3 back: the $9 kit price comes off the refund, so the buyer never pays twice).
+The merchant clicks "Let the buyer choose"; that approves every amount on the list. The buyer
+picks on the status page, and the pick becomes one PayPal partial refund through the same gate as
+a direct approval (`reserve` in `src/refunds/execute.js`, `src/offers.js`). A shattered mug, or an
+unsure damage type, gets the plain refund only. Amounts live in `src/catalog.js` under `repair`.
+
+Live sandbox run (`E2E_OFFER=1 node --env-file=.env scripts/e2e-sandbox.js probe/cases/chipped-closeup.jpg`):
+buyer picked the gold-leaf kit, refund `0XM259959W007021K` for $3.00 COMPLETED. Screenshots
+`screenshots/7-*.png` to `9-*.png`. Not built yet: real kit fulfilment (the merchant sees "Send:
+<kit>" on the case), and offering a replacement.
+
 ## Gates
 
 - Gate 1 (financial loop): done, in an earlier thread and again here.

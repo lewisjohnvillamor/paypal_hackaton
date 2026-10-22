@@ -22,6 +22,7 @@ export const STATUS = {
   new: ["New", "info"],
   needs_info: ["Waiting on buyer", "warn"],
   ready: ["To review", "info"],
+  offer_sent: ["Buyer choosing", "info"],
   refund_processing: ["Refunding", "warn"],
   refunded: ["Refunded", "ok"],
   closed: ["Closed", ""],
@@ -53,3 +54,10 @@ export function busy(btn, on, label) {
 
 // Cards fade in on first paint only; later re-renders (polling, actions) stay still.
 export const settle = () => setTimeout(() => document.body.classList.add("settled"), 700);
+
+// Wording for a resolution option, shared by the buyer's choice and the merchant's case page.
+export function optionText(o) {
+  if (o.kind === "refund") return { title: "Full refund", detail: `${usd(o.refundCents)} back to your PayPal account. Keep or recycle the pieces.` };
+  if (o.kitPriceCents) return { title: "Mend it in 24k gold leaf", detail: `${usd(o.refundCents)} back, plus the ${o.kit}. Its ${usd(o.kitPriceCents)} price comes off the refund, so there's nothing more to pay.` };
+  return { title: "Keep it and mend it with kintsugi", detail: `${usd(o.refundCents)} back, plus a free ${o.kit}. Lacquer and gold turn the break into the best part of the mug.` };
+}

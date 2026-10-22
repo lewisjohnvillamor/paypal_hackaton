@@ -27,7 +27,7 @@
     </form>
   </main>
   <script type="module">
-    import { api, usd, esc, hashToken, when, checkBadge, ICON, busy, settle } from "/app.js";
+    import { api, usd, esc, hashToken, when, checkBadge, ICON, busy, settle, optionText } from "/app.js";
     import { shrinkPhotos } from "/photos.js";
     const claimId = new URLSearchParams(location.search).get("claim");
     const token = hashToken();
@@ -37,11 +37,23 @@
     // Three steps, like an order tracker: sent, shop reviews, outcome.
     function steps(s) {
       const outcome = s.status === "closed" ? "Closed" : "Refunded";
-      const at = { new: 1, ready: 1, needs_info: 1, refund_processing: 2, refunded: 3, closed: 3 }[s.status] ?? 1;
-      return ["Sent", s.status === "needs_info" ? "Photo needed" : "Shop reviews", outcome].map((label, i) => {
+      const at = { new: 1, ready: 1, needs_info: 1, offer_sent: 1, refund_processing: 2, refunded: 3, closed: 3 }[s.status] ?? 1;
+      return ["Sent", s.status === "needs_info" ? "Photo needed" : s.status === "offer_sent" || s.offer ? "Your choice" : "Shop reviews", outcome].map((label, i) => {
         const cls = i < at ? "done" : i === at ? "now" : "";
         return `<li class="${s.status === "closed" && i === 2 ? "stop" : cls}">${label}</li>`;
       }).join("");
+    }
+
+    // The options the shop approved. Before a pick they are buttons; after, the pick stays highlighted.
+    function optionsHtml(offer) {
+      const art = (o) => o.kind === "refund" ? `<span class="art">${ICON.check}</span>` : `<span class="art"><img src="/assets/kintsugi.svg" alt=""></span>`;
+      return `<div class="options" role="group" aria-label="Ways to put this right">${offer.options.map((o) => {
+        const t = optionText(o);
+        const chosen = offer.chosen === o.id;
+        if (!offer.open && !chosen) return "";
+        return `<button type="button" class="option${o.kitPriceCents ? " gold" : ""}${chosen ? " chosen" : ""}" data-option="${esc(o.id)}" ${offer.open ? "" : "disabled"} aria-pressed="${chosen}">
+          ${art(o)}<span><b>${esc(t.title)}</b><span class="detail">${esc(t.detail)}</span></span><span class="amt">${usd(o.refundCents)}</span></button>`;
+      }).join("")}</div>`;
     }
 
     let last = "";
@@ -54,9 +66,11 @@
           ${refunded ? checkBadge() : ""}
           <p class="eyebrow" style="margin:0">Request ${esc(s.ref)}</p>
           ${refunded ? `<div class="big amount">${usd(s.refund.amountCents)}</div>` : ""}
-          <h2 style="font-size:28px;letter-spacing:-0.03em">${esc(s.message)}</h2>
+          <h2 style="font-size:28px;letter-spacing:-0.03em">${esc(kitChosen(s) && refunded ? "Refund sent. Your kintsugi kit is on its way." : s.message)}</h2>
           <ol class="tracker" style="--n:3;margin:28px 0 8px">${steps(s)}</ol>
         </div>
+        ${s.offer?.open ? `<div class="card"><h2 style="margin-top:0">Pick one</h2><p class="muted" style="margin-top:-6px">The shop approved all three. The amount on each is what comes back to your PayPal account.</p>${optionsHtml(s.offer)}</div>` : ""}
+        ${s.offer && !s.offer.open ? `<div class="card"><h2 style="margin-top:0">You chose</h2>${optionsHtml(s.offer)}${kitChosen(s) ? `<p class="footnote" style="margin:12px 0 0">The shop will post your kit to the address on your PayPal order.</p>` : ""}</div>` : ""}
         ${s.infoRequest ? `<div class="notice warn">${ICON.info}<span><b>The shop asks:</b> ${esc(s.infoRequest)}</span></div>` : ""}
         ${s.closeReason ? `<div class="notice">${ICON.info}<span><b>The shop's reason:</b> ${esc(s.closeReason)}. You can still use PayPal's own resolution options.</span></div>` : ""}
         <div class="card">
@@ -68,6 +82,16 @@
         ${refunded ? `<p class="footnote center" style="margin-top:16px">It goes back to how you paid. Depending on your bank, that can take a few days.</p>` : ""}`;
       $("card").classList.remove("hidden");
       $("more").classList.toggle("hidden", s.status !== "needs_info");
+      document.querySelectorAll("[data-option]:not([disabled])").forEach((b) => (b.onclick = () => choose(s.offer.id, b)));
+    }
+    const kitChosen = (s) => s.offer?.options.find((o) => o.id === s.offer.chosen)?.kind === "repair";
+
+    async function choose(offerId, btn) {
+      document.querySelectorAll("[data-option]").forEach((b) => (b.disabled = true));
+      btn.querySelector(".amt").innerHTML = `<span class="spinner" aria-hidden="true"></span>`;
+      fail("");
+      try { render(await api(`/api/claims/${encodeURIComponent(claimId)}/choose`, { method: "POST", body: { offerId, optionId: btn.dataset.option }, token })); }
+      catch (err) { fail(err.message); last = ""; await load(); }
     }
     const load = () => api(`/api/claims/${encodeURIComponent(claimId)}/status`, { token }).then(render, (e) => fail(e.message));
     await load();

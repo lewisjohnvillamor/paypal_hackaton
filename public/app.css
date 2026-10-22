@@ -262,6 +262,26 @@ details.more[open] summary::after { transform: rotate(-135deg) translateY(-2px);
 .check svg { width: 34px; height: 34px; }
 .check path { stroke-dasharray: 30; stroke-dashoffset: 30; animation: draw 0.45s 0.2s var(--ease) forwards; }
 
+/* Resolution options (kintsugi repair offers) */
+.options { display: grid; gap: 12px; margin-top: 4px; }
+.option { display: grid; grid-template-columns: 56px 1fr auto; gap: 14px; align-items: center; text-align: left; width: 100%; padding: 16px; border-radius: 16px; background: var(--surface); border: 1.5px solid var(--border); color: var(--text); font: inherit; min-height: 0; cursor: pointer; transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), transform 0.2s var(--ease); }
+.option:hover { border-color: var(--blue); box-shadow: var(--shadow-lift); background: var(--surface); }
+.option[disabled] { cursor: default; opacity: 1; }
+.option.chosen { border-color: #d4a23a; box-shadow: 0 0 0 3px rgb(212 162 58 / 0.25); }
+.option .art { width: 56px; height: 56px; border-radius: 12px; background: var(--surface-2); display: grid; place-items: center; overflow: hidden; }
+.option .art img { width: 52px; height: 52px; }
+.option .art svg { width: 26px; height: 26px; color: var(--text-2); }
+.option b { display: block; font-size: 16px; margin-bottom: 2px; }
+.option .detail { display: block; font-size: 13px; color: var(--text-2); line-height: 1.4; }
+.option .amt { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; white-space: nowrap; }
+.option.gold b { background: linear-gradient(90deg, #b8862b, #e0b44c, #b8862b); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.offer-pitch { margin-top: 18px; padding: 16px; border-radius: 16px; background: linear-gradient(135deg, rgb(212 162 58 / 0.12), rgb(212 162 58 / 0.04)); border: 1px solid rgb(212 162 58 / 0.35); }
+.offer-pitch .lead { display: grid; grid-template-columns: 48px 1fr; gap: 12px; align-items: center; }
+.offer-pitch .lead img { width: 48px; height: 48px; }
+.option-list { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 8px; }
+.option-list li { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+.option-list li span:last-child { font-weight: 600; white-space: nowrap; }
+
 /* Progress tracker (order-status style) */
 .tracker { list-style: none; display: grid; grid-template-columns: repeat(var(--n, 3), 1fr); padding: 0; margin: 8px 0 4px; counter-reset: s; }
 .tracker li { position: relative; text-align: center; font-size: 13px; color: var(--text-2); padding-top: 30px; }

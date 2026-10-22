@@ -1,6 +1,7 @@
 // Read models for the UI. Buyer views expose only that buyer's safe status.
 import { refundableBalance } from "./policy/refundPolicy.js";
 import { REASON_TEXT } from "./reasons.js";
+import { latestOffer } from "./offers.js";
 
 const json = (s) => (s ? JSON.parse(s) : null);
 
@@ -60,6 +61,7 @@ export function caseDetail(db, claimId) {
       reasonText: Object.fromEntries((json(proposal.calc_json).reasons ?? []).map((r) => [r, REASON_TEXT[r] ?? r])),
     },
     approvals,
+    offer: latestOffer(db, claimId),
     refunds: ops.filter((o) => o.claim_id === claimId).map((o) => ({
       id: o.id, status: o.status, amountCents: o.amount_cents, providerRefundId: o.provider_refund_id,
       providerStatus: o.provider_status, debugId: o.debug_id, error: o.error, attempts: o.attempts,
@@ -72,6 +74,7 @@ export function caseDetail(db, claimId) {
 const BUYER_WORDING = {
   new: "Received. The shop will look at it soon.",
   ready: "The shop is reviewing your photos.",
+  offer_sent: "Choose how you'd like this put right.",
   needs_info: "The shop needs another photo.",
   refund_processing: "Your refund is on its way.",
   refunded: "The shop refunded you through PayPal.",
@@ -82,12 +85,17 @@ export function buyerStatus(db, claim) {
   const op = db.prepare("SELECT status, amount_cents, provider_refund_id FROM refund_ops WHERE claim_id = ? ORDER BY created_at DESC LIMIT 1").get(claim.id);
   const last = (type) => db.prepare("SELECT payload FROM audit WHERE claim_id = ? AND type = ? ORDER BY id DESC LIMIT 1").get(claim.id, type);
   const line = db.prepare("SELECT title FROM order_lines WHERE id = ?").get(claim.line_id);
+  const offer = latestOffer(db, claim.id);
   return {
     ref: claim.ref, status: claim.status, message: BUYER_WORDING[claim.status], item: line.title, quantity: claim.quantity,
     infoRequest: claim.status === "needs_info" ? json(last("claim.info_requested")?.payload)?.message : null,
     closeReason: claim.status === "closed" ? json(last("claim.closed")?.payload)?.reason : null,
     refund: op && ["COMPLETED", "PENDING", "SUBMITTING", "UNKNOWN"].includes(op.status)
       ? { amountCents: op.amount_cents, state: op.status === "COMPLETED" ? "issued" : "processing", refundId: op.provider_refund_id }
+      : null,
+    // Only what the buyer needs to choose: no model findings, no risk flags.
+    offer: offer && (offer.status === "open" ? claim.status === "offer_sent" : true)
+      ? { id: offer.id, open: offer.status === "open", chosen: offer.chosen, options: offer.options }
       : null,
     createdAt: claim.created_at,
   };

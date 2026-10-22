@@ -21,7 +21,7 @@
   </main>
   <dialog id="zoom" aria-label="Photo"><span class="damage-frame"><img alt="Evidence photo, enlarged"></span></dialog>
   <script type="module">
-    import { api, usd, esc, pill, when, ICON, checkBadge, busy, settle } from "/app.js";
+    import { api, usd, esc, pill, when, ICON, checkBadge, busy, settle, optionText } from "/app.js";
     const id = new URLSearchParams(location.search).get("id");
     const $ = (x) => document.getElementById(x);
     const fail = (msg) => { $("error").textContent = msg; $("error").classList.toggle("hidden", !msg); };
@@ -60,6 +60,8 @@
       "assessment.failed": "AI review failed",
       "claim.info_requested": "You asked for more photos",
       "claim.closed": "Closed without a refund",
+      "offer.sent": "You let the buyer choose",
+      "offer.accepted": "Buyer chose",
       "refund.approved": "You approved the refund",
       "refund.completed": "PayPal completed the refund",
       "refund.pending": "PayPal refund pending",
@@ -100,7 +102,7 @@
           ${typeof p === "number" ? `<span class="meter" role="img" style="color:var(--${tone === "ok" ? "green-fill" : tone === "bad" ? "red" : "orange"})" title="Model confidence ${p.toFixed(2)}" aria-label="Confidence ${Math.round(p * 100)} percent"><i style="width:${Math.round(p * 100)}%"></i></span>` : ""}
           <span class="pill ${tone}">${values[f[k]] || esc(f[k])}</span></span></div>`;
       }).join("") +
-        `<div class="finding"><span>Damage type</span><span class="muted">${esc(f.damage_kind.replace("_", " "))}</span></div>
+        `<div class="finding"><span>Damage type</span><span class="muted">${esc(f.damage_kind.replaceAll("_", " "))}</span></div>
          <p class="footnote" style="margin:12px 0 0">${esc(a.model)} · ${esc(a.templateVersion)} · ${a.latencyMs} ms · ${a.photosTotal > a.photosSent ? `Looked at the ${a.photosSent} clearest of ${a.photosTotal} photos. ` : ""}Photos only. The buyer's words are never sent to the model.</p>`;
     }
 
@@ -108,6 +110,10 @@
       const { claim, proposal, payment } = d;
       if (["refunded", "closed", "refund_processing"].includes(claim.status)) return "";
       const head = `<div class="voice merchant" style="margin-bottom:16px"><span class="avatar">${ICON.check}</span><div><div class="tag">Your decision</div><div class="small muted">Nothing moves until you approve.</div></div></div>`;
+      if (claim.status === "offer_sent" && d.offer) {
+        return `<div class="card">${head}<p style="margin:0 0 4px"><b>Waiting for the buyer to choose.</b></p>
+          <p class="small muted" style="margin:0">You approved these amounts. Their pick is refunded through PayPal straight away.</p>${optionListHtml(d.offer.options)}</div>`;
+      }
       if (claim.status === "new" && (!proposal || !proposal.current) && polls < 40) {
         // Assessment runs in the background queue; check back until it lands (about a minute at most).
         polls++;
@@ -128,6 +134,12 @@
           <div class="small muted">${proposal.route === "request_info" ? "No amount until clearer photos arrive." : `${c.quantity} × ${usd(c.unitCents)} unit price paid`}</div>
         </div>
         ${proposal.reasons.length ? `<ul class="reasons">${proposal.reasons.map((r) => `<li>${esc(proposal.reasonText?.[r] || REASON[r] || r)}</li>`).join("")}</ul>` : ""}
+        ${proposal.options?.length > 1 ? `<div class="offer-pitch">
+          <div class="lead"><img src="/assets/kintsugi.svg" alt=""><div><b>This one can be mended</b><div class="small muted">Jev saw ${esc({ handle_off: "a snapped-off handle", crack_or_chip: "a crack or chip" }[d.assessment?.findings?.damage_kind] || "repairable damage")}. Offer a kintsugi kit and a smaller refund, or the full refund. The buyer picks.</div></div></div>
+          ${optionListHtml(proposal.options)}
+          <button id="send-offer" class="primary lg" style="margin-top:16px">Let the buyer choose</button>
+        </div>
+        <p class="small muted center" style="margin:16px 0 0">Or refund directly</p>` : ""}
         <label for="amount">Refund amount <span class="hint">Up to ${usd(payment.refundableCents)} left on this payment · ${esc(proposal.policyVersion)}</span></label>
         <input id="amount" type="number" inputmode="decimal" min="0.01" step="0.01" max="${(payment.refundableCents / 100).toFixed(2)}" value="${(suggested / 100).toFixed(2)}">
         <div id="reason-wrap" class="${proposal.route === "propose" ? "hidden" : ""}">
@@ -146,6 +158,10 @@
       </div>`;
     }
 
+    function optionListHtml(options) {
+      return `<ul class="option-list">${options.map((o) => `<li><span>${esc(optionText(o).title)}${o.kit ? ` <span class="muted">· ${esc(o.kit)}</span>` : ""}</span><span>${usd(o.refundCents)}</span></li>`).join("")}</ul>`;
+    }
+
     function refundsHtml() {
       if (!d.refunds.length) return "";
       return d.refunds.map((r) => {
@@ -156,6 +172,7 @@
             <h2 style="margin:0">PayPal refund ${word}</h2>
             <div class="big amount">${usd(r.amountCents)}</div>
           </div>
+          ${d.offer?.chosen ? (() => { const o = d.offer.options.find((x) => x.id === d.offer.chosen); return `<div class="kv-row"><span>Buyer chose</span><span>${esc(optionText(o).title)}${o.kit ? `<div class="footnote">Send: ${esc(o.kit)}</div>` : ""}</span></div>`; })() : ""}
           <div class="kv-row"><span>PayPal status</span><span class="pill ${tone}">${esc(r.providerStatus || r.status)}</span></div>
           <div class="kv-row"><span>Refund ID</span><span class="mono">${esc(r.providerRefundId || "Not known yet")}</span></div>
           <div class="kv-row"><span>Idempotency key</span><span class="mono">${esc(r.requestId)}</span></div>
@@ -169,7 +186,8 @@
 
     function historyHtml(history) {
       return `<div class="card"><h2>Activity</h2><ol class="timeline">${history.map((h) => {
-        const extra = h.payload?.reason || h.payload?.message || h.payload?.overrideReason;
+        const extra = h.payload?.reason || h.payload?.message || h.payload?.overrideReason ||
+          (h.type === "offer.accepted" ? `${h.payload.kit ? h.payload.kit + ", " : "full refund, "}$${h.payload.refund} back` : "");
         return `<li class="${esc(h.actor)}"><div>${esc(EVENT[h.type] || h.type)}</div><div class="when">${when(h.at)}${extra ? " · " + esc(extra) : ""}</div></li>`;
       }).join("")}</ol></div>`;
     }
@@ -242,6 +260,9 @@
           amountCents: Math.round(Number(amount.value) * 100), reason: $("reason")?.value,
         }, approve, "Refunding with PayPal…");
       }
+      $("send-offer") && ($("send-offer").onclick = (e) => act(`/api/merchant/claims/${id}/send-offer`, {
+        claimVersion: d.claim.version, proposalId: d.proposal.id, reason: $("reason")?.value,
+      }, e.currentTarget, "Sending…"));
       $("assess") && ($("assess").onclick = (e) => act(`/api/merchant/claims/${id}/assess`, {}, e.currentTarget, "Reviewing…"));
       $("request-info") && ($("request-info").onclick = (e) => act(`/api/merchant/claims/${id}/request-info`, { message: $("info").value }, e.currentTarget));
       $("close") && ($("close").onclick = (e) => act(`/api/merchant/claims/${id}/close`, { reason: $("close-reason").value }, e.currentTarget));
