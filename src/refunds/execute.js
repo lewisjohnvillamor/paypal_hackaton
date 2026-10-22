@@ -23,6 +23,42 @@ export function mapProviderStatus(s) {
 
 const OPEN = ["SUBMITTING", "PENDING", "UNKNOWN"];
 
+// Step 0 (network, before any reservation): compare PayPal's own record of the capture with ours.
+// Refunds issued from the PayPal dashboard, a reversed (charged-back) capture, or a capture PayPal
+// no longer considers refundable all block the app until a person reconciles them.
+export async function checkPayPalLedger(db, paypal, claimId) {
+  const claim = db.prepare("SELECT * FROM claims WHERE id = ?").get(claimId);
+  if (!claim) throw new GateError("NOT_FOUND", "No such refund request.");
+  const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(claim.order_id);
+  const ops = db.prepare("SELECT * FROM refund_ops WHERE capture_id = ?").all(order.capture_id);
+  if (ops.some((o) => OPEN.includes(o.status))) return; // the reservation step reports this case
+
+  let res;
+  try {
+    res = await paypal.getOrder(order.paypal_order_id);
+  } catch {
+    res = null;
+  }
+  if (!res || res.status !== 200) {
+    throw new GateError("PAYPAL_UNAVAILABLE", "Could not confirm the payment with PayPal. Nothing was refunded; try again shortly.", { status: 503 });
+  }
+  const payments = res.body.purchase_units?.[0]?.payments ?? {};
+  const cap = payments.captures?.find((c) => c.id === order.capture_id);
+  if (!cap) throw new GateError("CAPTURE_NOT_FOUND", "PayPal does not list this capture on the order.");
+  if (!["COMPLETED", "PARTIALLY_REFUNDED"].includes(cap.status)) {
+    audit(db, { claimId, actor: "system", type: "paypal.capture_not_refundable", payload: { captureStatus: cap.status } });
+    throw new GateError("CAPTURE_NOT_REFUNDABLE", `PayPal reports this payment as ${cap.status}; it cannot be refunded here.`);
+  }
+  const ours = new Set(ops.map((o) => o.provider_refund_id).filter(Boolean));
+  const external = (payments.refunds ?? []).filter((r) => !ours.has(r.id) && !["FAILED", "CANCELLED"].includes(r.status));
+  if (external.length) {
+    audit(db, { claimId, actor: "system", type: "paypal.external_refund_detected",
+      payload: { refunds: external.map((r) => ({ id: r.id, status: r.status, value: r.amount?.value })) } });
+    throw new GateError("EXTERNAL_REFUND_DETECTED",
+      "PayPal shows a refund on this payment that Refund Relay did not make. Reconcile it in PayPal before refunding here.");
+  }
+}
+
 // Step 1 (transaction, no I/O): validate approval inputs, record approval, reserve funds, persist op.
 export function approveAndReserve(db, { claimId, claimVersion, proposalId, amountCents, reason, actor }) {
   return tx(db, () => {

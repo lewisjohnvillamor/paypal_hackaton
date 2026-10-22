@@ -80,7 +80,7 @@ await page.click("#claim-link");
 await page.waitForSelector("#form:not(.hidden)");
 await say(page, "A few days later: one mug arrived broken. The buyer opens the claim link.", 3200);
 await page.locator("#statement").pressSequentially("One of the four mugs arrived broken. The handle snapped off in the box.", { delay: 18 });
-await page.setInputFiles("#photos", "probe/cases/broken-rocket-mug.jpg");
+await page.setInputFiles("#photos", "probe/cases/broken-handle-white.jpg");
 await scrollTo(page, "#submit");
 await say(page, "They pick the item and quantity, describe it, and attach a photo.", 3200);
 await page.click("#submit");

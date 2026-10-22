@@ -1,52 +1,9 @@
 // Workflow and financial-invariant tests over HTTP, using a fake PayPal and fake Jev (test doubles).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fakeAssess, fakePayPal, testPhoto } from "./helpers.js";
-import { createApp } from "../src/server.js";
-import { openDb } from "../src/db.js";
+import { fakePayPal, testPhoto } from "./helpers.js";
+import { approve, purchaseAndClaim, setup } from "./harness.js";
 import { reconcile, reconcileOpen } from "../src/refunds/execute.js";
-
-async function setup({ pp = fakePayPal(), assess = fakeAssess() } = {}) {
-  const db = openDb(":memory:");
-  const { app } = createApp({ db, pp, assess });
-  const server = app.listen(0);
-  const base = `http://127.0.0.1:${server.address().port}`;
-  let cookie = "";
-  const call = async (method, path, { body, headers = {}, form } = {}) => {
-    const res = await fetch(base + path, {
-      method,
-      headers: { ...(body ? { "Content-Type": "application/json" } : {}), ...(cookie ? { Cookie: cookie } : {}), ...headers },
-      body: form ?? (body ? JSON.stringify(body) : undefined),
-    });
-    const setCookie = res.headers.get("set-cookie");
-    if (setCookie) cookie = setCookie.split(";")[0];
-    return { status: res.status, body: await res.json().catch(() => null) };
-  };
-  const merchant = (method, path, body) => call(method, `/api/merchant${path}`, { body, headers: { "X-Refund-Relay": "1" } });
-  return { db, pp, call, merchant, close: () => server.close(), login: () => call("POST", "/api/merchant/login", { body: { password: "test-password" } }) };
-}
-
-async function purchaseAndClaim(t, { quantity = 1 } = {}) {
-  const order = await t.call("POST", "/api/demo/orders");
-  assert.equal(order.status, 201);
-  const cap = await t.call("POST", `/api/demo/orders/${order.body.paypalOrderId}/capture`);
-  assert.equal(cap.status, 200, JSON.stringify(cap.body));
-  const token = cap.body.claimUrl.split("#t=")[1];
-  const link = await t.call("GET", `/api/claim-link/${order.body.id}`, { headers: { "X-Claim-Token": token } });
-  const form = new FormData();
-  form.set("orderId", order.body.id);
-  form.set("lineId", link.body.lines[0].id);
-  form.set("quantity", String(quantity));
-  form.set("statement", "One mug arrived shattered.");
-  form.append("photos", new Blob([await testPhoto()], { type: "image/jpeg" }), "p.jpg");
-  const claim = await t.call("POST", "/api/claims", { form, headers: { "X-Claim-Token": token } });
-  assert.equal(claim.status, 201, JSON.stringify(claim.body));
-  return { orderId: order.body.id, token, claimId: claim.body.claimId, statusToken: claim.body.statusUrl.split("#t=")[1] };
-}
-
-const approve = (t, d, extra = {}) => t.merchant("POST", `/api/merchant/claims/${d.claim.id}/approve-refund`.replace("/api/merchant", ""), {
-  claimVersion: d.claim.version, proposalId: d.proposal.id, amountCents: d.proposal.amountCents, ...extra,
-});
 
 test("happy path: $80 purchase, one broken mug, $20 approved refund reaches PayPal once", async () => {
   const t = await setup();

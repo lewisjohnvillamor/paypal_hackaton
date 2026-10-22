@@ -7,7 +7,7 @@ import { ImageRejected, MAX_PHOTOS, MAX_UPLOAD_BYTES, normalizeImage } from "./i
 import { checkMerchantPassword, clearSession, issueSession, requireMerchant, tokenMatches } from "./auth.js";
 import { OrderError, captureOrder, startOrder } from "./orders.js";
 import { ClaimError, addEvidence, assessClaim, closeClaim, createClaim, readEvidence, requestInfo } from "./claims.js";
-import { GateError, approveAndReserve, reconcile, reconcileOpen, submit } from "./refunds/execute.js";
+import { GateError, approveAndReserve, checkPayPalLedger, reconcile, reconcileOpen, submit } from "./refunds/execute.js";
 import { caseDetail, inbox, buyerStatus } from "./views.js";
 
 export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence } = {}) {
@@ -36,7 +36,7 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence 
 
   const wrap = (fn) => (req, res) => Promise.resolve(fn(req, res)).catch((err) => {
     if (err instanceof GateError || err instanceof ClaimError || err instanceof OrderError || err instanceof ImageRejected) {
-      const status = err.status || ({ NOT_FOUND: 404, STALE_CASE: 409, REFUND_IN_PROGRESS: 409, NOT_READY: 409 }[err.code] ?? 400);
+      const status = err.status || ({ CAPTURE_NOT_REFUNDABLE: 409, EXTERNAL_REFUND_DETECTED: 409, NOT_FOUND: 404, STALE_CASE: 409, REFUND_IN_PROGRESS: 409, NOT_READY: 409 }[err.code] ?? 400);
       return res.status(status).json({ error: err.code || "IMAGE_REJECTED", message: err.message, debugId: err.debugId });
     }
     if (err instanceof multer.MulterError) return res.status(400).json({ error: "UPLOAD_REJECTED", message: err.message });
@@ -149,6 +149,7 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence 
   }));
   m.post("/claims/:id/approve-refund", wrap(async (req, res) => {
     const { claimVersion, proposalId, amountCents, reason } = req.body;
+    await checkPayPalLedger(db, pp, req.params.id);
     const { op, duplicate } = approveAndReserve(db, {
       claimId: req.params.id, claimVersion: Number(claimVersion), proposalId, amountCents: Number(amountCents), reason, actor: req.actor,
     });
@@ -163,6 +164,14 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence 
   app.use("/api/merchant", m);
 
   app.use("/api", (_req, res) => res.status(404).json({ error: "NOT_FOUND" }));
+  // Upload limits (too many files, file too large) fail inside multer, before any route handler.
+  app.use((err, _req, res, next) => {
+    if (err instanceof multer.MulterError) {
+      const message = { LIMIT_FILE_COUNT: `Up to ${MAX_PHOTOS} photos per request.`, LIMIT_FILE_SIZE: "Each photo must be 5 MB or smaller." }[err.code] || err.message;
+      return res.status(400).json({ error: "UPLOAD_REJECTED", message });
+    }
+    next(err);
+  });
   return { app, db };
 }
 

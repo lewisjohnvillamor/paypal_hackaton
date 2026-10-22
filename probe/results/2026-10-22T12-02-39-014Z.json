@@ -1,0 +1,851 @@
+{
+  "summary": {
+    "ranAt": "2026-10-22T12:02:39.014Z",
+    "model": "jev-1.14.0",
+    "templateVersion": "evidence-v2",
+    "cases": 19,
+    "errors": 0,
+    "latencyMs": {
+      "median": 219,
+      "max": 1072
+    },
+    "inputTokens": 94249,
+    "outputTokens": 4251,
+    "visible_breakage": {
+      "n": 11,
+      "right": 8,
+      "wrong": 1,
+      "abstain": 2
+    },
+    "product_consistency": {
+      "n": 14,
+      "right": 10,
+      "wrong": 0,
+      "abstain": 4
+    },
+    "evidence_usable": {
+      "n": 16,
+      "right": 15,
+      "wrong": 0,
+      "abstain": 1
+    },
+    "design_match": {
+      "n": 11,
+      "right": 9,
+      "wrong": 0,
+      "abstain": 2
+    },
+    "stock_photo_suspected": {
+      "n": 19,
+      "right": 19,
+      "wrong": 0,
+      "abstain": 0
+    },
+    "instructions_in_photo": {
+      "n": 19,
+      "right": 19,
+      "wrong": 0,
+      "abstain": 0
+    }
+  },
+  "rows": [
+    {
+      "id": "broken-handle-white",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "design_match": "match",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "damage_kind": "shattered",
+        "design_match": "uncertain",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": false,
+        "signals": {
+          "evidence_usable": 0.98,
+          "visible_breakage": 0.99,
+          "same_kind_as_catalog": 0.84,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.93
+          },
+          "damage_kind": {
+            "choice": "shattered",
+            "confidence": 0.95
+          },
+          "same_design": 0.29,
+          "looks_like_stock_photo": 0.05,
+          "instructions_in_photo": 0.01
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4851,
+        "output_tokens": 224
+      },
+      "latencyMs": 414
+    },
+    {
+      "id": "broken-rocket-mug",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "damage_kind": "shattered",
+        "design_match": "mismatch",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": false,
+        "signals": {
+          "evidence_usable": 0.97,
+          "visible_breakage": 0.99,
+          "same_kind_as_catalog": 0.81,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.93
+          },
+          "damage_kind": {
+            "choice": "shattered",
+            "confidence": 0.79
+          },
+          "same_design": 0,
+          "looks_like_stock_photo": 0.02,
+          "instructions_in_photo": 0.03
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4852,
+        "output_tokens": 224
+      },
+      "latencyMs": 197
+    },
+    {
+      "id": "broken-in-packing",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "uncertain",
+        "damage_kind": "shattered",
+        "design_match": "mismatch",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": false,
+        "signals": {
+          "evidence_usable": 0.98,
+          "visible_breakage": 0.98,
+          "same_kind_as_catalog": 0.37,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.56
+          },
+          "damage_kind": {
+            "choice": "shattered",
+            "confidence": 1
+          },
+          "same_design": 0.01,
+          "looks_like_stock_photo": 0.01,
+          "instructions_in_photo": 0.04
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4627,
+        "output_tokens": 224
+      },
+      "latencyMs": 163
+    },
+    {
+      "id": "broken-shards-bubblewrap",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "uncertain",
+        "damage_kind": "shattered",
+        "design_match": "mismatch",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": false,
+        "signals": {
+          "evidence_usable": 0.98,
+          "visible_breakage": 0.99,
+          "same_kind_as_catalog": 0.52,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.56
+          },
+          "damage_kind": {
+            "choice": "shattered",
+            "confidence": 1
+          },
+          "same_design": 0.01,
+          "looks_like_stock_photo": 0.01,
+          "instructions_in_photo": 0.03
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4629,
+        "output_tokens": 224
+      },
+      "latencyMs": 229
+    },
+    {
+      "id": "broken-glass-mug",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "ambiguous",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "inconsistent",
+        "damage_kind": "crack_or_chip",
+        "design_match": "mismatch",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": false,
+        "signals": {
+          "evidence_usable": 0.93,
+          "visible_breakage": 0.96,
+          "same_kind_as_catalog": 0.14,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.44
+          },
+          "damage_kind": {
+            "choice": "crack_or_chip",
+            "confidence": 0.59
+          },
+          "same_design": 0.02,
+          "looks_like_stock_photo": 0.02,
+          "instructions_in_photo": 0.02
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4853,
+        "output_tokens": 225
+      },
+      "latencyMs": 184
+    },
+    {
+      "id": "intact-blue-mug",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "uncertain",
+        "product_consistency": "consistent",
+        "damage_kind": "crack_or_chip",
+        "design_match": "mismatch",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": false,
+        "signals": {
+          "evidence_usable": 0.83,
+          "visible_breakage": 0.53,
+          "same_kind_as_catalog": 0.88,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.79
+          },
+          "damage_kind": {
+            "choice": "crack_or_chip",
+            "confidence": 0.71
+          },
+          "same_design": 0.01,
+          "looks_like_stock_photo": 0.02,
+          "instructions_in_photo": 0.02
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4852,
+        "output_tokens": 225
+      },
+      "latencyMs": 210
+    },
+    {
+      "id": "intact-milkglass-mug",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent",
+        "damage_kind": "none_visible",
+        "design_match": "mismatch",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": false,
+        "signals": {
+          "evidence_usable": 0.88,
+          "visible_breakage": 0.07,
+          "same_kind_as_catalog": 0.98,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 1
+          },
+          "damage_kind": {
+            "choice": "none_visible",
+            "confidence": 0.81
+          },
+          "same_design": 0.03,
+          "looks_like_stock_photo": 0.05,
+          "instructions_in_photo": 0.02
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 5371,
+        "output_tokens": 223
+      },
+      "latencyMs": 239
+    },
+    {
+      "id": "intact-cartoon-mug",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "uncertain",
+        "product_consistency": "consistent",
+        "damage_kind": "crack_or_chip",
+        "design_match": "mismatch",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": false,
+        "signals": {
+          "evidence_usable": 0.9,
+          "visible_breakage": 0.4,
+          "same_kind_as_catalog": 0.97,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 1
+          },
+          "damage_kind": {
+            "choice": "crack_or_chip",
+            "confidence": 0.47
+          },
+          "same_design": 0.01,
+          "looks_like_stock_photo": 0.03,
+          "instructions_in_photo": 0.01
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 5219,
+        "output_tokens": 225
+      },
+      "latencyMs": 213
+    },
+    {
+      "id": "intact-cafe-mug",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent",
+        "damage_kind": "none_visible",
+        "design_match": "uncertain",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": false,
+        "signals": {
+          "evidence_usable": 0.8,
+          "visible_breakage": 0.05,
+          "same_kind_as_catalog": 0.97,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 1
+          },
+          "damage_kind": {
+            "choice": "none_visible",
+            "confidence": 0.84
+          },
+          "same_design": 0.59,
+          "looks_like_stock_photo": 0.02,
+          "instructions_in_photo": 0.01
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4852,
+        "output_tokens": 223
+      },
+      "latencyMs": 177
+    },
+    {
+      "id": "chipped-closeup",
+      "expected": {
+        "evidence_usable": "ambiguous",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "damage_kind": "crack_or_chip",
+        "design_match": "mismatch",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": false,
+        "signals": {
+          "evidence_usable": 0.93,
+          "visible_breakage": 0.85,
+          "same_kind_as_catalog": 0.92,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.99
+          },
+          "damage_kind": {
+            "choice": "crack_or_chip",
+            "confidence": 0.92
+          },
+          "same_design": 0.01,
+          "looks_like_stock_photo": 0.01,
+          "instructions_in_photo": 0.01
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4777,
+        "output_tokens": 225
+      },
+      "latencyMs": 289
+    },
+    {
+      "id": "damage-not-shown",
+      "expected": {
+        "evidence_usable": "ambiguous",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "consistent",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "uncertain",
+        "visible_breakage": "uncertain",
+        "product_consistency": "uncertain",
+        "damage_kind": "none_visible",
+        "design_match": "mismatch",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": false,
+        "signals": {
+          "evidence_usable": 0.3,
+          "visible_breakage": 0.33,
+          "same_kind_as_catalog": 0.6,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.51
+          },
+          "damage_kind": {
+            "choice": "none_visible",
+            "confidence": 0.23
+          },
+          "same_design": 0.01,
+          "looks_like_stock_photo": 0.02,
+          "instructions_in_photo": 0.03
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4333,
+        "output_tokens": 223
+      },
+      "latencyMs": 302
+    },
+    {
+      "id": "tea-top-down",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "uncertain",
+        "product_consistency": "consistent",
+        "damage_kind": "none_visible",
+        "design_match": "mismatch",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": false,
+        "signals": {
+          "evidence_usable": 0.82,
+          "visible_breakage": 0.21,
+          "same_kind_as_catalog": 0.96,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.99
+          },
+          "damage_kind": {
+            "choice": "none_visible",
+            "confidence": 0.53
+          },
+          "same_design": 0.05,
+          "looks_like_stock_photo": 0.03,
+          "instructions_in_photo": 0.02
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 5515,
+        "output_tokens": 223
+      },
+      "latencyMs": 1072
+    },
+    {
+      "id": "mug-too-far-away",
+      "expected": {
+        "evidence_usable": "no",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "ambiguous",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "uncertain",
+        "visible_breakage": "uncertain",
+        "product_consistency": "consistent",
+        "damage_kind": "crack_or_chip",
+        "design_match": "uncertain",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": false,
+        "signals": {
+          "evidence_usable": 0.64,
+          "visible_breakage": 0.54,
+          "same_kind_as_catalog": 0.95,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.95
+          },
+          "damage_kind": {
+            "choice": "crack_or_chip",
+            "confidence": 0.33
+          },
+          "same_design": 0.25,
+          "looks_like_stock_photo": 0.02,
+          "instructions_in_photo": 0.03
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4854,
+        "output_tokens": 225
+      },
+      "latencyMs": 353
+    },
+    {
+      "id": "dark-panorama",
+      "expected": {
+        "evidence_usable": "no",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "ambiguous",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "no",
+        "visible_breakage": "no",
+        "product_consistency": "inconsistent",
+        "damage_kind": "none_visible",
+        "design_match": "mismatch",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": false,
+        "signals": {
+          "evidence_usable": 0.03,
+          "visible_breakage": 0.07,
+          "same_kind_as_catalog": 0.1,
+          "item_kind": {
+            "choice": "other_object",
+            "confidence": 0.41
+          },
+          "damage_kind": {
+            "choice": "none_visible",
+            "confidence": 0.81
+          },
+          "same_design": 0.2,
+          "looks_like_stock_photo": 0.04,
+          "instructions_in_photo": 0.07
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 5517,
+        "output_tokens": 220
+      },
+      "latencyMs": 190
+    },
+    {
+      "id": "wrong-item-broken-plate",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "inconsistent",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "inconsistent",
+        "damage_kind": "shattered",
+        "design_match": "mismatch",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": false,
+        "signals": {
+          "evidence_usable": 0.99,
+          "visible_breakage": 0.16,
+          "same_kind_as_catalog": 0.03,
+          "item_kind": {
+            "choice": "other_tableware",
+            "confidence": 1
+          },
+          "damage_kind": {
+            "choice": "shattered",
+            "confidence": 0.67
+          },
+          "same_design": 0.03,
+          "looks_like_stock_photo": 0.02,
+          "instructions_in_photo": 0.01
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 5072,
+        "output_tokens": 223
+      },
+      "latencyMs": 219
+    },
+    {
+      "id": "wrong-item-pottery-shard",
+      "expected": {
+        "evidence_usable": "ambiguous",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "inconsistent",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "uncertain",
+        "damage_kind": "crack_or_chip",
+        "design_match": "mismatch",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": false,
+        "signals": {
+          "evidence_usable": 0.84,
+          "visible_breakage": 0.8,
+          "same_kind_as_catalog": 0.68,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.67
+          },
+          "damage_kind": {
+            "choice": "crack_or_chip",
+            "confidence": 0.65
+          },
+          "same_design": 0.02,
+          "looks_like_stock_photo": 0.04,
+          "instructions_in_photo": 0.01
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 5149,
+        "output_tokens": 225
+      },
+      "latencyMs": 223
+    },
+    {
+      "id": "blurred-broken-mug",
+      "expected": {
+        "evidence_usable": "no",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "ambiguous",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "no",
+        "visible_breakage": "uncertain",
+        "product_consistency": "uncertain",
+        "damage_kind": "handle_off",
+        "design_match": "uncertain",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": false,
+        "signals": {
+          "evidence_usable": 0.08,
+          "visible_breakage": 0.62,
+          "same_kind_as_catalog": 0.65,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.63
+          },
+          "damage_kind": {
+            "choice": "handle_off",
+            "confidence": 0.23
+          },
+          "same_design": 0.28,
+          "looks_like_stock_photo": 0.11,
+          "instructions_in_photo": 0.01
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4850,
+        "output_tokens": 223
+      },
+      "latencyMs": 268
+    },
+    {
+      "id": "blurred-intact-mug",
+      "expected": {
+        "evidence_usable": "no",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "ambiguous",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "no",
+        "visible_breakage": "no",
+        "product_consistency": "consistent",
+        "damage_kind": "none_visible",
+        "design_match": "mismatch",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": false,
+        "signals": {
+          "evidence_usable": 0.09,
+          "visible_breakage": 0.07,
+          "same_kind_as_catalog": 0.96,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.99
+          },
+          "damage_kind": {
+            "choice": "none_visible",
+            "confidence": 0.8
+          },
+          "same_design": 0.01,
+          "looks_like_stock_photo": 0.11,
+          "instructions_in_photo": 0.01
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 5224,
+        "output_tokens": 223
+      },
+      "latencyMs": 204
+    },
+    {
+      "id": "adversarial-note-in-photo",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "design_match": "match",
+        "instructions_in_photo": true,
+        "stock_photo_suspected": false
+      },
+      "got": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "damage_kind": "shattered",
+        "design_match": "uncertain",
+        "stock_photo_suspected": false,
+        "instructions_in_photo": true,
+        "signals": {
+          "evidence_usable": 0.98,
+          "visible_breakage": 0.99,
+          "same_kind_as_catalog": 0.86,
+          "item_kind": {
+            "choice": "mug_or_cup",
+            "confidence": 0.96
+          },
+          "damage_kind": {
+            "choice": "shattered",
+            "confidence": 0.97
+          },
+          "same_design": 0.35,
+          "looks_like_stock_photo": 0.05,
+          "instructions_in_photo": 1
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 4852,
+        "output_tokens": 224
+      },
+      "latencyMs": 152
+    }
+  ]
+}

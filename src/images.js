@@ -27,6 +27,8 @@ export async function normalizeImage(buf) {
     .flatten({ background: "#ffffff" });
   let out = await img.jpeg({ quality: 88, progressive: false }).toBuffer({ resolveWithObject: true });
 
+  // Hash before any padding, so a small copy of a photo still matches the original.
+  const phash = await differenceHash(out.data);
   const { width, height } = out.info;
   if (width < MIN_SIDE || height < MIN_SIDE) {
     // Pad small photos up to the minimum instead of rejecting them.
@@ -42,5 +44,25 @@ export async function normalizeImage(buf) {
     width: out.info.width,
     height: out.info.height,
     sha256: createHash("sha256").update(out.data).digest("hex"),
+    phash,
   };
 }
+
+// 64-bit difference hash: survives re-encoding, resizing and small edits, so a photo reused from
+// another claim (or the shop's own catalog photo) is caught even when it is not byte-identical.
+export async function differenceHash(buf) {
+  const px = await sharp(buf).greyscale().resize(9, 8, { fit: "fill" }).raw().toBuffer();
+  let bits = 0n;
+  for (let y = 0; y < 8; y++) {
+    for (let x = 0; x < 8; x++) bits = (bits << 1n) | (px[y * 9 + x] > px[y * 9 + x + 1] ? 1n : 0n);
+  }
+  return bits.toString(16).padStart(16, "0");
+}
+
+export function hashDistance(a, b) {
+  let v = BigInt(`0x${a}`) ^ BigInt(`0x${b}`), n = 0;
+  while (v) { n += Number(v & 1n); v >>= 1n; }
+  return n;
+}
+
+export const SIMILAR_PHOTO_BITS = 8; // at most 8 of 64 bits differ

@@ -37,18 +37,20 @@ npm start               # http://localhost:8888
 
 - Store: `http://localhost:8888`. Pay with a sandbox **Personal** account.
 - Merchant console: `http://localhost:8888/merchant`. Sign in with `MERCHANT_PASSWORD`.
-- Sample damage photos for the claim form are in `probe/cases/`. `broken-rocket-mug.jpg` usually gets a one-click proposal; `damage-not-shown.jpg` goes to manual review.
+- Sample damage photos for the claim form are in `probe/cases/`. `broken-handle-white.jpg` usually gets a one-click proposal; `damage-not-shown.jpg` goes to manual review, and `broken-rocket-mug.jpg` is flagged as a different design from the catalog mug.
 
 ### Tests and checks
 
 ```sh
-npm test                                     # 20 tests: money, policy, duplicate/concurrent approvals, tampering,
-                                             # stale approvals, timeouts, restart recovery, access control
-npm run probe                                # live Jev run over 18 labelled photos (uses your API key)
+npm test                                     # 41 tests: money, policy, duplicate/concurrent approvals, tampering,
+                                             # stale approvals, timeouts, restart recovery, access control, edge cases
+npm run probe                                # live Jev run over 19 labelled photos (uses your API key)
 node --env-file=.env scripts/e2e-sandbox.js  # full live run in a headless browser (needs the app running and Playwright)
 ```
 
 Tests use a fake PayPal and a fake Jev and are labelled as such. The probe and the end-to-end script call the real services.
+
+Every edge case, abuse attempt and failure mode the app handles, and the known limits, are listed in [`hackathon/EDGE_CASES.md`](hackathon/EDGE_CASES.md).
 
 ## How well the AI does
 
