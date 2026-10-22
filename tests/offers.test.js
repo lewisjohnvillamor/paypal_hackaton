@@ -74,13 +74,14 @@ test("buyer picks the gold kit: one PayPal refund for the net amount, and a retr
     // The agent timeline tells the whole story in order, naming who acted at each step.
     const who = d.timeline.map((x) => x.actor);
     assert.deepEqual([...new Set(who)], ["buyer", "jev", "policy", "merchant", "paypal"]);
-    assert.ok(d.timeline.some((x) => x.title === "Buyer chose: Mend it in 24k gold leaf"));
+    assert.ok(d.timeline.some((x) => x.title === "Buyer chose: Mend it in 24k gold leaf ($9 kit)"));
     assert.equal(d.timeline.at(-1).title, "PayPal completed the refund");
     // The inbox grid row carries the headline finding and how the case ended.
     const row = (await t.merchant("GET", "/claims")).body.find((r) => r.id === o.claimId);
     assert.equal(row.damage_kind, "handle_off");
     assert.equal(row.remedies, 3);
-    assert.equal(row.chosen_title, "Mend it in 24k gold leaf");
+    assert.equal(row.ai_suggestions, 0);
+    assert.equal(row.chosen_title, "Mend it in 24k gold leaf ($9 kit)");
     assert.equal(row.chosen_option, "kintsugi_gold");
     assert.equal(row.refunded_cents, 300);
     assert.equal(row.concerns, 0);

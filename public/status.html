@@ -29,6 +29,7 @@
   <script type="module">
     import { api, usd, esc, hashToken, when, checkBadge, ICON, busy, settle, optionText, optionArt, optionAmount } from "/app.js";
     import { shrinkPhotos } from "/photos.js";
+    const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
     const claimId = new URLSearchParams(location.search).get("claim");
     const token = hashToken();
     const $ = (id) => document.getElementById(id);
@@ -66,7 +67,7 @@
           ${refunded || s.status === "resolved" ? checkBadge() : ""}
           <p class="eyebrow" style="margin:0">Request ${esc(s.ref)}</p>
           ${refunded ? `<div class="big amount">${usd(s.refund.amountCents)}</div>` : ""}
-          <h2 style="font-size:28px;letter-spacing:-0.03em">${esc(chosen(s)?.item && (refunded || s.status === "resolved") ? (refunded ? "Refund sent, and " : "Sorted: ") + chosen(s).item + " is on its way." : s.message)}</h2>
+          <h2 style="font-size:28px;letter-spacing:-0.03em">${esc(chosen(s)?.item && (refunded || s.status === "resolved") ? `${refunded ? "Refund sent." : "All sorted."} ${cap(chosen(s).item)} is on its way.` : s.message)}</h2>
           <ol class="tracker" style="--n:3;margin:28px 0 8px">${steps(s)}</ol>
         </div>
         ${s.offer?.open ? `<div class="card"><h2 style="margin-top:0">Pick one</h2><p class="muted" style="margin-top:-6px">The shop approved every option here. The amount on each is what comes back to your PayPal account.</p>${optionsHtml(s.offer)}</div>` : ""}

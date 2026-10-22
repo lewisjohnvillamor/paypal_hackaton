@@ -9,10 +9,10 @@ export const PRODUCTS = {
     // Starting remedy library. The merchant edits it on the Remedies page; Jev reads each "fits"
     // line against the photos and the best-fitting ones become the buyer's options.
     remedies: [
-      { id: "kintsugi", kind: "repair_kit", title: "Keep it and mend it with kintsugi", item: "kintsugi repair kit with gold powder",
+      { id: "kintsugi", kind: "repair_kit", title: "Keep it and mend it with kintsugi", item: "a kintsugi repair kit with gold powder",
         fits: "Mends a chip, a crack, or a snapped-off handle on a ceramic mug that is otherwise in one piece. Cannot rebuild a mug broken into many pieces.",
         refundUnitCents: 1200 },
-      { id: "kintsugi_gold", kind: "repair_kit", title: "Mend it in 24k gold leaf", item: "24k gold-leaf kintsugi kit (its $9 price comes off the refund)",
+      { id: "kintsugi_gold", kind: "repair_kit", title: "Mend it in 24k gold leaf ($9 kit)", item: "a 24k gold-leaf kintsugi kit",
         fits: "Mends a chip, a crack, or a snapped-off handle on a ceramic mug that is otherwise in one piece, with real gold leaf. Cannot rebuild a mug broken into many pieces.",
         refundUnitCents: 300 },
       { id: "replacement", kind: "replacement", title: "Get a new one, shipped free", item: "a new Classic white ceramic mug",
