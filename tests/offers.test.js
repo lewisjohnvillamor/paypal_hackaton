@@ -65,6 +65,19 @@ test("buyer picks the gold kit: one PayPal refund for the net amount, and a retr
     assert.equal(d.offer.chosen, "repair_gold");
     assert.equal(d.payment.refundableCents, 7700);
     assert.ok(d.history.some((h) => h.type === "offer.accepted" && h.actor === "buyer"));
+    // The agent timeline tells the whole story in order, naming who acted at each step.
+    const who = d.timeline.map((x) => x.actor);
+    assert.deepEqual([...new Set(who)], ["buyer", "jev", "policy", "merchant", "paypal"]);
+    assert.ok(d.timeline.some((x) => x.title === "Buyer chose: Mend it in 24k gold leaf"));
+    assert.equal(d.timeline.at(-1).title, "PayPal completed the refund");
+    // The inbox grid row carries the headline finding and how the case ended.
+    const row = (await t.merchant("GET", "/claims")).body.find((r) => r.id === o.claimId);
+    assert.equal(row.damage_kind, "handle_off");
+    assert.equal(row.repairable, true);
+    assert.equal(row.chosen_option, "repair_gold");
+    assert.equal(row.refunded_cents, 300);
+    assert.equal(row.concerns, 0);
+    assert.ok(who.indexOf("jev") < who.indexOf("policy") && who.indexOf("policy") < who.indexOf("merchant"));
   } finally { t.close(); }
 });
 

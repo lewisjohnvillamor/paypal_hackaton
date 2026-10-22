@@ -88,6 +88,7 @@ header.top nav a:hover { opacity: 1; text-decoration: none; }
 /* Layout */
 main { max-width: 1040px; margin: 0 auto; padding: 40px 22px 80px; }
 main.narrow { max-width: 640px; }
+main.wide { max-width: 1320px; }
 .stack > * + * { margin-top: 16px; }
 .grid { display: grid; gap: 20px; }
 @media (min-width: 820px) { .grid.two { grid-template-columns: 1fr 1fr; } .grid.case { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: start; } }
@@ -324,6 +325,15 @@ ol.timeline li.buyer { --dot: var(--buyer); }
 ol.timeline li.system { --dot: var(--model); }
 ol.timeline li.merchant { --dot: var(--merchant); }
 ol.timeline .when { font-size: 13px; color: var(--text-2); }
+ol.timeline li.jev { --dot: var(--model); }
+ol.timeline li.policy { --dot: var(--orange); }
+ol.timeline li.paypal { --dot: #0070e0; }
+ol.timeline.agent li { padding-bottom: 16px; }
+ol.timeline.agent .who { font-size: 12px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--dot, var(--text-2)); }
+ol.timeline.agent .who .when { font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 6px; }
+ol.timeline.agent .what { font-weight: 500; margin: 1px 0 2px; }
+ol.timeline.agent .small { line-height: 1.45; }
+ol.timeline.agent .footnote { margin: 2px 0 0; word-break: break-all; }
 
 /* Lightbox */
 dialog { border: 0; padding: 0; background: transparent; max-width: 92vw; }
@@ -357,3 +367,24 @@ footer.foot { max-width: 1040px; margin: 0 auto; padding: 0 22px 40px; color: va
   .inbox-row .row { flex-wrap: nowrap; }
   .brand .ctx { display: none; }
 }
+
+/* Merchant inbox grid (AG Grid, quartz theme tuned to the app's tokens) */
+.grid-tools { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.grid-tools input[type=search] { width: 220px; min-height: 36px; padding: 6px 12px; }
+.grid-tools button { min-height: 36px; }
+.inbox-grid { height: 640px; width: 100%;
+  --ag-font-family: Inter, -apple-system, system-ui, sans-serif; --ag-font-size: 14px;
+  --ag-background-color: var(--surface); --ag-foreground-color: var(--text); --ag-header-background-color: var(--surface-2);
+  --ag-header-foreground-color: var(--text-2); --ag-border-color: var(--border); --ag-row-border-color: var(--separator);
+  --ag-row-hover-color: var(--fill); --ag-selected-row-background-color: var(--fill); --ag-wrapper-border-radius: 18px;
+  --ag-active-color: var(--blue); --ag-input-focus-border-color: var(--blue); }
+.inbox-grid .grid-row { cursor: pointer; }
+.inbox-grid .ag-cell { display: flex; align-items: center; }
+.inbox-grid .mono-cell { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-weight: 600; }
+.grid-thumb { position: relative; display: inline-block; line-height: 0; border-radius: 8px; overflow: hidden; background: var(--surface-2); }
+.grid-thumb img { height: 46px; width: auto; display: block; }
+.inbox-grid .meter { display: inline-block; margin-right: 8px; vertical-align: middle; }
+.grid-thumb i { position: absolute; border: 2px solid var(--red); border-radius: 4px; }
+.pill.gold { background: rgb(212 162 58 / 0.16); color: #9a6b10; }
+@media (prefers-color-scheme: dark) { .pill.gold { color: #f0c860; } }
+@media (max-width: 620px) { .inbox-grid { height: 520px; } .grid-tools input[type=search] { width: 100%; } }

@@ -2,20 +2,41 @@
 import { refundableBalance } from "./policy/refundPolicy.js";
 import { REASON_TEXT } from "./reasons.js";
 import { latestOffer } from "./offers.js";
+import { agentTimeline } from "./timeline.js";
 
 const json = (s) => (s ? JSON.parse(s) : null);
 
 // Newest first, one page at a time: `before` is the created_at of the last row already shown.
 // The whole table in one response was 4.8 MB and 200 ms at 20k claims.
+// Each row also carries what the merchant grid shows at a glance: Jev's headline finding, the
+// photo it outlined, how many concerns the policy raised, and how the case ended.
 export function inbox(db, { limit = 100, before = null } = {}) {
   const n = Math.min(Math.max(Number(limit) || 100, 1), 500);
   return db.prepare(`
     SELECT c.id, c.ref, c.status, c.quantity, c.created_at, c.updated_at, l.title, l.ref_image, o.amount_cents,
-      (SELECT route FROM proposals p WHERE p.claim_id = c.id ORDER BY p.created_at DESC LIMIT 1) AS route,
-      (SELECT amount_cents FROM proposals p WHERE p.claim_id = c.id ORDER BY p.created_at DESC LIMIT 1) AS proposed_cents
+      p.route, p.amount_cents AS proposed_cents, p.calc_json, a.findings_json, a.photo_ids_json,
+      (SELECT id FROM evidence e WHERE e.claim_id = c.id ORDER BY e.created_at LIMIT 1) AS first_photo,
+      (SELECT COUNT(*) FROM evidence e WHERE e.claim_id = c.id) AS photos,
+      (SELECT chosen_option FROM offers f WHERE f.claim_id = c.id ORDER BY f.created_at DESC LIMIT 1) AS chosen_option,
+      (SELECT COALESCE(SUM(amount_cents), 0) FROM refund_ops r WHERE r.claim_id = c.id AND r.status = 'COMPLETED') AS refunded_cents
     FROM claims c JOIN order_lines l ON l.id = c.line_id JOIN orders o ON o.id = c.order_id
+    LEFT JOIN proposals p ON p.id = (SELECT id FROM proposals x WHERE x.claim_id = c.id ORDER BY x.created_at DESC LIMIT 1)
+    LEFT JOIN assessments a ON a.id = p.assessment_id
     WHERE (? IS NULL OR c.created_at < ?)
-    ORDER BY c.created_at DESC LIMIT ?`).all(before, before, n);
+    ORDER BY c.created_at DESC LIMIT ?`).all(before, before, n).map(({ calc_json, findings_json, photo_ids_json, ...r }) => {
+    const f = json(findings_json);
+    const calc = json(calc_json);
+    const sent = json(photo_ids_json) ?? [];
+    const i = (f?.locations ?? []).findIndex((x) => x?.box);
+    return {
+      ...r,
+      damage_kind: f?.damage_kind ?? null,
+      breakage: f?.signals?.visible_breakage ?? null,
+      concerns: calc?.reasons?.length ?? null,
+      repairable: (calc?.options ?? []).length > 1,
+      thumb: i >= 0 ? { id: sent[i], box: f.locations[i].box } : r.first_photo ? { id: r.first_photo, box: null } : null,
+    };
+  });
 }
 
 export function caseDetail(db, claimId) {
@@ -68,6 +89,7 @@ export function caseDetail(db, claimId) {
       requestId: o.request_id, updatedAt: o.updated_at,
     })),
     history,
+    timeline: agentTimeline(db, claimId),
   };
 }
 

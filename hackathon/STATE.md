@@ -44,6 +44,18 @@ buyer picked the gold-leaf kit, refund `0XM259959W007021K` for $3.00 COMPLETED. 
 `screenshots/7-*.png` to `9-*.png`. Not built yet: real kit fulfilment (the merchant sees "Send:
 <kit>" on the case), and offering a replacement.
 
+## Agent timeline and AG Grid inbox (2026-10-22)
+
+- Case page: "How this case was handled" lists every step with who acted (buyer, Jev, refund
+  policy, merchant, PayPal), what Jev saw with its confidences and latency, what the policy
+  drafted and why, the buyer's pick, and PayPal's refund ID. Built from the audit log and stored
+  assessments in `src/timeline.js`; nothing is shown that was not recorded.
+- Merchant inbox is an AG Grid Community 32.3.3 grid (CDN): outlined-photo thumbnails, status,
+  Jev's damage type, breakage confidence meter, concern count, a Kintsugi tag on repairable
+  cases, drafted and refunded amounts, outcome; sort, column filters, quick search, status
+  segments, CSV export, Enter or click opens a case. Falls back to the old list if the CDN fails.
+  Screenshots `screenshots/10-*.png`, `11-agent-timeline.png`.
+
 ## Gates
 
 - Gate 1 (financial loop): done, in an earlier thread and again here.

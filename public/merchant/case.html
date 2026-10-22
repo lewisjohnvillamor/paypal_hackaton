@@ -184,12 +184,15 @@
       }).join("");
     }
 
-    function historyHtml(history) {
-      return `<div class="card"><h2>Activity</h2><ol class="timeline">${history.map((h) => {
-        const extra = h.payload?.reason || h.payload?.message || h.payload?.overrideReason ||
-          (h.type === "offer.accepted" ? `${h.payload.kit ? h.payload.kit + ", " : "full refund, "}$${h.payload.refund} back` : "");
-        return `<li class="${esc(h.actor)}"><div>${esc(EVENT[h.type] || h.type)}</div><div class="when">${when(h.at)}${extra ? " · " + esc(extra) : ""}</div></li>`;
-      }).join("")}</ol></div>`;
+    const ACTOR = { buyer: "Buyer", jev: "Jev · AI", policy: "Refund policy", merchant: "You", paypal: "PayPal", system: "System" };
+    // The agent timeline: who did what, in order, with what each one saw.
+    function timelineHtml(steps) {
+      const time = (iso) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" });
+      return `<div class="card"><h2>How this case was handled</h2><ol class="timeline agent">${steps.map((t) => `
+        <li class="${esc(t.actor)}"><div class="who">${esc(ACTOR[t.actor] || t.actor)} <span class="when">${time(t.at)}</span></div>
+          <div class="what">${esc(t.title)}</div>
+          ${t.detail ? `<div class="small muted">${esc(t.detail)}</div>` : ""}
+          ${t.meta ? `<div class="footnote mono">${esc(t.meta)}</div>` : ""}</li>`).join("")}</ol></div>`;
     }
 
     function render() {
@@ -229,7 +232,7 @@
           <div class="sticky-col">
             ${refundsHtml()}
             ${actionsHtml()}
-            ${historyHtml(history)}
+            ${timelineHtml(d.timeline)}
             <p class="footnote center" style="margin-top:12px">Case version ${claim.version}. Approvals are tied to this version.</p>
           </div>
         </div>`;

@@ -59,14 +59,15 @@ export function acceptOffer(db, { claimId, offerId, optionId }) {
     const note = option.kind === "repair"
       ? `Refund for request ${claim.ref}: you kept the item; your ${option.kit} ships separately.`
       : `Refund for request ${claim.ref}, reviewed by the merchant.`;
+    // Logged before the reservation so the timeline reads: the pick, then the money.
+    audit(db, { claimId, actor: "buyer", type: "offer.accepted",
+      payload: { option: option.id, refund: toDecimal(option.refundCents), kit: option.kit ?? null } });
     const op = reserve(db, {
       claim, proposal, amountCents: option.refundCents, actor: "buyer",
       overrideReason: `Buyer chose "${option.id}" from options the ${offer.actor} approved`, note,
     });
     db.prepare("UPDATE offers SET status = 'accepted', chosen_option = ?, op_id = ?, decided_at = ? WHERE id = ?")
       .run(option.id, op.id, now(), offer.id);
-    audit(db, { claimId, opId: op.id, actor: "buyer", type: "offer.accepted",
-      payload: { option: option.id, refund: toDecimal(option.refundCents), kit: option.kit ?? null } });
     return { op, option, duplicate: false };
   });
 }
