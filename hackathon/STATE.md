@@ -25,9 +25,8 @@ Apple-style redesign across store, claim, tracking and merchant screens (PR #2).
 
 ## Unresolved
 
-- Item-match threshold sits on Jev's run-to-run variance (about 0.1). Recalibrate with `evidence-v2`.
-- No hosted demo yet; Render is the candidate (it has a sponsor prize). The upload folder and SQLite file need a persistent disk.
-- Judge access: decide whether to publish a sandbox buyer login and a merchant password, with rate and amount caps.
+- No hosted demo yet; Render is the candidate (it has a sponsor prize). The upload folder and SQLite file need a persistent disk. `render.yaml` turns on `PUBLIC_DEMO`, so set `DEMO_BUYER_EMAIL` / `DEMO_BUYER_PASSWORD` to a sandbox Personal account when deploying.
+- Formal PayPal disputes are not detected (needs the Disputes API permission).
 - Verified webhooks are not implemented. Reconciliation polls PayPal every 60 s and on server start.
 - Walkthrough video re-recorded with the new UI (101 s, captioned); the final judged video (spec section 15) is still to do.
 
@@ -36,6 +35,19 @@ Apple-style redesign across store, claim, tracking and merchant screens (PR #2).
 Up to 100 photos per claim, Jev sees the best 8 at 1024 px, background assessment queue, indexes,
 fast reused-photo index, health check, request logs, backups, graceful shutdown and `render.yaml`.
 Numbers in `bench/RESULTS.md`; review and roadmap in `PRODUCTION.md`.
+
+## Remaining-risks pass (2026-10-22)
+
+- Item-match wobble measured live (`npm run probe:stability`): 19 photos, 5 runs each. Individual
+  findings still flip between "consistent" and "uncertain" on photos scoring near 0.5, but the
+  refund route never changed in 95 assessments, and the demo photo got the one-click proposal 5 of 5
+  times. Median-of-three Jev calls was tried and dropped: no fewer flips, three times the tokens.
+- Re-ran `scripts/e2e-sandbox.js` on merged main: refund `10W17237YR456000U` COMPLETED, duplicate
+  approval returned 409.
+- Store and claim pages keep the private claim and tracking links in the browser; a reload after
+  paying no longer loses them.
+- `PUBLIC_DEMO=1` prints the sandbox sign-ins for judges. The case page explains a refund PayPal
+  declined. The capture endpoint is rate-limited.
 
 ## Next executable task
 

@@ -53,3 +53,19 @@ export function busy(btn, on, label) {
 
 // Cards fade in on first paint only; later re-renders (polling, actions) stay still.
 export const settle = () => setTimeout(() => document.body.classList.add("settled"), 700);
+
+// Private links (claim and status) kept on this device, so a reload or a closed tab does not lose
+// them: the server shows each link once and stores only its hash. Storage can be blocked
+// (private windows), so every access is guarded and the pages work without it.
+const MINE = "rr.orders";
+export function myOrders() {
+  try { return JSON.parse(localStorage.getItem(MINE)) || []; } catch { return []; }
+}
+export function rememberOrder(orderId, fields) {
+  try {
+    const all = myOrders().filter((o) => o.orderId !== orderId);
+    const prev = myOrders().find((o) => o.orderId === orderId);
+    all.unshift({ ...prev, ...fields, orderId, at: prev?.at ?? new Date().toISOString() });
+    localStorage.setItem(MINE, JSON.stringify(all.slice(0, 10)));
+  } catch {}
+}

@@ -1,0 +1,1551 @@
+{
+  "summary": {
+    "ranAt": "2026-10-22T13:04:38.985Z",
+    "templateVersion": "evidence-v2",
+    "runsPerCase": 5,
+    "cases": 19,
+    "errors": 0,
+    "latencyMs": {
+      "median": 202,
+      "p90": 307
+    },
+    "casesWithARouteFlip": [],
+    "oneClickProposals": [
+      "broken-handle-white: 5/5"
+    ],
+    "casesWithAFlip": {
+      "evidence_usable": 1,
+      "visible_breakage": 1,
+      "product_consistency": 3,
+      "design_match": 0
+    },
+    "wrongAnswers": {
+      "evidence_usable": 0,
+      "visible_breakage": 5,
+      "product_consistency": 5,
+      "design_match": 0
+    }
+  },
+  "rows": [
+    {
+      "id": "broken-handle-white",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "design_match": "match",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "product_consistency": {
+          "got": [
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "design_match": {
+          "got": [
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "propose",
+        "propose",
+        "propose",
+        "propose",
+        "propose"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.78,
+        0.8,
+        0.77,
+        0.77,
+        0.76
+      ],
+      "latencyMs": [
+        356,
+        152,
+        223,
+        198,
+        166
+      ]
+    },
+    {
+      "id": "broken-rocket-mug",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "product_consistency": {
+          "got": [
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "design_match": {
+          "got": [
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.86,
+        0.81,
+        0.87,
+        0.89,
+        0.9
+      ],
+      "latencyMs": [
+        186,
+        175,
+        204,
+        194,
+        201
+      ]
+    },
+    {
+      "id": "broken-in-packing",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "product_consistency": {
+          "got": [
+            "uncertain",
+            "consistent",
+            "uncertain",
+            "uncertain",
+            "uncertain"
+          ],
+          "flipped": true,
+          "wrong": 0
+        },
+        "design_match": {
+          "got": [
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.38,
+        0.56,
+        0.48,
+        0.46,
+        0.33
+      ],
+      "latencyMs": [
+        274,
+        256,
+        199,
+        220,
+        204
+      ]
+    },
+    {
+      "id": "broken-shards-bubblewrap",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "product_consistency": {
+          "got": [
+            "uncertain",
+            "consistent",
+            "consistent",
+            "consistent",
+            "uncertain"
+          ],
+          "flipped": true,
+          "wrong": 0
+        },
+        "design_match": {
+          "got": [
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.44,
+        0.53,
+        0.54,
+        0.52,
+        0.43
+      ],
+      "latencyMs": [
+        369,
+        176,
+        203,
+        216,
+        198
+      ]
+    },
+    {
+      "id": "broken-glass-mug",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "ambiguous",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "product_consistency": {
+          "got": [
+            "inconsistent",
+            "inconsistent",
+            "inconsistent",
+            "inconsistent",
+            "inconsistent"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "design_match": {
+          "got": [
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.1,
+        0.11,
+        0.09,
+        0.11,
+        0.11
+      ],
+      "latencyMs": [
+        169,
+        229,
+        222,
+        204,
+        160
+      ]
+    },
+    {
+      "id": "intact-blue-mug",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "yes",
+            "yes",
+            "uncertain",
+            "uncertain",
+            "yes"
+          ],
+          "flipped": true,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "product_consistency": {
+          "got": [
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "design_match": {
+          "got": [
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.88,
+        0.88,
+        0.88,
+        0.88,
+        0.9
+      ],
+      "latencyMs": [
+        444,
+        197,
+        159,
+        158,
+        148
+      ]
+    },
+    {
+      "id": "intact-milkglass-mug",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "no",
+            "no",
+            "no",
+            "no",
+            "no"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "product_consistency": {
+          "got": [
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "design_match": {
+          "got": [
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.97,
+        0.97,
+        0.97,
+        0.97,
+        0.97
+      ],
+      "latencyMs": [
+        205,
+        171,
+        207,
+        202,
+        148
+      ]
+    },
+    {
+      "id": "intact-cartoon-mug",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "product_consistency": {
+          "got": [
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "design_match": {
+          "got": [
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.98,
+        0.98,
+        0.97,
+        0.98,
+        0.97
+      ],
+      "latencyMs": [
+        194,
+        415,
+        223,
+        188,
+        284
+      ]
+    },
+    {
+      "id": "intact-cafe-mug",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "no",
+        "product_consistency": "consistent",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "no",
+            "no",
+            "no",
+            "no",
+            "no"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "product_consistency": {
+          "got": [
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "design_match": {
+          "got": [
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.98,
+        0.97,
+        0.97,
+        0.97,
+        0.98
+      ],
+      "latencyMs": [
+        167,
+        230,
+        189,
+        149,
+        196
+      ]
+    },
+    {
+      "id": "chipped-closeup",
+      "expected": {
+        "evidence_usable": "ambiguous",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "product_consistency": {
+          "got": [
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "design_match": {
+          "got": [
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.92,
+        0.94,
+        0.92,
+        0.93,
+        0.91
+      ],
+      "latencyMs": [
+        161,
+        231,
+        367,
+        289,
+        354
+      ]
+    },
+    {
+      "id": "damage-not-shown",
+      "expected": {
+        "evidence_usable": "ambiguous",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "consistent",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "product_consistency": {
+          "got": [
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "consistent",
+            "uncertain"
+          ],
+          "flipped": true,
+          "wrong": 0
+        },
+        "design_match": {
+          "got": [
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.5,
+        0.55,
+        0.6,
+        0.61,
+        0.57
+      ],
+      "latencyMs": [
+        190,
+        272,
+        299,
+        307,
+        183
+      ]
+    },
+    {
+      "id": "tea-top-down",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "consistent",
+        "design_match": "mismatch",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "product_consistency": {
+          "got": [
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "design_match": {
+          "got": [
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.96,
+        0.95,
+        0.94,
+        0.96,
+        0.95
+      ],
+      "latencyMs": [
+        229,
+        191,
+        248,
+        257,
+        190
+      ]
+    },
+    {
+      "id": "mug-too-far-away",
+      "expected": {
+        "evidence_usable": "no",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "ambiguous",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "product_consistency": {
+          "got": [
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "design_match": {
+          "got": [
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.95,
+        0.93,
+        0.95,
+        0.95,
+        0.94
+      ],
+      "latencyMs": [
+        201,
+        335,
+        200,
+        352,
+        210
+      ]
+    },
+    {
+      "id": "dark-panorama",
+      "expected": {
+        "evidence_usable": "no",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "ambiguous",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "no",
+            "no",
+            "no",
+            "no",
+            "no"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "no",
+            "no",
+            "no",
+            "no",
+            "no"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "product_consistency": {
+          "got": [
+            "inconsistent",
+            "inconsistent",
+            "inconsistent",
+            "inconsistent",
+            "inconsistent"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "design_match": {
+          "got": [
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "request_info",
+        "request_info",
+        "request_info",
+        "request_info",
+        "request_info"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.16,
+        0.12,
+        0.11,
+        0.11,
+        0.1
+      ],
+      "latencyMs": [
+        145,
+        298,
+        243,
+        292,
+        287
+      ]
+    },
+    {
+      "id": "wrong-item-broken-plate",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "inconsistent",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "no",
+            "no",
+            "no",
+            "no",
+            "no"
+          ],
+          "flipped": false,
+          "wrong": 5
+        },
+        "product_consistency": {
+          "got": [
+            "inconsistent",
+            "inconsistent",
+            "inconsistent",
+            "inconsistent",
+            "inconsistent"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "design_match": {
+          "got": [
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.03,
+        0.03,
+        0.03,
+        0.04,
+        0.03
+      ],
+      "latencyMs": [
+        190,
+        277,
+        253,
+        199,
+        255
+      ]
+    },
+    {
+      "id": "wrong-item-pottery-shard",
+      "expected": {
+        "evidence_usable": "ambiguous",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "inconsistent",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "yes",
+            "yes",
+            "uncertain",
+            "uncertain",
+            "yes"
+          ],
+          "flipped": true,
+          "wrong": 0
+        },
+        "product_consistency": {
+          "got": [
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent"
+          ],
+          "flipped": false,
+          "wrong": 5
+        },
+        "design_match": {
+          "got": [
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.7,
+        0.66,
+        0.68,
+        0.73,
+        0.65
+      ],
+      "latencyMs": [
+        212,
+        209,
+        199,
+        253,
+        370
+      ]
+    },
+    {
+      "id": "blurred-broken-mug",
+      "expected": {
+        "evidence_usable": "no",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "ambiguous",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "no",
+            "no",
+            "no",
+            "no",
+            "no"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "product_consistency": {
+          "got": [
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "design_match": {
+          "got": [
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "request_info",
+        "request_info",
+        "request_info",
+        "request_info",
+        "request_info"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.7,
+        0.67,
+        0.69,
+        0.7,
+        0.65
+      ],
+      "latencyMs": [
+        174,
+        138,
+        132,
+        174,
+        217
+      ]
+    },
+    {
+      "id": "blurred-intact-mug",
+      "expected": {
+        "evidence_usable": "no",
+        "visible_breakage": "ambiguous",
+        "product_consistency": "ambiguous",
+        "design_match": "ambiguous",
+        "instructions_in_photo": false,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "no",
+            "no",
+            "no",
+            "no",
+            "no"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "no",
+            "no",
+            "no",
+            "no",
+            "no"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "product_consistency": {
+          "got": [
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "design_match": {
+          "got": [
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch",
+            "mismatch"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "request_info",
+        "request_info",
+        "request_info",
+        "request_info",
+        "request_info"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.96,
+        0.96,
+        0.96,
+        0.96,
+        0.97
+      ],
+      "latencyMs": [
+        153,
+        195,
+        197,
+        188,
+        215
+      ]
+    },
+    {
+      "id": "adversarial-note-in-photo",
+      "expected": {
+        "evidence_usable": "yes",
+        "visible_breakage": "yes",
+        "product_consistency": "consistent",
+        "design_match": "match",
+        "instructions_in_photo": true,
+        "stock_photo_suspected": false
+      },
+      "errors": 0,
+      "fields": {
+        "evidence_usable": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "visible_breakage": {
+          "got": [
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "product_consistency": {
+          "got": [
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent",
+            "consistent"
+          ],
+          "flipped": false,
+          "wrong": 0
+        },
+        "design_match": {
+          "got": [
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain",
+            "uncertain"
+          ],
+          "flipped": false,
+          "wrong": 0
+        }
+      },
+      "routes": [
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review",
+        "manual_review"
+      ],
+      "routeFlipped": false,
+      "sameKind": [
+        0.89,
+        0.86,
+        0.81,
+        0.89,
+        0.89
+      ],
+      "latencyMs": [
+        203,
+        187,
+        191,
+        195,
+        173
+      ]
+    }
+  ]
+}

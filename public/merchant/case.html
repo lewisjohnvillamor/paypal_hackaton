@@ -94,7 +94,11 @@
         return `<div class="card">${head}<p class="muted">Checking the photos with Jev…</p></div>`;
       }
       if (!proposal || !proposal.current) {
-        return `<div class="card">${head}<p class="muted">The photos changed since the last review.</p><button id="assess" class="primary lg">Review current photos</button></div>`;
+        // After PayPal declines a refund the approval is spent, so the case needs a fresh review.
+        const declined = d.refunds.at(-1)?.status === "FAILED" && claim.status === "ready";
+        const why = declined ? `PayPal declined the last refund (${esc(d.refunds.at(-1).error || "no reason given")}). Nothing was refunded. Review the case again to approve a new amount.`
+          : !proposal ? "This request hasn't been reviewed yet." : "The photos changed since the last review.";
+        return `<div class="card">${head}<p class="muted">${why}</p><button id="assess" class="primary lg">Review ${declined ? "again" : "current photos"}</button></div>`;
       }
       const [routeLabel, tone] = ROUTE[proposal.route];
       const c = proposal.calculation;
