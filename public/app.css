@@ -398,3 +398,16 @@ footer.foot { max-width: 1040px; margin: 0 auto; padding: 0 22px 40px; color: va
 .remedy-add { display: grid; grid-template-columns: 1.2fr 1.2fr 1.6fr 100px 140px auto; gap: 8px; margin-top: 14px; }
 .remedy-add input, .remedy-add select { margin: 0; }
 @media (max-width: 860px) { .remedy-add { grid-template-columns: 1fr; } }
+
+/* Claude Haiku suggestions on a case */
+.ai-suggest { margin-top: 18px; padding: 16px; border-radius: 16px; background: var(--surface-2); border: 1px solid var(--border); }
+.ai-suggest .lead { display: grid; grid-template-columns: 32px 1fr; gap: 10px; align-items: center; }
+.ai-suggest .lead .art { color: var(--model); display: grid; place-items: center; }
+.ai-suggest .lead .art svg { width: 24px; height: 24px; }
+.ai-suggest ul { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; }
+.ai-suggest li { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 12px; border-radius: 12px; background: var(--surface); }
+.ai-suggest li.dismissed { opacity: 0.55; }
+.ai-suggest .sugg-act { display: flex; gap: 6px; }
+.ai-suggest .sugg-act button { padding: 8px 14px; }
+.option-list .fit.ai { color: var(--model); }
+ol.timeline li.claude { --dot: var(--model); }

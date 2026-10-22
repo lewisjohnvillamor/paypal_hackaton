@@ -16,13 +16,15 @@ import { GateError, approveAndReserve, checkPayPalLedger, reconcile, reconcileOp
 import { caseDetail, inbox, buyerStatus } from "./views.js";
 import { acceptOffer, sendOffer } from "./offers.js";
 import { createRemedy, remedyLibrary, seedRemedies, updateRemedy } from "./remedies.js";
+import { defaultSuggester } from "./ai/haiku.js";
+import { decideSuggestion } from "./suggest/suggestions.js";
 import { assessmentQueue } from "./queue.js";
 
 // Whole multipart request: 100 photos already shrunk by the browser fit with lots of room.
 const MAX_REQUEST_BYTES = Number(process.env.MAX_REQUEST_MB || 300) * 1024 * 1024;
 const started = Date.now();
 
-export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence, queue = assessmentQueue(db, assess) } = {}) {
+export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence, suggest = defaultSuggester(), queue = assessmentQueue(db, assess, { suggest }) } = {}) {
   seedRemedies(db);
   const app = express();
   app.disable("x-powered-by");
@@ -196,7 +198,12 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
     res.sendFile(resolve(uploadDir(), e.storage_key), { cacheControl: false, lastModified: false });
   }));
   m.post("/claims/:id/assess", wrap(async (req, res) => {
-    await assessClaim(db, req.params.id, assess, req.actor);
+    await assessClaim(db, req.params.id, assess, req.actor, suggest);
+    res.json(caseDetail(db, req.params.id));
+  }));
+  // The merchant approves or dismisses one of Claude Haiku's suggestions for this case.
+  m.post("/claims/:id/suggestions/:sid", wrap(async (req, res) => {
+    decideSuggestion(db, { claimId: req.params.id, suggestionId: req.params.sid, approve: req.body.approve === true, actor: req.actor });
     res.json(caseDetail(db, req.params.id));
   }));
   m.post("/claims/:id/request-info", wrap(async (req, res) => {

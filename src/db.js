@@ -165,6 +165,25 @@ CREATE TABLE IF NOT EXISTS remedies (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS suggestions (
+  id TEXT PRIMARY KEY,
+  claim_id TEXT NOT NULL REFERENCES claims(id),
+  proposal_id TEXT NOT NULL REFERENCES proposals(id),
+  listing_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  title TEXT NOT NULL,
+  item TEXT NOT NULL,
+  item_price_cents INTEGER NOT NULL,
+  why TEXT NOT NULL,
+  refund_unit_cents INTEGER NOT NULL CHECK (refund_unit_cents >= 0),
+  model TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending','approved','dismissed')),
+  decided_by TEXT,
+  created_at TEXT NOT NULL,
+  decided_at TEXT,
+  UNIQUE (proposal_id, listing_id)
+);
+
 CREATE TABLE IF NOT EXISTS audit (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   claim_id TEXT,
@@ -188,6 +207,7 @@ const MIGRATIONS = [
 // each inbox load scanned whole tables (see bench/RESULTS.md).
 const INDEXES = `
 CREATE INDEX IF NOT EXISTS offers_by_claim ON offers(claim_id, created_at);
+CREATE INDEX IF NOT EXISTS suggestions_by_proposal ON suggestions(proposal_id, created_at);
 CREATE INDEX IF NOT EXISTS remedies_by_sku ON remedies(sku, active, position);
 CREATE INDEX IF NOT EXISTS evidence_by_claim ON evidence(claim_id, created_at);
 CREATE INDEX IF NOT EXISTS claims_by_order ON claims(order_id, created_at);

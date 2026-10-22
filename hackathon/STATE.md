@@ -65,6 +65,21 @@ or less. Screenshots `screenshots/12-*.png` to `16-*.png` (fit numbers in those 
 values played back through the test double). Free-form AI suggestions outside the library are
 deliberately not built before the deadline.
 
+## Claude Haiku remedy suggestions (2026-10-22)
+
+Beyond the merchant's library, Claude Haiku 5.5 (`src/ai/haiku.js`) can suggest other store
+listings as remedies. The server first narrows the listings (`LISTINGS` in `src/catalog.js`) to the
+ordered product's category and the damage Jev saw (`src/suggest/candidates.js`, at most 12); Haiku
+gets the photos, Jev's reading and that list, never the buyer's words, and its answer is a JSON
+schema whose listing id must be one of the candidates (effort low). The server re-checks every
+suggestion (`checkSuggestions`: known id, integer refund, listing price plus refund at or under the
+price paid, at most 2) and stores it as pending. The merchant adds or dismisses each one on the
+case page; only added ones join the buyer's choices (`offerOptions`), and a pick is refunded through
+the same gate. Runs only when Jev clearly saw damage on usable photos; a Haiku failure is logged on
+the timeline and never blocks the review. Off unless `ANTHROPIC_API_KEY` is set. Pricing (checked
+2026-10-22): $0.10 / $0.50 per MTok, about $1 per 1,000 claims. Not yet run against the live API;
+screenshots `screenshots/17-*.png` to `19-*.png` use the test double.
+
 ## Agent timeline and AG Grid inbox (2026-10-22)
 
 - Case page: "How this case was handled" lists every step with who acted (buyer, Jev, refund

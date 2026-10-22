@@ -76,6 +76,16 @@ export function agentTimeline(db, claimId) {
       case "claim.closed": add({ title: "You closed it without a refund", detail: x.reason }); break;
       case "offer.sent": add({ title: "You let the buyer choose", detail: "This approved every amount on the list." }); break;
       case "offer.accepted": add({ title: `Buyer chose: ${x.title ?? x.option}`, detail: `${x.refund === "0.00" ? "No refund" : `$${x.refund} back`}${x.kit ? `; send ${x.kit}` : ""}.` }); break;
+      case "suggestion.created":
+        steps.push({ at: h.at, actor: "claude", title: x.titles.length
+          ? `Claude Haiku suggested ${x.titles.length === 1 ? "a remedy" : `${x.titles.length} remedies`} from ${x.candidates} store listings`
+          : `Claude Haiku looked at ${x.candidates} store listings and found none that fit`,
+          detail: x.titles.length ? `${x.titles.join(" · ")}. Waiting for your approval.` : undefined,
+          meta: `${x.model} · ${x.latencyMs} ms · photos and Jev's reading only, never the buyer's words${x.dropped ? ` · ${x.dropped} failed the price check` : ""}` });
+        break;
+      case "suggestion.failed": steps.push({ at: h.at, actor: "claude", title: "Claude Haiku could not suggest a remedy", detail: x.error }); break;
+      case "suggestion.approved": add({ title: `You approved Haiku's suggestion: ${x.title}`, detail: `${x.refundUnitCents ? `$${(x.refundUnitCents / 100).toFixed(2)} back per item` : "No refund"}, plus ${x.item}.` }); break;
+      case "suggestion.dismissed": add({ title: `You dismissed Haiku's suggestion: ${x.title}` }); break;
       case "claim.resolved": add({ title: "Sorted without a refund", detail: x.sends ? `Send ${x.sends}.` : undefined }); break;
       case "refund.approved":
         // A buyer's pick already has its own step; the reservation behind it adds nothing new.

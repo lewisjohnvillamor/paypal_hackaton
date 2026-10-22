@@ -12,6 +12,8 @@ import { anyNearOtherClaim } from "./photoIndex.js";
 import { pickForModel, tooManyTokens } from "./ai/select.js";
 import { PRODUCTS } from "./catalog.js";
 import { activeRemedies } from "./remedies.js";
+import { candidatesFor } from "./suggest/candidates.js";
+import { checkSuggestions, storeSuggestions } from "./suggest/suggestions.js";
 
 export const uploadDir = () => process.env.UPLOAD_DIR || "data/uploads";
 const STATUS_TOKEN_DAYS = 30;
@@ -123,7 +125,8 @@ function catalogPhoto(sku) {
 
 // Run Jev on the current evidence and draft a proposal for the current claim version.
 // If Jev fails we record the error and still draft a manual-review proposal; we never invent findings.
-export async function assessClaim(db, claimId, assess, actor = "system") {
+// suggest, when the server has a Claude key, adds Haiku's pending remedy suggestions.
+export async function assessClaim(db, claimId, assess, actor = "system", suggest = null) {
   const claim = db.prepare("SELECT * FROM claims WHERE id = ?").get(claimId);
   if (!claim) throw new ClaimError("NOT_FOUND", "No such request.", 404);
   if (!["new", "ready", "needs_info"].includes(claim.status)) {
@@ -136,11 +139,11 @@ export async function assessClaim(db, claimId, assess, actor = "system") {
   const flags = riskFlags(db, claim, evidence, catalogHash);
   const remedies = activeRemedies(db, line.sku);
 
-  let result = null, error = null, sent = pickForModel(evidence);
+  let result = null, error = null, sent = pickForModel(evidence), copies = [];
   if (evidence.length === 0) error = "No photos uploaded";
   else {
     try {
-      const copies = await mapLimit(sent, IMAGE_CONCURRENCY, async (e) => aiCopy(await readEvidence(e.storage_key)));
+      copies = await mapLimit(sent, IMAGE_CONCURRENCY, async (e) => aiCopy(await readEvidence(e.storage_key)));
       // If the photos still exceed the model's per-call budget, halve the set rather than fail.
       for (let n = copies.length; ; n = Math.ceil(n / 2)) {
         try {
@@ -155,6 +158,8 @@ export async function assessClaim(db, claimId, assess, actor = "system") {
       error = String(err?.message || err).slice(0, 300);
     }
   }
+
+  const suggested = await suggestFor({ suggest, sku: line.sku, findings: result?.findings, photos: copies.slice(0, sent.length), reference });
 
   return tx(db, () => {
     const current = db.prepare("SELECT * FROM claims WHERE id = ?").get(claimId);
@@ -178,16 +183,42 @@ export async function assessClaim(db, claimId, assess, actor = "system") {
     const options = draft.route === "request_info" ? [] : resolutionOptions({
       remedies, quantity: draft.calculation.quantity, findings: result?.findings ?? null, amountCents: draft.amountCents,
     });
+    const proposalId = randomUUID();
     db.prepare(`INSERT INTO proposals (id, claim_id, claim_version, assessment_id, policy_version, route, amount_cents,
       currency, calc_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(randomUUID(), claimId, claim.version, assessmentId, draft.policyVersion, draft.route, draft.amountCents,
+      .run(proposalId, claimId, claim.version, assessmentId, draft.policyVersion, draft.route, draft.amountCents,
         draft.currency, JSON.stringify({ reasons: draft.reasons, calculation: draft.calculation, options }), ts);
 
     db.prepare("UPDATE claims SET status = 'ready', updated_at = ? WHERE id = ?").run(ts, claimId);
     audit(db, { claimId, actor, type: error ? "assessment.failed" : "assessment.completed",
       payload: { route: draft.route, amountCents: draft.amountCents, error } });
+    if (suggested && draft.route !== "request_info" && draft.amountCents > 0) {
+      if (suggested.error) audit(db, { claimId, actor: "system", type: "suggestion.failed", payload: { error: suggested.error } });
+      else {
+        storeSuggestions(db, { claimId, proposalId, model: suggested.model, suggestions: suggested.suggestions });
+        audit(db, { claimId, actor: "system", type: "suggestion.created", payload: {
+          model: suggested.model, latencyMs: suggested.latencyMs, candidates: suggested.candidates,
+          titles: suggested.suggestions.map((x) => x.title), dropped: suggested.dropped } });
+      }
+    }
     return draft;
   });
+}
+
+// Ask Haiku only when Jev clearly saw damage on usable photos, with the store's listings narrowed
+// to this product and damage first. A failure is recorded and never blocks the review.
+async function suggestFor({ suggest, sku, findings, photos, reference }) {
+  if (!suggest || !findings || findings.visible_breakage !== "yes" || findings.evidence_usable === "no" || !photos.length) return null;
+  const candidates = candidatesFor(sku, findings);
+  if (!candidates.length) return null;
+  const product = PRODUCTS[sku];
+  try {
+    const r = await suggest({ photos, reference, product, findings, candidates });
+    const suggestions = checkSuggestions(r.suggestions, { candidates, unitCents: product.unitCents });
+    return { model: r.model, latencyMs: r.latencyMs, candidates: candidates.length, suggestions, dropped: (r.suggestions?.length ?? 0) - suggestions.length };
+  } catch (err) {
+    return { error: String(err?.message || err).slice(0, 300) };
+  }
 }
 
 export function requestInfo(db, claimId, message, actor) {

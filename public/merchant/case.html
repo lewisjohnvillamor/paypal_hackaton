@@ -139,8 +139,9 @@
           <div class="small muted">${proposal.route === "request_info" ? "No amount until clearer photos arrive." : `${c.quantity} × ${usd(c.unitCents)} unit price paid`}</div>
         </div>
         ${proposal.reasons.length ? `<ul class="reasons">${proposal.reasons.map((r) => `<li>${esc(proposal.reasonText?.[r] || REASON[r] || r)}</li>`).join("")}</ul>` : ""}
+        ${suggestionsHtml(proposal.suggestions)}
         ${proposal.options?.length > 1 ? `<div class="offer-pitch">
-          <div class="lead"><span class="art">${optionArt(proposal.options[1])}</span><div><b>Jev found ${proposal.options.length - 1} ${proposal.options.length === 2 ? "remedy" : "remedies"} that fit</b><div class="small muted">From <a href="/merchant/remedies">your remedy library</a>, best fit first. Offer them with the full refund and let the buyer pick.</div></div></div>
+          <div class="lead"><span class="art">${optionArt(proposal.options[1])}</span><div><b>${proposal.options.length - 1} ${proposal.options.length === 2 ? "remedy" : "remedies"} ready to offer</b><div class="small muted">${proposal.options.some((o) => o.source === "haiku") ? "Jev's matches from <a href=\"/merchant/remedies\">your remedy library</a> and the Haiku suggestions you approved." : "Jev matched these from <a href=\"/merchant/remedies\">your remedy library</a>, best fit first."} Offer them with the full refund and let the buyer pick.</div></div></div>
           ${optionListHtml(proposal.options)}
           <button id="send-offer" class="primary lg" style="margin-top:16px">Let the buyer choose</button>
         </div>
@@ -163,8 +164,23 @@
       </div>`;
     }
 
+    // Claude Haiku's suggestions from the store's listings. None reaches the buyer until approved here.
+    function suggestionsHtml(list) {
+      if (!list?.length) return "";
+      return `<div class="ai-suggest">
+        <div class="lead"><span class="art">${ICON.sparkle}</span><div><b>Claude Haiku suggests</b><div class="small muted">Picked from your store listings for this product and damage. Approve one to add it to the buyer's choices.</div></div></div>
+        <ul>${list.map((s) => `<li class="${s.status}">
+          <div><b>${esc(s.title)}</b>
+            <div class="small">Send ${esc(s.item)} (${usd(s.itemPriceCents)}) · ${s.refundUnitCents ? `${usd(s.refundUnitCents)} back per item` : "no refund"}</div>
+            <div class="small muted">${esc(s.why)}</div></div>
+          <div class="sugg-act">${s.status === "pending"
+            ? `<button class="primary" data-suggest="${esc(s.id)}" data-approve="1">Add</button><button class="plain" data-suggest="${esc(s.id)}">Dismiss</button>`
+            : `<span class="pill ${s.status === "approved" ? "ok" : ""}">${s.status === "approved" ? "Added" : "Dismissed"}</span>`}</div>
+        </li>`).join("")}</ul></div>`;
+    }
+
     function optionListHtml(options) {
-      return `<ul class="option-list">${options.map((o) => `<li><span>${esc(optionText(o).title)}${o.item ? ` <span class="muted">· ${esc(o.item)}</span>` : ""}${typeof o.fit === "number" ? ` <span class="fit" title="How well Jev judged it fits the damage">${Math.round(o.fit * 100)}% fit</span>` : ""}</span><span>${optionAmount(o)}</span></li>`).join("")}</ul>`;
+      return `<ul class="option-list">${options.map((o) => `<li><span>${esc(optionText(o).title)}${o.item ? ` <span class="muted">· ${esc(o.item)}</span>` : ""}${typeof o.fit === "number" ? ` <span class="fit" title="How well Jev judged it fits the damage">${Math.round(o.fit * 100)}% fit</span>` : ""}${o.source === "haiku" ? ` <span class="fit ai" title="Suggested by Claude Haiku, approved by you">Haiku</span>` : ""}</span><span>${optionAmount(o)}</span></li>`).join("")}</ul>`;
     }
 
     function refundsHtml() {
@@ -189,7 +205,7 @@
       }).join("");
     }
 
-    const ACTOR = { buyer: "Buyer", jev: "Jev · AI", policy: "Refund policy", merchant: "You", paypal: "PayPal", system: "System" };
+    const ACTOR = { buyer: "Buyer", jev: "Jev · AI", claude: "Claude Haiku · AI", policy: "Refund policy", merchant: "You", paypal: "PayPal", system: "System" };
     // The agent timeline: who did what, in order, with what each one saw.
     function timelineHtml(steps) {
       const time = (iso) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" });
@@ -271,6 +287,7 @@
       $("send-offer") && ($("send-offer").onclick = (e) => act(`/api/merchant/claims/${id}/send-offer`, {
         claimVersion: d.claim.version, proposalId: d.proposal.id, reason: $("reason")?.value,
       }, e.currentTarget, "Sending…"));
+      document.querySelectorAll("[data-suggest]").forEach((b) => (b.onclick = () => act(`/api/merchant/claims/${id}/suggestions/${b.dataset.suggest}`, { approve: !!b.dataset.approve }, b, b.dataset.approve ? "Adding…" : "Dismissing…")));
       $("assess") && ($("assess").onclick = (e) => act(`/api/merchant/claims/${id}/assess`, {}, e.currentTarget, "Reviewing…"));
       $("request-info") && ($("request-info").onclick = (e) => act(`/api/merchant/claims/${id}/request-info`, { message: $("info").value }, e.currentTarget));
       $("close") && ($("close").onclick = (e) => act(`/api/merchant/claims/${id}/close`, { reason: $("close-reason").value }, e.currentTarget));

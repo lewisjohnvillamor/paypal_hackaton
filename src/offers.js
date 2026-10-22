@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { audit, now, tx } from "./db.js";
 import { GateError, reserve } from "./refunds/execute.js";
 import { toDecimal } from "./money.js";
+import { offerOptions } from "./suggest/suggestions.js";
 
 const json = (s) => (s ? JSON.parse(s) : null);
 
@@ -19,7 +20,7 @@ export function sendOffer(db, { claimId, claimVersion, proposalId, reason, actor
     if (!proposal || proposal.claim_version !== claim.version) {
       throw new GateError("STALE_CASE", "The proposal is out of date. Reload and review again.");
     }
-    const options = json(proposal.calc_json).options ?? [];
+    const options = offerOptions(db, proposal);
     if (options.length < 2) throw new GateError("NO_OPTIONS", "No remedy in your library fits this damage; approve a refund instead.");
     // Same rule as a direct approval: a case the policy did not propose needs the merchant's reason.
     const why = (reason || "").trim();
