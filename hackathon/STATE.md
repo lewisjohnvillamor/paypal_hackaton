@@ -37,12 +37,33 @@ gold-leaf kit ($3 back: the $9 kit price comes off the refund, so the buyer neve
 The merchant clicks "Let the buyer choose"; that approves every amount on the list. The buyer
 picks on the status page, and the pick becomes one PayPal partial refund through the same gate as
 a direct approval (`reserve` in `src/refunds/execute.js`, `src/offers.js`). A shattered mug, or an
-unsure damage type, gets the plain refund only. Amounts live in `src/catalog.js` under `repair`.
+unsure damage type, gets the plain refund only. Superseded by the remedy library below.
 
 Live sandbox run (`E2E_OFFER=1 node --env-file=.env scripts/e2e-sandbox.js probe/cases/chipped-closeup.jpg`):
 buyer picked the gold-leaf kit, refund `0XM259959W007021K` for $3.00 COMPLETED. Screenshots
 `screenshots/7-*.png` to `9-*.png`. Not built yet: real kit fulfilment (the merchant sees "Send:
 <kit>" on the case), and offering a replacement.
+
+## Remedy library: Jev suggests the remedy (2026-10-22)
+
+The fixed kintsugi rule above is replaced by a merchant-owned remedy library (`remedies` table,
+`src/remedies.js`, page `/merchant/remedies`, an editable AG Grid). Each remedy has a title, what
+the merchant sends, a refund per item (always below the price paid), a kind (repair kit, spare
+part, replacement, other) and a plain-language "when it fits" sentence. On every review Jev gets
+one yes/no question per active remedy ("does the damage in the photos match this description?",
+`rankRemedies` in `src/ai/jev.js`, run in parallel with the main call); remedies scoring 0.5 or
+more are offered, best fit first, at most 3, next to the full refund (`resolutionOptions`). The AI
+picks from the merchant's list, so it can never invent an item or an amount. Only merchant-written
+text goes to Jev with the photos; the buyer's words still never do. Seeded from `src/catalog.js`:
+kintsugi kit ($12 back), 24k gold-leaf kit ($3 back), replacement (no refund).
+
+A replacement settles the case with no PayPal call (status `resolved`; the order line counts as
+handled for later claims). Live Jev fits, two runs each: chip, kintsugi 0.81-0.83 and replacement
+0.83-0.84; snapped handle, replacement 0.97 and kintsugi 0.08 or less; shards, replacement
+0.52-0.65; broken-in-packing, replacement 0.43-0.80 (noisy around the 0.5 cut); intact mug, 0.16
+or less. Screenshots `screenshots/12-*.png` to `16-*.png` (fit numbers in those are recorded
+values played back through the test double). Free-form AI suggestions outside the library are
+deliberately not built before the deadline.
 
 ## Agent timeline and AG Grid inbox (2026-10-22)
 
@@ -51,8 +72,7 @@ buyer picked the gold-leaf kit, refund `0XM259959W007021K` for $3.00 COMPLETED. 
   drafted and why, the buyer's pick, and PayPal's refund ID. Built from the audit log and stored
   assessments in `src/timeline.js`; nothing is shown that was not recorded.
 - Merchant inbox is an AG Grid Community 32.3.3 grid (CDN): outlined-photo thumbnails, status,
-  Jev's damage type, breakage confidence meter, concern count, a Kintsugi tag on repairable
-  cases, drafted and refunded amounts, outcome; sort, column filters, quick search, status
+  Jev's damage type, breakage confidence meter, concern count, how many remedies fit, drafted and refunded amounts, outcome; sort, column filters, quick search, status
   segments, CSV export, Enter or click opens a case. Falls back to the old list if the CDN fails.
   Screenshots `screenshots/10-*.png`, `11-agent-timeline.png`.
 

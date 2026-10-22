@@ -1,7 +1,7 @@
 // Live end-to-end run against the PayPal sandbox and Jev, driving the real UI with Playwright.
 // Needs the app running (npm start), Playwright installed, and SANDBOX_BUYER_EMAIL / _PASSWORD in .env.
 // Usage: node --env-file=.env scripts/e2e-sandbox.js [photo.jpg]
-// E2E_OFFER=1 takes the repair-offer path instead: the merchant lets the buyer choose, and the
+// E2E_OFFER=1 takes the remedy-offer path instead: the merchant lets the buyer choose, and the
 // buyer picks the gold-leaf kintsugi kit (needs a photo Jev reads as a chip or snapped handle).
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
@@ -79,7 +79,7 @@ if (process.env.E2E_OFFER) {
   await page.goto(BASE + statusUrl);
   await page.waitForSelector("[data-option]");
   await shot("7-buyer-choose");
-  await page.click('[data-option="repair_gold"]');
+  await page.click('[data-option="kintsugi_gold"]');
   await page.waitForSelector(".option.chosen", { timeout: 60_000 });
   await shot("8-buyer-chose-kit");
   const cookies = await page.context().cookies();

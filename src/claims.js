@@ -11,6 +11,7 @@ import { IMAGE_CONCURRENCY, MAX_PHOTOS, SIMILAR_PHOTO_BITS, aiCopy, differenceHa
 import { anyNearOtherClaim } from "./photoIndex.js";
 import { pickForModel, tooManyTokens } from "./ai/select.js";
 import { PRODUCTS } from "./catalog.js";
+import { activeRemedies } from "./remedies.js";
 
 export const uploadDir = () => process.env.UPLOAD_DIR || "data/uploads";
 const STATUS_TOKEN_DAYS = 30;
@@ -35,10 +36,10 @@ export function createClaim(db, { orderId, lineId, quantity, statement }) {
     throw new ClaimError("INVALID", `Quantity must be between 1 and ${line.quantity}.`);
   }
   // Units already refunded on earlier requests cannot be claimed again.
-  const resolved = db.prepare("SELECT COALESCE(SUM(quantity), 0) n FROM claims WHERE line_id = ? AND status = 'refunded'").get(lineId).n;
+  const resolved = db.prepare("SELECT COALESCE(SUM(quantity), 0) n FROM claims WHERE line_id = ? AND status IN ('refunded', 'resolved')").get(lineId).n;
   if (quantity > line.quantity - resolved) {
     throw new ClaimError("UNITS_ALREADY_RESOLVED",
-      `${resolved} of ${line.quantity} were already refunded; you can report at most ${line.quantity - resolved} more.`, 409);
+      `${resolved} of ${line.quantity} were already refunded or replaced; you can report at most ${line.quantity - resolved} more.`, 409);
   }
   const token = newToken();
   const ts = now();
@@ -133,6 +134,7 @@ export async function assessClaim(db, claimId, assess, actor = "system") {
   const { reference, hash: catalogHash } = await catalogPhoto(line.sku);
 
   const flags = riskFlags(db, claim, evidence, catalogHash);
+  const remedies = activeRemedies(db, line.sku);
 
   let result = null, error = null, sent = pickForModel(evidence);
   if (evidence.length === 0) error = "No photos uploaded";
@@ -142,7 +144,7 @@ export async function assessClaim(db, claimId, assess, actor = "system") {
       // If the photos still exceed the model's per-call budget, halve the set rather than fail.
       for (let n = copies.length; ; n = Math.ceil(n / 2)) {
         try {
-          result = await assess({ photos: copies.slice(0, n), reference });
+          result = await assess({ photos: copies.slice(0, n), reference, remedies });
           sent = sent.slice(0, n);
           break;
         } catch (err) {
@@ -174,7 +176,7 @@ export async function assessClaim(db, claimId, assess, actor = "system") {
       refundableCents: refundableBalance(order.amount_cents, ops), flags,
     });
     const options = draft.route === "request_info" ? [] : resolutionOptions({
-      repair: PRODUCTS[line.sku]?.repair, quantity: draft.calculation.quantity, findings: result?.findings ?? null, amountCents: draft.amountCents,
+      remedies, quantity: draft.calculation.quantity, findings: result?.findings ?? null, amountCents: draft.amountCents,
     });
     db.prepare(`INSERT INTO proposals (id, claim_id, claim_version, assessment_id, policy_version, route, amount_cents,
       currency, calc_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)

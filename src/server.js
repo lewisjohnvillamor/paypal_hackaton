@@ -15,6 +15,7 @@ import { ClaimError, addEvidence, assessClaim, closeClaim, createClaim, requestI
 import { GateError, approveAndReserve, checkPayPalLedger, reconcile, reconcileOpen, submit } from "./refunds/execute.js";
 import { caseDetail, inbox, buyerStatus } from "./views.js";
 import { acceptOffer, sendOffer } from "./offers.js";
+import { createRemedy, remedyLibrary, seedRemedies, updateRemedy } from "./remedies.js";
 import { assessmentQueue } from "./queue.js";
 
 // Whole multipart request: 100 photos already shrunk by the browser fit with lots of room.
@@ -22,6 +23,7 @@ const MAX_REQUEST_BYTES = Number(process.env.MAX_REQUEST_MB || 300) * 1024 * 102
 const started = Date.now();
 
 export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence, queue = assessmentQueue(db, assess) } = {}) {
+  seedRemedies(db);
   const app = express();
   app.disable("x-powered-by");
   // Behind Render's (or any) load balancer, req.ip is the proxy unless we trust its X-Forwarded-For;
@@ -87,7 +89,7 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
 
   const wrap = (fn) => (req, res) => Promise.resolve(fn(req, res)).catch((err) => {
     if (err instanceof GateError || err instanceof ClaimError || err instanceof OrderError || err instanceof ImageRejected) {
-      const status = err.status || ({ CAPTURE_NOT_REFUNDABLE: 409, EXTERNAL_REFUND_DETECTED: 409, NOT_FOUND: 404, STALE_CASE: 409, REFUND_IN_PROGRESS: 409, NOT_READY: 409, NO_OPTIONS: 409 }[err.code] ?? 400);
+      const status = err.status || ({ CAPTURE_NOT_REFUNDABLE: 409, EXTERNAL_REFUND_DETECTED: 409, NOT_FOUND: 404, STALE_CASE: 409, REFUND_IN_PROGRESS: 409, NOT_READY: 409, NO_OPTIONS: 409, TOO_MANY_REMEDIES: 409 }[err.code] ?? 400);
       return res.status(status).json({ error: err.code || "IMAGE_REJECTED", message: err.message, debugId: err.debugId });
     }
     if (err instanceof multer.MulterError) return res.status(400).json({ error: "UPLOAD_REJECTED", message: err.message });
@@ -123,7 +125,7 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
   app.get("/api/claim-link/:orderId", wrap(async (req, res) => {
     const order = orderForClaimToken(req);
     const lines = db.prepare("SELECT id, title, quantity, unit_cents, ref_image FROM order_lines WHERE order_id = ?").all(order.id);
-    const open = db.prepare("SELECT id, ref FROM claims WHERE order_id = ? AND status NOT IN ('closed','refunded')").get(order.id);
+    const open = db.prepare("SELECT id, ref FROM claims WHERE order_id = ? AND status NOT IN ('closed','refunded','resolved')").get(order.id);
     res.json({ orderId: order.id, amountCents: order.amount_cents, capturedAt: order.delivered_at, lines, openClaimRef: open?.ref ?? null });
   }));
 
@@ -156,7 +158,7 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
     const claim = claimForStatusToken(req);
     await checkPayPalLedger(db, pp, claim.id);
     const { op, duplicate } = acceptOffer(db, { claimId: claim.id, offerId: String(req.body.offerId || ""), optionId: String(req.body.optionId || "") });
-    if (!duplicate) await submit(db, pp, op, "buyer");
+    if (op && !duplicate) await submit(db, pp, op, "buyer");
     res.json(buyerStatus(db, db.prepare("SELECT * FROM claims WHERE id = ?").get(claim.id)));
   }));
 
@@ -220,6 +222,9 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
     sendOffer(db, { claimId: req.params.id, claimVersion: Number(claimVersion), proposalId, reason, actor: req.actor });
     res.json(caseDetail(db, req.params.id));
   }));
+  m.get("/remedies", (_req, res) => res.json(remedyLibrary(db)));
+  m.post("/remedies", wrap(async (req, res) => res.status(201).json(createRemedy(db, req.body))));
+  m.patch("/remedies/:id", wrap(async (req, res) => res.json(updateRemedy(db, req.params.id, req.body))));
   m.post("/refunds/:id/reconcile", wrap(async (req, res) => {
     const op = await reconcile(db, pp, req.params.id, req.actor);
     res.json(caseDetail(db, op.claim_id));

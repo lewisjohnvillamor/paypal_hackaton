@@ -21,7 +21,7 @@
   </main>
   <dialog id="zoom" aria-label="Photo"><span class="damage-frame"><img alt="Evidence photo, enlarged"></span></dialog>
   <script type="module">
-    import { api, usd, esc, pill, when, ICON, checkBadge, busy, settle, optionText } from "/app.js";
+    import { api, usd, esc, pill, when, ICON, checkBadge, busy, settle, optionText, optionArt, optionAmount } from "/app.js";
     const id = new URLSearchParams(location.search).get("id");
     const $ = (x) => document.getElementById(x);
     const fail = (msg) => { $("error").textContent = msg; $("error").classList.toggle("hidden", !msg); };
@@ -109,6 +109,11 @@
     function actionsHtml() {
       const { claim, proposal, payment } = d;
       if (["refunded", "closed", "refund_processing"].includes(claim.status)) return "";
+      if (claim.status === "resolved") {
+        const o = d.offer?.options.find((x) => x.id === d.offer.chosen);
+        return `<div class="card"><div class="hero" style="padding:8px 0 12px">${checkBadge()}<h2 style="margin:0">Sorted without a refund</h2></div>
+          <div class="kv-row"><span>Buyer chose</span><span>${esc(o?.title ?? "")}<div class="footnote">Send: ${esc(o?.item ?? "")}</div></span></div></div>`;
+      }
       const head = `<div class="voice merchant" style="margin-bottom:16px"><span class="avatar">${ICON.check}</span><div><div class="tag">Your decision</div><div class="small muted">Nothing moves until you approve.</div></div></div>`;
       if (claim.status === "offer_sent" && d.offer) {
         return `<div class="card">${head}<p style="margin:0 0 4px"><b>Waiting for the buyer to choose.</b></p>
@@ -135,7 +140,7 @@
         </div>
         ${proposal.reasons.length ? `<ul class="reasons">${proposal.reasons.map((r) => `<li>${esc(proposal.reasonText?.[r] || REASON[r] || r)}</li>`).join("")}</ul>` : ""}
         ${proposal.options?.length > 1 ? `<div class="offer-pitch">
-          <div class="lead"><img src="/assets/kintsugi.svg" alt=""><div><b>This one can be mended</b><div class="small muted">Jev saw ${esc({ handle_off: "a snapped-off handle", crack_or_chip: "a crack or chip" }[d.assessment?.findings?.damage_kind] || "repairable damage")}. Offer a kintsugi kit and a smaller refund, or the full refund. The buyer picks.</div></div></div>
+          <div class="lead"><span class="art">${optionArt(proposal.options[1])}</span><div><b>Jev found ${proposal.options.length - 1} ${proposal.options.length === 2 ? "remedy" : "remedies"} that fit</b><div class="small muted">From <a href="/merchant/remedies">your remedy library</a>, best fit first. Offer them with the full refund and let the buyer pick.</div></div></div>
           ${optionListHtml(proposal.options)}
           <button id="send-offer" class="primary lg" style="margin-top:16px">Let the buyer choose</button>
         </div>
@@ -159,7 +164,7 @@
     }
 
     function optionListHtml(options) {
-      return `<ul class="option-list">${options.map((o) => `<li><span>${esc(optionText(o).title)}${o.kit ? ` <span class="muted">· ${esc(o.kit)}</span>` : ""}</span><span>${usd(o.refundCents)}</span></li>`).join("")}</ul>`;
+      return `<ul class="option-list">${options.map((o) => `<li><span>${esc(optionText(o).title)}${o.item ? ` <span class="muted">· ${esc(o.item)}</span>` : ""}${typeof o.fit === "number" ? ` <span class="fit" title="How well Jev judged it fits the damage">${Math.round(o.fit * 100)}% fit</span>` : ""}</span><span>${optionAmount(o)}</span></li>`).join("")}</ul>`;
     }
 
     function refundsHtml() {
@@ -172,7 +177,7 @@
             <h2 style="margin:0">PayPal refund ${word}</h2>
             <div class="big amount">${usd(r.amountCents)}</div>
           </div>
-          ${d.offer?.chosen ? (() => { const o = d.offer.options.find((x) => x.id === d.offer.chosen); return `<div class="kv-row"><span>Buyer chose</span><span>${esc(optionText(o).title)}${o.kit ? `<div class="footnote">Send: ${esc(o.kit)}</div>` : ""}</span></div>`; })() : ""}
+          ${d.offer?.chosen ? (() => { const o = d.offer.options.find((x) => x.id === d.offer.chosen); return `<div class="kv-row"><span>Buyer chose</span><span>${esc(optionText(o).title)}${o.item ? `<div class="footnote">Send: ${esc(o.item)}</div>` : ""}</span></div>`; })() : ""}
           <div class="kv-row"><span>PayPal status</span><span class="pill ${tone}">${esc(r.providerStatus || r.status)}</span></div>
           <div class="kv-row"><span>Refund ID</span><span class="mono">${esc(r.providerRefundId || "Not known yet")}</span></div>
           <div class="kv-row"><span>Idempotency key</span><span class="mono">${esc(r.requestId)}</span></div>

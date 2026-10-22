@@ -5,13 +5,19 @@ export const PRODUCTS = {
     title: "Classic white ceramic mug",
     unitCents: 2000,
     refImage: "catalog-mug.jpg",
-    // A chipped or cracked mug, or one with a snapped handle, can be kept and mended with
-    // kintsugi (lacquer and gold). The shop sets the amounts; the buyer can always take a full refund.
-    repair: {
-      refundUnitCents: 1200,
-      kit: "kintsugi repair kit with gold powder",
-      upgrade: { kit: "24k gold-leaf kintsugi kit", unitCents: 900 },
-    },
+    // Starting remedy library. The merchant edits it on the Remedies page; Jev reads each "fits"
+    // line against the photos and the best-fitting ones become the buyer's options.
+    remedies: [
+      { id: "kintsugi", kind: "repair_kit", title: "Keep it and mend it with kintsugi", item: "kintsugi repair kit with gold powder",
+        fits: "Mends a chip, a crack, or a snapped-off handle on a ceramic mug that is otherwise in one piece. Cannot rebuild a mug broken into many pieces.",
+        refundUnitCents: 1200 },
+      { id: "kintsugi_gold", kind: "repair_kit", title: "Mend it in 24k gold leaf", item: "24k gold-leaf kintsugi kit (its $9 price comes off the refund)",
+        fits: "Mends a chip, a crack, or a snapped-off handle on a ceramic mug that is otherwise in one piece, with real gold leaf. Cannot rebuild a mug broken into many pieces.",
+        refundUnitCents: 300 },
+      { id: "replacement", kind: "replacement", title: "Get a new one, shipped free", item: "a new Classic white ceramic mug",
+        fits: "Any damage to the mug, including one broken into pieces or damaged beyond repair.",
+        refundUnitCents: 0 },
+    ],
   },
 };
 

@@ -278,7 +278,10 @@ details.more[open] summary::after { transform: rotate(-135deg) translateY(-2px);
 .option.gold b { background: linear-gradient(90deg, #b8862b, #e0b44c, #b8862b); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .offer-pitch { margin-top: 18px; padding: 16px; border-radius: 16px; background: linear-gradient(135deg, rgb(212 162 58 / 0.12), rgb(212 162 58 / 0.04)); border: 1px solid rgb(212 162 58 / 0.35); }
 .offer-pitch .lead { display: grid; grid-template-columns: 48px 1fr; gap: 12px; align-items: center; }
-.offer-pitch .lead img { width: 48px; height: 48px; }
+.offer-pitch .lead .art { width: 48px; height: 48px; display: grid; place-items: center; color: var(--text-2); }
+.offer-pitch .lead .art img { width: 48px; height: 48px; }
+.offer-pitch .lead .art svg { width: 26px; height: 26px; }
+.option-list .fit { font-size: 12px; color: var(--green); font-weight: 600; white-space: nowrap; }
 .option-list { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 8px; }
 .option-list li { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
 .option-list li span:last-child { font-weight: 600; white-space: nowrap; }
@@ -388,3 +391,10 @@ footer.foot { max-width: 1040px; margin: 0 auto; padding: 0 22px 40px; color: va
 .pill.gold { background: rgb(212 162 58 / 0.16); color: #9a6b10; }
 @media (prefers-color-scheme: dark) { .pill.gold { color: #f0c860; } }
 @media (max-width: 620px) { .inbox-grid { height: 520px; } .grid-tools input[type=search] { width: 100%; } }
+
+/* Remedy library */
+.remedy-product { margin-top: 20px; padding: 24px; }
+.remedy-grid.inbox-grid { width: 100%; height: auto; }
+.remedy-add { display: grid; grid-template-columns: 1.2fr 1.2fr 1.6fr 100px 140px auto; gap: 8px; margin-top: 14px; }
+.remedy-add input, .remedy-add select { margin: 0; }
+@media (max-width: 860px) { .remedy-add { grid-template-columns: 1fr; } }

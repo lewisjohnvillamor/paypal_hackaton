@@ -16,7 +16,7 @@
 <body>
   <header class="top">
     <a class="brand" href="/merchant"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span>Refund Relay <span class="ctx">Merchant</span></a>
-    <nav><a href="/">Store</a><a href="#" id="logout" class="hidden">Sign out</a></nav>
+    <nav><a href="/merchant/remedies">Remedies</a><a href="/">Store</a><a href="#" id="logout" class="hidden">Sign out</a></nav>
   </header>
   <main class="wide">
     <form id="login" class="card hidden center" style="max-width:400px;margin:40px auto 0;padding:40px 32px">
@@ -52,8 +52,8 @@
     const ROUTE = { propose: "Suggested refund", manual_review: "Needs your judgment", request_info: "Ask for photos" };
 
     const DAMAGE = { shattered: "Broken", handle_off: "Handle off", crack_or_chip: "Crack or chip", none_visible: "None seen" };
-    const OUTCOME = (r) => r.status === "refunded" ? (r.chosen_option && r.chosen_option !== "refund" ? `Refunded, ${r.chosen_option === "repair_gold" ? "gold-leaf kit" : "kintsugi kit"}` : "Refunded")
-      : r.status === "closed" ? "Closed" : r.status === "offer_sent" ? "Buyer choosing" : ROUTE[r.route] || "";
+    const OUTCOME = (r) => r.chosen_option && r.chosen_option !== "refund" ? `Buyer chose: ${r.chosen_title}`
+      : r.status === "refunded" ? "Refunded" : r.status === "closed" ? "Closed" : r.status === "offer_sent" ? "Buyer choosing" : ROUTE[r.route] || "";
     const pct = (p) => `${(p * 100).toFixed(2)}%`;
     let grid = null;
 
@@ -76,10 +76,10 @@
       { headerName: "Breakage", field: "breakage", width: 135, type: "rightAligned",
         cellRenderer: html((r) => r.breakage == null ? "—" : `<span class="meter" style="color:var(--${r.breakage >= 0.8 ? "green-fill" : r.breakage <= 0.2 ? "red" : "orange"})"><i style="width:${Math.round(r.breakage * 100)}%"></i></span> ${Math.round(r.breakage * 100)}%`) },
       { headerName: "Concerns", field: "concerns", width: 115, type: "rightAligned", valueFormatter: (p) => p.value == null ? "—" : p.value === 0 ? "None" : String(p.value) },
-      { headerName: "Repairable", field: "repairable", width: 120, cellRenderer: html((r) => r.repairable ? `<span class="pill gold">Kintsugi</span>` : "") },
+      { headerName: "Remedies", field: "remedies", width: 120, cellRenderer: html((r) => r.remedies ? `<span class="pill gold">${r.remedies} fit${r.remedies === 1 ? "s" : ""}</span>` : "") },
       { headerName: "Drafted", field: "proposed_cents", width: 110, type: "rightAligned", valueFormatter: (p) => p.value ? usd(p.value) : "—" },
       { headerName: "Refunded", field: "refunded_cents", width: 115, type: "rightAligned", valueFormatter: (p) => p.value ? usd(p.value) : "—" },
-      { headerName: "Outcome", colId: "outcome", width: 175, valueGetter: (p) => OUTCOME(p.data) },
+      { headerName: "Outcome", colId: "outcome", width: 230, valueGetter: (p) => OUTCOME(p.data) },
       { headerName: "Reported", field: "created_at", width: 165, sort: "desc", valueFormatter: (p) => when(p.value) },
     ];
 
@@ -146,7 +146,7 @@
       catch (err) { $("login-error").textContent = err.status === 401 ? "That password isn't right. Try again." : err.message; $("login-error").classList.remove("hidden"); }
     };
     $("search").oninput = (e) => grid?.setGridOption("quickFilterText", e.target.value);
-    $("export").onclick = () => grid?.exportDataAsCsv({ fileName: "refund-requests.csv", columnKeys: ["ref", "status", "title", "damage_kind", "breakage", "concerns", "repairable", "proposed_cents", "refunded_cents", "outcome", "created_at"] });
+    $("export").onclick = () => grid?.exportDataAsCsv({ fileName: "refund-requests.csv", columnKeys: ["ref", "status", "title", "damage_kind", "breakage", "concerns", "remedies", "proposed_cents", "refunded_cents", "outcome", "created_at"] });
     $("logout").onclick = async (e) => { e.preventDefault(); await api("/api/merchant/logout", { method: "POST" }); location.reload(); };
     window.addEventListener("load", () => rows.length && draw()); // the grid script is deferred
     load();
