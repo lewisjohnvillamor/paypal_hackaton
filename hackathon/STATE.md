@@ -16,6 +16,16 @@ Screenshots of the latest run are in `hackathon/screenshots/` (desktop and `m-*`
 
 Apple-style redesign across store, claim, tracking and merchant screens (PR #2). Tokens and rationale: `DESIGN.md`. axe WCAG AA: 0 violations on store, inbox and case pages in both themes. The walkthrough video was re-recorded with the new UI.
 
+## Damage boxes (2026-10-22)
+
+Each photo Jev sees also gets its own small call with a `box` question ("where is the damage?") and a
+per-photo damage check. The merchant case page outlines the damage on the thumbnails, in the
+enlarged photo, and in a large photo at the top of "What Jev saw". A box is drawn only when that
+call is at least 0.8 sure the photo shows damage, because Jev returns a box even for an intact mug.
+Boxes are display only; policy never reads them. Live check (jev-1.14.0): snapped handle, chip and
+cracked glass were all outlined in the right place, intact mugs got no box, about 300-600 ms for
+the whole assessment. Screenshots: `screenshots/6-damage-boxes.png`, `6b-damage-zoom.png`.
+
 ## Gates
 
 - Gate 1 (financial loop): done, in an earlier thread and again here.

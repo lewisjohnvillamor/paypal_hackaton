@@ -27,6 +27,22 @@ test("a claim with 100 photos is stored in full and the model sees the best 8", 
   } finally { t.close(); }
 });
 
+test("damage boxes land on the photos Jev saw, in the order it saw them", async () => {
+  const box = { top: 0.1, bottom: 0.5, left: 0.2, right: 0.6 };
+  // Box only for the second photo the model sees; the first had no confident damage.
+  const assess = async ({ photos }) => ({ ...(await fakeAssess()()),
+    findings: { ...clearFindings, locations: photos.map((_, i) => (i === 1 ? { damaged: 0.95, box } : { damaged: 0.3, box: null })) } });
+  const t = await setup({ pp: uniqueEmails(), assess });
+  try {
+    const photos = await Promise.all(Array.from({ length: 3 }, (_, i) => testPhoto(5000 + i)));
+    const c = await purchaseAndClaim(t, { photos });
+    await t.login();
+    const d = await detail(t, c.claimId);
+    assert.deepEqual(d.evidence.map((e) => e.damageBox), [null, box, null]);
+    assert.equal(d.proposal.route, "propose"); // display only: policy is unchanged
+  } finally { t.close(); }
+});
+
 test("if the photos exceed the model's token budget the set is halved, not failed", async () => {
   const calls = [];
   const assess = async ({ photos }) => {

@@ -19,7 +19,7 @@
     <div id="error" class="notice bad hidden" role="alert"></div>
     <div id="page"></div>
   </main>
-  <dialog id="zoom" aria-label="Photo"><img alt="Evidence photo, enlarged"></dialog>
+  <dialog id="zoom" aria-label="Photo"><span class="damage-frame"><img alt="Evidence photo, enlarged"></span></dialog>
   <script type="module">
     import { api, usd, esc, pill, when, ICON, checkBadge, busy, settle } from "/app.js";
     const id = new URLSearchParams(location.search).get("id");
@@ -67,6 +67,27 @@
       "refund.unknown": "PayPal refund status unknown",
       "refund.network_error": "Network error reaching PayPal",
     };
+
+    const pct = (x) => `${(Math.min(1, Math.max(0, x)) * 100).toFixed(2)}%`;
+    // Jev's box is in fractions of the whole photo. Thumbnails crop it to a centred square
+    // (object-fit: cover), so map the box through that crop; elsewhere the photo is shown whole.
+    function boxHtml(b, label, { w, h } = {}) {
+      let { top, bottom, left, right } = b;
+      if (w && h) {
+        const k = Math.max(1 / w, 1 / h), dw = w * k, dh = h * k, ox = (1 - dw) / 2, oy = (1 - dh) / 2;
+        [left, right, top, bottom] = [ox + left * dw, ox + right * dw, oy + top * dh, oy + bottom * dh];
+      }
+      return `<span class="damage-box${top < 0.12 ? " low" : ""}" style="top:${pct(top)};left:${pct(left)};width:${pct(right - left)};height:${pct(bottom - top)}">${label ? `<span class="damage-label">${esc(label)}</span>` : ""}</span>`;
+    }
+
+    function damageHeroHtml() {
+      const i = d.evidence.findIndex((e) => e.damageBox);
+      if (i < 0) return "";
+      const e = d.evidence[i];
+      return `<figure class="damage-hero"><button type="button" class="plain" style="padding:0;min-height:0;cursor:zoom-in" data-zoom="${e.url}" data-box='${esc(JSON.stringify(e.damageBox))}' aria-label="Enlarge customer photo ${i + 1}">
+        <span class="damage-frame"><img src="${e.url}" alt="Customer photo ${i + 1}, with the damage Jev found outlined">${boxHtml(e.damageBox, "Damage")}</span></button>
+        <figcaption>Jev outlined the damage in customer photo ${i + 1}${d.evidence.filter((x) => x.damageBox).length > 1 ? ` and ${d.evidence.filter((x) => x.damageBox).length - 1} more` : ""}. Outlines only help you look; they never change the amount.</figcaption></figure>`;
+    }
 
     function findingsHtml(a) {
       if (!a) return `<p class="muted">Not reviewed yet.</p>`;
@@ -166,13 +187,14 @@
                 <div class="bubble">${esc(claim.statement)}</div>
               </div></div>
               <div class="row" style="align-items:flex-start;gap:16px;margin-top:20px;flex-wrap:wrap">
-                ${evidence.map((e, i) => `<figure class="figure thumbs" style="margin:0"><button type="button" data-zoom="${e.url}" aria-label="Enlarge customer photo ${i + 1}"><img src="${e.url}" alt="Customer photo ${i + 1}" loading="lazy"></button><figcaption>Customer photo${evidence.length > 1 ? " " + (i + 1) : ""}${e.sentToAi && evidence.length > 8 ? " · checked by Jev" : ""}</figcaption></figure>`).join("")}
+                ${evidence.map((e, i) => `<figure class="figure thumbs" style="margin:0"><button type="button" data-zoom="${e.url}"${e.damageBox ? ` data-box='${esc(JSON.stringify(e.damageBox))}'` : ""} aria-label="Enlarge customer photo ${i + 1}"><img src="${e.url}" alt="Customer photo ${i + 1}" loading="lazy">${e.damageBox ? boxHtml(e.damageBox, "", { w: e.width, h: e.height }) : ""}</button><figcaption>Customer photo${evidence.length > 1 ? " " + (i + 1) : ""}${e.sentToAi && evidence.length > 8 ? " · checked by Jev" : ""}</figcaption></figure>`).join("")}
                 <figure class="figure thumbs" style="margin:0"><button type="button" data-zoom="${line.refImage}" aria-label="Enlarge your catalog photo"><img src="${line.refImage}" alt="Your catalog photo"></button><figcaption>Your catalog photo</figcaption></figure>
               </div>
             </div>
             <div class="card">
               <div class="voice model"><span class="avatar">${ICON.sparkle}</span><div style="flex:1">
                 <div class="tag">What Jev saw in the photos</div>
+                ${assessment && !assessment.error ? damageHeroHtml() : ""}
                 ${findingsHtml(assessment)}
               </div></div>
             </div>
@@ -197,7 +219,13 @@
     }
 
     function wire() {
-      document.querySelectorAll("[data-zoom]").forEach((b) => (b.onclick = () => { $("zoom").querySelector("img").src = b.dataset.zoom; $("zoom").showModal(); }));
+      document.querySelectorAll("[data-zoom]").forEach((b) => (b.onclick = () => {
+        const frame = $("zoom").querySelector(".damage-frame");
+        frame.querySelector(".damage-box")?.remove();
+        frame.querySelector("img").src = b.dataset.zoom;
+        if (b.dataset.box) frame.insertAdjacentHTML("beforeend", boxHtml(JSON.parse(b.dataset.box), "Damage"));
+        $("zoom").showModal();
+      }));
       $("zoom").onclick = () => $("zoom").close();
       const amount = $("amount"), approve = $("approve");
       if (amount && approve) {

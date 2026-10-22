@@ -204,7 +204,20 @@ button:disabled { opacity: 0.4; cursor: default; }
 .thumbs button { padding: 0; border-radius: 14px; background: none; min-height: 0; overflow: hidden; cursor: zoom-in; transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease); }
 .thumbs button:hover { transform: scale(1.02); box-shadow: var(--shadow-lift); background: none; }
 .thumbs.sm img { width: 64px; height: 64px; border-radius: 10px; }
+.thumbs button { position: relative; }
 .figure { display: grid; gap: 6px; }
+
+/* Where Jev saw the damage: fractions of the photo, drawn over it */
+.damage-frame { position: relative; display: inline-block; line-height: 0; overflow: hidden; border-radius: 18px; }
+.damage-frame img { display: block; }
+.damage-box { position: absolute; border: 3px solid var(--red); border-radius: 10px; pointer-events: none; box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.38); animation: box-in 0.6s var(--ease) 0.15s both; }
+.thumbs .damage-box { border-width: 2px; border-radius: 6px; box-shadow: none; }
+.damage-box .damage-label { position: absolute; left: -3px; bottom: 100%; margin-bottom: 6px; line-height: 1; padding: 5px 8px; border-radius: 7px; background: var(--red); color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.damage-box.low .damage-label { bottom: auto; top: 0; left: 0; margin: 0; border-radius: 6px 0 7px 0; } /* no room above: sit inside the corner */
+.damage-hero { margin: 4px 0 18px; }
+.damage-hero .damage-frame { max-width: 100%; }
+.damage-hero img { max-width: 100%; max-height: 360px; width: auto; height: auto; }
+.damage-hero figcaption { margin-top: 8px; font-size: 12px; color: var(--text-2); }
 .figure figcaption { font-size: 12px; color: var(--text-2); text-align: center; }
 
 /* Voices: who said what */
@@ -303,6 +316,7 @@ footer.foot { max-width: 1040px; margin: 0 auto; padding: 0 22px 40px; color: va
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes pop { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: none; } }
 @keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes box-in { from { opacity: 0; transform: scale(1.25); } to { opacity: 1; transform: none; } }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0ms !important; transition-duration: 0.01ms !important; }
