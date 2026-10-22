@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { toCents, toDecimal } from "../src/money.js";
 import { draftProposal, refundableBalance } from "../src/policy/refundPolicy.js";
-import { normalize } from "../src/ai/jev.js";
+import { normalize, normalizeLocation } from "../src/ai/jev.js";
 import { mapProviderStatus } from "../src/refunds/execute.js";
 import { clearFindings } from "./helpers.js";
 
@@ -85,6 +85,23 @@ test("Jev answers normalize to yes/no/uncertain with two signals for item match"
   assert.equal(normalize(ans({ same_design: { noul: 0.3 } })).design_match, "uncertain");
   assert.equal(normalize(ans({ instructions_in_photo: { noul: 0.6 } })).instructions_in_photo, true);
   assert.equal(normalize(ans({ same_kind_as_catalog: { noul: 0.05 } })).product_consistency, "inconsistent");
+});
+
+test("a damage box is kept only when the same call is confident the photo shows damage", () => {
+  const area = { box: { top: 0.4, bottom: 0.6, left: 0.2, right: 0.5 } };
+  assert.deepEqual(normalizeLocation({ damaged: { noul: 0.95 }, damage_area: area }), { damaged: 0.95, box: area.box });
+  // Jev returns a box even for an intact mug; without confident damage nothing is drawn.
+  assert.equal(normalizeLocation({ damaged: { noul: 0.55 }, damage_area: area }).box, null);
+  assert.deepEqual(normalizeLocation({ damaged: { noul: 0.75 }, damage_area: area }).box, area.box);
+  // A box around (almost) the whole photo points at nothing.
+  assert.equal(normalizeLocation({ damaged: { noul: 0.99 }, damage_area: { box: { top: -0.1, bottom: 1.3, left: 0, right: 1 } } }).box, null);
+  // A hairline box is widened about its centre and stays inside the photo.
+  const thin = normalizeLocation({ damaged: { noul: 0.9 }, damage_area: { box: { top: 0.2, bottom: 0.6, left: 0.31, right: 0.32 } } }).box;
+  assert.ok(Math.abs(thin.right - thin.left - 0.08) < 1e-9 && Math.abs((thin.left + thin.right) / 2 - 0.315) < 1e-9);
+  assert.equal(normalizeLocation({ damaged: { noul: 0.9 }, damage_area: { box: { top: 0.1, bottom: 0.5, left: 0.98, right: 1 } } }).box.right, 1);
+  assert.equal(normalizeLocation({ damaged: { noul: 0.9 }, damage_area: { box: { top: 0.5, bottom: 0.5, left: 0, right: 1 } } }), null);
+  assert.equal(normalizeLocation({ damaged: { noul: 0.9 } }), null);
+  assert.equal(normalizeLocation(undefined), null);
 });
 
 test("unknown provider statuses are reconciled, never treated as success", () => {

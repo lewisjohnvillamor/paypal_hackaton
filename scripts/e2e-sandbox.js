@@ -1,6 +1,8 @@
 // Live end-to-end run against the PayPal sandbox and Jev, driving the real UI with Playwright.
 // Needs the app running (npm start), Playwright installed, and SANDBOX_BUYER_EMAIL / _PASSWORD in .env.
 // Usage: node --env-file=.env scripts/e2e-sandbox.js [photo.jpg]
+// E2E_OFFER=1 takes the repair-offer path instead: the merchant lets the buyer choose, and the
+// buyer picks the gold-leaf kintsugi kit (needs a photo Jev reads as a chip or snapped handle).
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
 
@@ -68,6 +70,26 @@ await shot("2-merchant-inbox");
 await page.click("a.inbox-row");
 await page.waitForSelector("#approve");
 await shot("3-merchant-case");
+if (process.env.E2E_OFFER) {
+  if (!(await page.$("#send-offer"))) throw new Error("No repair offer for this photo; try probe/cases/chipped-closeup.jpg");
+  if (await page.isVisible("#reason")) await page.fill("#reason", "Same mug, chip is clear in the photo");
+  await page.click("#send-offer");
+  await page.waitForSelector("text=Waiting for the buyer to choose");
+  await shot("6-offer-sent");
+  await page.goto(BASE + statusUrl);
+  await page.waitForSelector("[data-option]");
+  await shot("7-buyer-choose");
+  await page.click('[data-option="repair_gold"]');
+  await page.waitForSelector(".option.chosen", { timeout: 60_000 });
+  await shot("8-buyer-chose-kit");
+  const cookies = await page.context().cookies();
+  const caseId = new URL(BASE + statusUrl).searchParams.get("claim");
+  const d = await (await fetch(`${BASE}/api/merchant/claims/${caseId}`, { headers: { Cookie: cookies.map((c) => `${c.name}=${c.value}`).join("; ") } })).json();
+  log("offer", JSON.stringify(d.offer));
+  log("refund", JSON.stringify(d.refunds.map((r) => ({ id: r.providerRefundId, status: r.status, amount: r.amountCents }))));
+  await browser.close();
+  process.exit(0);
+}
 log("approve button:", await page.textContent("#approve"));
 await page.click("#approve");
 await page.waitForSelector("h2:has-text(\"PayPal refund\")", { timeout: 60_000 });

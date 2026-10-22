@@ -132,6 +132,24 @@ CREATE TABLE IF NOT EXISTS refund_ops (
 CREATE UNIQUE INDEX IF NOT EXISTS one_open_op_per_capture
   ON refund_ops(capture_id) WHERE status IN ('SUBMITTING','PENDING','UNKNOWN');
 
+-- Resolution options the merchant approved and sent to the buyer. The buyer's pick becomes the
+-- refund; every option's amount was approved by the merchant when the offer was sent.
+CREATE TABLE IF NOT EXISTS offers (
+  id TEXT PRIMARY KEY,
+  claim_id TEXT NOT NULL REFERENCES claims(id),
+  claim_version INTEGER NOT NULL,
+  proposal_id TEXT NOT NULL REFERENCES proposals(id),
+  options_json TEXT NOT NULL,
+  actor TEXT NOT NULL,
+  reason TEXT,
+  status TEXT NOT NULL CHECK (status IN ('open','accepted')),
+  chosen_option TEXT,
+  op_id TEXT REFERENCES refund_ops(id),
+  created_at TEXT NOT NULL,
+  decided_at TEXT,
+  UNIQUE (claim_id, claim_version)
+);
+
 CREATE TABLE IF NOT EXISTS audit (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   claim_id TEXT,
@@ -153,6 +171,7 @@ const MIGRATIONS = [
 // Every lookup the app makes by foreign key or by time. Without these, each claim submission and
 // each inbox load scanned whole tables (see bench/RESULTS.md).
 const INDEXES = `
+CREATE INDEX IF NOT EXISTS offers_by_claim ON offers(claim_id, created_at);
 CREATE INDEX IF NOT EXISTS evidence_by_claim ON evidence(claim_id, created_at);
 CREATE INDEX IF NOT EXISTS claims_by_order ON claims(order_id, created_at);
 CREATE INDEX IF NOT EXISTS claims_by_line ON claims(line_id, status);

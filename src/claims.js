@@ -5,7 +5,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { audit, now, tx } from "./db.js";
 import { hashToken, newToken } from "./auth.js";
-import { draftProposal, refundableBalance } from "./policy/refundPolicy.js";
+import { draftProposal, refundableBalance, resolutionOptions } from "./policy/refundPolicy.js";
 import { TEMPLATE_VERSION } from "./ai/jev.js";
 import { IMAGE_CONCURRENCY, MAX_PHOTOS, SIMILAR_PHOTO_BITS, aiCopy, differenceHash, hashDistance, mapLimit } from "./images.js";
 import { anyNearOtherClaim } from "./photoIndex.js";
@@ -173,10 +173,13 @@ export async function assessClaim(db, claimId, assess, actor = "system") {
       deliveredAt: order.delivered_at, claimedAt: claim.created_at,
       refundableCents: refundableBalance(order.amount_cents, ops), flags,
     });
+    const options = draft.route === "request_info" ? [] : resolutionOptions({
+      repair: PRODUCTS[line.sku]?.repair, quantity: draft.calculation.quantity, findings: result?.findings ?? null, amountCents: draft.amountCents,
+    });
     db.prepare(`INSERT INTO proposals (id, claim_id, claim_version, assessment_id, policy_version, route, amount_cents,
       currency, calc_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(randomUUID(), claimId, claim.version, assessmentId, draft.policyVersion, draft.route, draft.amountCents,
-        draft.currency, JSON.stringify({ reasons: draft.reasons, calculation: draft.calculation }), ts);
+        draft.currency, JSON.stringify({ reasons: draft.reasons, calculation: draft.calculation, options }), ts);
 
     db.prepare("UPDATE claims SET status = 'ready', updated_at = ? WHERE id = ?").run(ts, claimId);
     audit(db, { claimId, actor, type: error ? "assessment.failed" : "assessment.completed",

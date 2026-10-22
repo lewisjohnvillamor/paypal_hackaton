@@ -14,6 +14,7 @@ import { OrderError, captureOrder, startOrder } from "./orders.js";
 import { ClaimError, addEvidence, assessClaim, closeClaim, createClaim, requestInfo, uploadDir } from "./claims.js";
 import { GateError, approveAndReserve, checkPayPalLedger, reconcile, reconcileOpen, submit } from "./refunds/execute.js";
 import { caseDetail, inbox, buyerStatus } from "./views.js";
+import { acceptOffer, sendOffer } from "./offers.js";
 import { assessmentQueue } from "./queue.js";
 
 // Whole multipart request: 100 photos already shrunk by the browser fit with lots of room.
@@ -86,7 +87,7 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
 
   const wrap = (fn) => (req, res) => Promise.resolve(fn(req, res)).catch((err) => {
     if (err instanceof GateError || err instanceof ClaimError || err instanceof OrderError || err instanceof ImageRejected) {
-      const status = err.status || ({ CAPTURE_NOT_REFUNDABLE: 409, EXTERNAL_REFUND_DETECTED: 409, NOT_FOUND: 404, STALE_CASE: 409, REFUND_IN_PROGRESS: 409, NOT_READY: 409 }[err.code] ?? 400);
+      const status = err.status || ({ CAPTURE_NOT_REFUNDABLE: 409, EXTERNAL_REFUND_DETECTED: 409, NOT_FOUND: 404, STALE_CASE: 409, REFUND_IN_PROGRESS: 409, NOT_READY: 409, NO_OPTIONS: 409 }[err.code] ?? 400);
       return res.status(status).json({ error: err.code || "IMAGE_REJECTED", message: err.message, debugId: err.debugId });
     }
     if (err instanceof multer.MulterError) return res.status(400).json({ error: "UPLOAD_REJECTED", message: err.message });
@@ -150,6 +151,15 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
     res.json(buyerStatus(db, claimForStatusToken(req)));
   }));
 
+  // The buyer picks one of the options the merchant approved; the pick is the refund.
+  app.post("/api/claims/:id/choose", limit(10, 60e3), wrap(async (req, res) => {
+    const claim = claimForStatusToken(req);
+    await checkPayPalLedger(db, pp, claim.id);
+    const { op, duplicate } = acceptOffer(db, { claimId: claim.id, offerId: String(req.body.offerId || ""), optionId: String(req.body.optionId || "") });
+    if (!duplicate) await submit(db, pp, op, "buyer");
+    res.json(buyerStatus(db, db.prepare("SELECT * FROM claims WHERE id = ?").get(claim.id)));
+  }));
+
   app.post("/api/claims/:id/evidence", limit(5, 60e3), photos, wrap(async (req, res) => {
     const claim = claimForStatusToken(req);
     if (claim.status !== "needs_info") throw new ClaimError("INVALID_STATE", "The merchant has not asked for more photos.", 409);
@@ -204,6 +214,11 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
     // A duplicate click never submits again; it reports the operation that already exists.
     if (!duplicate) await submit(db, pp, op, req.actor);
     res.status(duplicate ? 409 : 200).json({ duplicate, ...caseDetail(db, req.params.id) });
+  }));
+  m.post("/claims/:id/send-offer", wrap(async (req, res) => {
+    const { claimVersion, proposalId, reason } = req.body;
+    sendOffer(db, { claimId: req.params.id, claimVersion: Number(claimVersion), proposalId, reason, actor: req.actor });
+    res.json(caseDetail(db, req.params.id));
   }));
   m.post("/refunds/:id/reconcile", wrap(async (req, res) => {
     const op = await reconcile(db, pp, req.params.id, req.actor);

@@ -88,6 +88,7 @@ header.top nav a:hover { opacity: 1; text-decoration: none; }
 /* Layout */
 main { max-width: 1040px; margin: 0 auto; padding: 40px 22px 80px; }
 main.narrow { max-width: 640px; }
+main.wide { max-width: 1320px; }
 .stack > * + * { margin-top: 16px; }
 .grid { display: grid; gap: 20px; }
 @media (min-width: 820px) { .grid.two { grid-template-columns: 1fr 1fr; } .grid.case { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: start; } }
@@ -204,7 +205,20 @@ button:disabled { opacity: 0.4; cursor: default; }
 .thumbs button { padding: 0; border-radius: 14px; background: none; min-height: 0; overflow: hidden; cursor: zoom-in; transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease); }
 .thumbs button:hover { transform: scale(1.02); box-shadow: var(--shadow-lift); background: none; }
 .thumbs.sm img { width: 64px; height: 64px; border-radius: 10px; }
+.thumbs button { position: relative; }
 .figure { display: grid; gap: 6px; }
+
+/* Where Jev saw the damage: fractions of the photo, drawn over it */
+.damage-frame { position: relative; display: inline-block; line-height: 0; overflow: hidden; border-radius: 18px; }
+.damage-frame img { display: block; }
+.damage-box { position: absolute; border: 3px solid var(--red); border-radius: 10px; pointer-events: none; box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.38); animation: box-in 0.6s var(--ease) 0.15s both; }
+.thumbs .damage-box { border-width: 2px; border-radius: 6px; box-shadow: none; }
+.damage-box .damage-label { position: absolute; left: -3px; bottom: 100%; margin-bottom: 6px; line-height: 1; padding: 5px 8px; border-radius: 7px; background: var(--red); color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.damage-box.low .damage-label { bottom: auto; top: 0; left: 0; margin: 0; border-radius: 6px 0 7px 0; } /* no room above: sit inside the corner */
+.damage-hero { margin: 4px 0 18px; }
+.damage-hero .damage-frame { max-width: 100%; }
+.damage-hero img { max-width: 100%; max-height: 360px; width: auto; height: auto; }
+.damage-hero figcaption { margin-top: 8px; font-size: 12px; color: var(--text-2); }
 .figure figcaption { font-size: 12px; color: var(--text-2); text-align: center; }
 
 /* Voices: who said what */
@@ -249,6 +263,26 @@ details.more[open] summary::after { transform: rotate(-135deg) translateY(-2px);
 .check svg { width: 34px; height: 34px; }
 .check path { stroke-dasharray: 30; stroke-dashoffset: 30; animation: draw 0.45s 0.2s var(--ease) forwards; }
 
+/* Resolution options (kintsugi repair offers) */
+.options { display: grid; gap: 12px; margin-top: 4px; }
+.option { display: grid; grid-template-columns: 56px 1fr auto; gap: 14px; align-items: center; text-align: left; width: 100%; padding: 16px; border-radius: 16px; background: var(--surface); border: 1.5px solid var(--border); color: var(--text); font: inherit; min-height: 0; cursor: pointer; transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), transform 0.2s var(--ease); }
+.option:hover { border-color: var(--blue); box-shadow: var(--shadow-lift); background: var(--surface); }
+.option[disabled] { cursor: default; opacity: 1; }
+.option.chosen { border-color: #d4a23a; box-shadow: 0 0 0 3px rgb(212 162 58 / 0.25); }
+.option .art { width: 56px; height: 56px; border-radius: 12px; background: var(--surface-2); display: grid; place-items: center; overflow: hidden; }
+.option .art img { width: 52px; height: 52px; }
+.option .art svg { width: 26px; height: 26px; color: var(--text-2); }
+.option b { display: block; font-size: 16px; margin-bottom: 2px; }
+.option .detail { display: block; font-size: 13px; color: var(--text-2); line-height: 1.4; }
+.option .amt { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; white-space: nowrap; }
+.option.gold b { background: linear-gradient(90deg, #b8862b, #e0b44c, #b8862b); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.offer-pitch { margin-top: 18px; padding: 16px; border-radius: 16px; background: linear-gradient(135deg, rgb(212 162 58 / 0.12), rgb(212 162 58 / 0.04)); border: 1px solid rgb(212 162 58 / 0.35); }
+.offer-pitch .lead { display: grid; grid-template-columns: 48px 1fr; gap: 12px; align-items: center; }
+.offer-pitch .lead img { width: 48px; height: 48px; }
+.option-list { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 8px; }
+.option-list li { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+.option-list li span:last-child { font-weight: 600; white-space: nowrap; }
+
 /* Progress tracker (order-status style) */
 .tracker { list-style: none; display: grid; grid-template-columns: repeat(var(--n, 3), 1fr); padding: 0; margin: 8px 0 4px; counter-reset: s; }
 .tracker li { position: relative; text-align: center; font-size: 13px; color: var(--text-2); padding-top: 30px; }
@@ -291,6 +325,15 @@ ol.timeline li.buyer { --dot: var(--buyer); }
 ol.timeline li.system { --dot: var(--model); }
 ol.timeline li.merchant { --dot: var(--merchant); }
 ol.timeline .when { font-size: 13px; color: var(--text-2); }
+ol.timeline li.jev { --dot: var(--model); }
+ol.timeline li.policy { --dot: var(--orange); }
+ol.timeline li.paypal { --dot: #0070e0; }
+ol.timeline.agent li { padding-bottom: 16px; }
+ol.timeline.agent .who { font-size: 12px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--dot, var(--text-2)); }
+ol.timeline.agent .who .when { font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 6px; }
+ol.timeline.agent .what { font-weight: 500; margin: 1px 0 2px; }
+ol.timeline.agent .small { line-height: 1.45; }
+ol.timeline.agent .footnote { margin: 2px 0 0; word-break: break-all; }
 
 /* Lightbox */
 dialog { border: 0; padding: 0; background: transparent; max-width: 92vw; }
@@ -303,6 +346,7 @@ footer.foot { max-width: 1040px; margin: 0 auto; padding: 0 22px 40px; color: va
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes pop { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: none; } }
 @keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes box-in { from { opacity: 0; transform: scale(1.25); } to { opacity: 1; transform: none; } }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0ms !important; transition-duration: 0.01ms !important; }
@@ -323,3 +367,24 @@ footer.foot { max-width: 1040px; margin: 0 auto; padding: 0 22px 40px; color: va
   .inbox-row .row { flex-wrap: nowrap; }
   .brand .ctx { display: none; }
 }
+
+/* Merchant inbox grid (AG Grid, quartz theme tuned to the app's tokens) */
+.grid-tools { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.grid-tools input[type=search] { width: 220px; min-height: 36px; padding: 6px 12px; }
+.grid-tools button { min-height: 36px; }
+.inbox-grid { height: 640px; width: 100%;
+  --ag-font-family: Inter, -apple-system, system-ui, sans-serif; --ag-font-size: 14px;
+  --ag-background-color: var(--surface); --ag-foreground-color: var(--text); --ag-header-background-color: var(--surface-2);
+  --ag-header-foreground-color: var(--text-2); --ag-border-color: var(--border); --ag-row-border-color: var(--separator);
+  --ag-row-hover-color: var(--fill); --ag-selected-row-background-color: var(--fill); --ag-wrapper-border-radius: 18px;
+  --ag-active-color: var(--blue); --ag-input-focus-border-color: var(--blue); }
+.inbox-grid .grid-row { cursor: pointer; }
+.inbox-grid .ag-cell { display: flex; align-items: center; }
+.inbox-grid .mono-cell { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-weight: 600; }
+.grid-thumb { position: relative; display: inline-block; line-height: 0; border-radius: 8px; overflow: hidden; background: var(--surface-2); }
+.grid-thumb img { height: 46px; width: auto; display: block; }
+.inbox-grid .meter { display: inline-block; margin-right: 8px; vertical-align: middle; }
+.grid-thumb i { position: absolute; border: 2px solid var(--red); border-radius: 4px; }
+.pill.gold { background: rgb(212 162 58 / 0.16); color: #9a6b10; }
+@media (prefers-color-scheme: dark) { .pill.gold { color: #f0c860; } }
+@media (max-width: 620px) { .inbox-grid { height: 520px; } .grid-tools input[type=search] { width: 100%; } }
