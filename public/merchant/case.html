@@ -21,7 +21,7 @@
     const id = new URLSearchParams(location.search).get("id");
     const $ = (x) => document.getElementById(x);
     const fail = (msg) => { $("error").textContent = msg; $("error").classList.toggle("hidden", !msg); };
-    let d;
+    let d, polls = 0;
 
     const FINDING = {
       evidence_usable: ["Photos usable for review", { yes: "Yes", no: "No", uncertain: "Unsure" }],
@@ -56,12 +56,18 @@
         `<div class="finding"><span>${label}</span><span><span class="pill ${TONE[f[k]] || ""}">${values[f[k]] || f[k]}</span>
           <span class="small muted" title="Model probability">${k === "product_consistency" ? "" : `p=${f.signals[k].toFixed(2)}`}</span></span></div>`).join("") +
         `<div class="finding"><span>Damage type</span><span class="muted">${esc(f.damage_kind.replace("_", " "))}</span></div>
-         <p class="small muted" style="margin:8px 0 0">${esc(a.model)} · ${esc(a.templateVersion)} · ${a.latencyMs} ms · photos only, the buyer's text is not sent to the model.</p>`;
+         <p class="small muted" style="margin:8px 0 0">${esc(a.model)} · ${esc(a.templateVersion)} · ${a.latencyMs} ms · ${a.photosTotal > a.photosSent ? `looked at the ${a.photosSent} clearest of ${a.photosTotal} photos · ` : ""}photos only, the buyer's text is not sent to the model.</p>`;
     }
 
     function actionsHtml() {
       const { claim, proposal, payment } = d;
       if (["refunded", "closed", "refund_processing"].includes(claim.status)) return "";
+      if (claim.status === "new" && (!proposal || !proposal.current) && polls < 40) {
+        // Assessment runs in the background queue; check back until it lands (about a minute at most).
+        polls++;
+        setTimeout(refresh, 1500);
+        return `<div class="card"><h2>Decision</h2><p class="muted">Checking the photos with Jev…</p></div>`;
+      }
       if (!proposal || !proposal.current) {
         return `<div class="card"><h2>Decision</h2><p class="muted">Evidence changed since the last assessment.</p><button id="assess" class="primary">Assess current photos</button></div>`;
       }
@@ -118,7 +124,7 @@
             <div class="card">
               <div class="who buyer"><div class="tag">Customer says</div><div>${esc(claim.statement)}</div></div>
               <h3 style="margin-top:14px">Customer photos</h3>
-              <div class="thumbs">${evidence.map((e, i) => `<img src="${e.url}" alt="Evidence photo ${i + 1}" data-zoom>`).join("")}</div>
+              <div class="thumbs">${evidence.map((e, i) => `<img src="${e.url}" alt="Evidence photo ${i + 1}${e.sentToAi && evidence.length > 8 ? " (checked by Jev)" : ""}" loading="lazy" data-zoom>`).join("")}</div>
               <h3 style="margin-top:14px">Your catalog photo</h3>
               <div class="thumbs"><img src="${line.refImage}" alt="Catalog photo" data-zoom></div>
             </div>
@@ -183,8 +189,11 @@
       }
     }
 
-    try { d = await api(`/api/merchant/claims/${encodeURIComponent(id)}`); render(); }
-    catch (e) { if (e.status === 401) location.href = "/merchant"; else fail(e.message); }
+    async function refresh() {
+      try { d = await api(`/api/merchant/claims/${encodeURIComponent(id)}`); render(); }
+      catch (e) { if (e.status === 401) location.href = "/merchant"; else fail(e.message); }
+    }
+    await refresh();
   </script>
 </body>
 </html>

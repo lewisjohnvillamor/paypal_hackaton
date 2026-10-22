@@ -26,7 +26,8 @@ Tests are in `tests/edge-cases.test.js` (E), `tests/workflow.test.js` (W) and `t
 | Non-image file, GIF/WebP/HEIC, animated image | Rejected before any claim is created. | `normalizeImage()` | W; E |
 | Decompression bomb (tiny file, huge pixel count) | Rejected by the pixel limit before decoding. | `limitInputPixels` | E |
 | Photo under 280 px | Padded up to the model's minimum instead of rejected. | `normalizeImage()` | E |
-| More than 3 photos, or a photo over 5 MB | Rejected with a clear message. | multer limits | E |
+| More than 100 photos, a photo over 15 MB, or a request over 300 MB | Rejected with a clear message. | multer limits, `MAX_REQUEST_MB` | E |
+| More photos than Jev takes in one call (about 12-20) | Jev sees the 8 clearest, newest upload first, near-duplicates skipped; if it still refuses the size, half as many. The merchant sees every photo and which ones Jev looked at. | `src/ai/select.js` | E |
 | Sideways phone photo (EXIF rotation) | Rotated upright, and metadata (including location) is stripped. | `normalizeImage()` | — |
 
 ## Buyer behaviour

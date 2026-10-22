@@ -27,6 +27,12 @@ Screenshots of the latest run are in `hackathon/screenshots/`.
 - Verified webhooks are not implemented. Reconciliation polls PayPal every 60 s and on server start.
 - No video yet.
 
+## Scale and production work (2026-10-22, separate PR)
+
+Up to 100 photos per claim, Jev sees the best 8 at 1024 px, background assessment queue, indexes,
+fast reused-photo index, health check, request logs, backups, graceful shutdown and `render.yaml`.
+Numbers in `bench/RESULTS.md`; review and roadmap in `PRODUCTION.md`.
+
 ## Next executable task
 
 Deploy to Render with a persistent disk, then record the 3-minute demo following spec section 15.

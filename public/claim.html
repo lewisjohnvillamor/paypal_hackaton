@@ -20,7 +20,7 @@
       <input id="quantity" name="quantity" type="number" min="1" value="1" required>
       <label for="statement">What happened?</label>
       <textarea id="statement" name="statement" maxlength="1000" required placeholder="One mug arrived with the handle snapped off."></textarea>
-      <label for="photos">Photos of the damage (up to 3, JPEG or PNG, 5 MB each)</label>
+      <label for="photos">Photos of the damage (up to 100, JPEG or PNG)</label>
       <input id="photos" name="photos" type="file" accept="image/jpeg,image/png" multiple required>
       <div class="thumbs" id="previews" style="margin-top:10px"></div>
       <p class="small muted">Your photos are processed by an AI model (Jev, by TypeSafe) to help the shop review them. The shop decides every refund. Asking the shop is optional: PayPal's own resolution options stay open to you.</p>
@@ -36,6 +36,7 @@
   </main>
   <script type="module">
     import { api, usd, esc, hashToken } from "/app.js";
+    import { shrinkPhotos } from "/photos.js";
     const orderId = new URLSearchParams(location.search).get("order");
     const token = hashToken();
     const $ = (id) => document.getElementById(id);
@@ -53,14 +54,14 @@
     $("line").onchange = (e) => { $("quantity").max = e.target.selectedOptions[0].dataset.max; };
     $("photos").onchange = (e) => {
       const files = [...e.target.files];
-      if (files.length > 3) { fail("Choose up to 3 photos."); e.target.value = ""; return; }
+      if (files.length > 100) { fail("Choose up to 100 photos."); e.target.value = ""; return; }
       $("previews").innerHTML = "";
-      for (const f of files) { const img = new Image(); img.src = URL.createObjectURL(f); img.alt = f.name; $("previews").append(img); }
+      for (const f of files) { const img = new Image(); img.loading = "lazy"; img.src = URL.createObjectURL(f); img.alt = f.name; $("previews").append(img); }
     };
     $("form").onsubmit = async (e) => {
       e.preventDefault();
       $("submit").disabled = true; $("submit").textContent = "Sending…";
-      const form = new FormData($("form"));
+      const form = await shrinkPhotos(new FormData($("form")));
       form.set("orderId", orderId);
       try {
         const r = await api("/api/claims", { method: "POST", form, token });

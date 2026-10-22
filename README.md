@@ -9,7 +9,7 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/). It 
 ## What happens
 
 1. **Purchase.** The buyer pays $80 for four $20 mugs with PayPal Checkout. The server sets the price, captures the payment, checks the amount, currency and payee, and gives the buyer a private claim link.
-2. **Complaint.** The buyer picks the item and quantity, describes the problem, and uploads up to three photos.
+2. **Complaint.** The buyer picks the item and quantity, describes the problem, and uploads up to 100 photos. The page shrinks them in the browser before sending.
 3. **Evidence check.** [Jev](https://docs.typesafe.ai) (TypeSafe, `jev-1.14.0`) answers narrow typed questions about the photos: are they usable, is breakage visible, is it the same kind of product as the catalog photo. Only the photos go to the model, never the buyer's text, so a complaint cannot talk the model into anything.
 4. **Policy.** A pure function turns the findings into a draft: "propose $20.00", "needs your judgment", or "ask for better photos". A negative finding never denies a claim by itself.
 5. **Approval.** The merchant sees the customer's words, the model's observations and the PayPal payment side by side, and clicks **Approve $20.00 refund**. A different amount, or approving a case the policy did not propose, requires a written reason.
@@ -63,6 +63,14 @@ On 18 labelled photos ([full write-up](hackathon/GATE2_PROBE.md)):
 
 The weak spot is matching shattered pieces to the catalog photo. Those cases go to the merchant instead of getting a one-click proposal. This is a small feasibility check, not an accuracy benchmark.
 
+## Scale and operations
+
+- A claim can carry 100 photos. Jev looks at the 8 clearest (newest upload first, near-duplicates skipped) as 1024 px copies, which keeps each call inside its token budget; the merchant sees all of them.
+- Assessment runs in a bounded background queue (`JEV_CONCURRENCY`), so a burst of claims never opens dozens of model calls, and it resumes after a restart.
+- `GET /healthz`, one JSON log line per API request with an `X-Request-Id`, graceful shutdown on SIGTERM, and `npm run backup` (or `BACKUP_INTERVAL_HOURS`) for online database copies.
+- `render.yaml` deploys one web service with a persistent disk.
+- `npm run bench` load-tests the app with a stub Jev. Before and after numbers are in [bench/RESULTS.md](bench/RESULTS.md); the production review and roadmap are in [hackathon/PRODUCTION.md](hackathon/PRODUCTION.md).
+
 ## Project layout
 
 ```text
@@ -72,9 +80,13 @@ src/ai/jev.js               Jev questions and normalised findings
 src/policy/refundPolicy.js  pure refund policy
 src/refunds/execute.js      approval, reservation, submission, reconciliation
 src/claims.js, orders.js    workflow
+src/ai/select.js            which photos the model sees
+src/queue.js                bounded assessment queue
+src/photoIndex.js           fast reused-photo lookup
 public/                     store, claim form, buyer status, merchant console
 probe/                      Gate 2 photo set, runner, results
 tests/                      node:test suites
+bench/                      load tests, live Jev samples, results
 hackathon/                  state, probe report, screenshots
 ```
 

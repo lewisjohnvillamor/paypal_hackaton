@@ -1,0 +1,45 @@
+# Render Blueprint: one web service with a persistent disk for SQLite and evidence photos.
+# A disk pins the service to a single instance (no horizontal scaling) and needs a paid plan.
+services:
+  - type: web
+    name: refund-relay
+    runtime: node
+    plan: starter
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 2
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_PATH
+        value: /var/data/refund-relay.db
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+      - key: BACKUP_INTERVAL_HOURS
+        value: "24"
+      - key: TRUST_PROXY
+        value: "1"
+      - key: PAYPAL_MODE
+        value: sandbox
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_MERCHANT_ID
+        sync: false
+      - key: TYPESAFE_API_KEY
+        sync: false
+      - key: MERCHANT_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: APP_BASE_URL
+        sync: false
+      - key: REPEAT_CLAIM_LIMIT
+        value: "0"

@@ -20,6 +20,7 @@
   </main>
   <script type="module">
     import { api, usd, esc, hashToken, pill, when } from "/app.js";
+    import { shrinkPhotos } from "/photos.js";
     const claimId = new URLSearchParams(location.search).get("claim");
     const token = hashToken();
     const $ = (id) => document.getElementById(id);
@@ -45,7 +46,7 @@
     $("more").onsubmit = async (e) => {
       e.preventDefault();
       $("send").disabled = true;
-      try { render(await api(`/api/claims/${encodeURIComponent(claimId)}/evidence`, { method: "POST", form: new FormData($("more")), token })); }
+      try { render(await api(`/api/claims/${encodeURIComponent(claimId)}/evidence`, { method: "POST", form: await shrinkPhotos(new FormData($("more"))), token })); }
       catch (err) { fail(err.message); }
       $("send").disabled = false;
     };

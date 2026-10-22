@@ -6,7 +6,7 @@ import { openDb } from "../src/db.js";
 
 export async function setup({ pp = fakePayPal(), assess = fakeAssess() } = {}) {
   const db = openDb(":memory:");
-  const { app } = createApp({ db, pp, assess });
+  const { app, queue } = createApp({ db, pp, assess });
   const server = app.listen(0);
   const base = `http://127.0.0.1:${server.address().port}`;
   let cookie = "";
@@ -18,10 +18,12 @@ export async function setup({ pp = fakePayPal(), assess = fakeAssess() } = {}) {
     });
     const setCookie = res.headers.get("set-cookie");
     if (setCookie) cookie = setCookie.split(";")[0];
-    return { status: res.status, body: await res.json().catch(() => null) };
+    const out = { status: res.status, body: await res.json().catch(() => null) };
+    await queue.idle(); // assessment runs in the queue; tests read the settled result
+    return out;
   };
   const merchant = (method, path, body) => call(method, `/api/merchant${path}`, { body, headers: { "X-Refund-Relay": "1" } });
-  return { db, pp, call, merchant, close: () => server.close(), login: () => call("POST", "/api/merchant/login", { body: { password: "test-password" } }) };
+  return { db, pp, queue, call, merchant, close: () => server.close(), login: () => call("POST", "/api/merchant/login", { body: { password: "test-password" } }) };
 }
 
 export async function purchase(t) {
