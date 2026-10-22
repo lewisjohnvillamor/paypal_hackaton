@@ -42,7 +42,7 @@
         <label for="statement">What happened?</label>
         <textarea id="statement" name="statement" maxlength="1000" required placeholder="For example: one mug arrived with the handle snapped off."></textarea>
 
-        <label for="photos">Add photos <span class="hint">Up to 3 · JPEG or PNG · 5 MB each. Show the damage and the item.</span></label>
+        <label for="photos">Add photos <span class="hint">Up to 100 · JPEG or PNG. Show the damage and the item.</span></label>
         <div class="dropzone" id="drop">
           <span data-icon="photo"></span>
           <span id="drop-text"><strong>Choose photos</strong> or drag them here</span>
@@ -70,6 +70,7 @@
   </main>
   <script type="module">
     import { api, usd, esc, hashToken, ICON, checkBadge, busy } from "/app.js";
+    import { shrinkPhotos } from "/photos.js";
     document.querySelectorAll("[data-icon]").forEach((el) => (el.outerHTML = ICON[el.dataset.icon]));
     const orderId = new URLSearchParams(location.search).get("order");
     const token = hashToken();
@@ -105,10 +106,10 @@
 
     $("photos").onchange = (e) => {
       const files = [...e.target.files];
-      if (files.length > 3) { fail("You can add up to 3 photos."); e.target.value = ""; return; }
+      if (files.length > 100) { fail("You can add up to 100 photos."); e.target.value = ""; return; }
       fail("");
       $("previews").innerHTML = "";
-      for (const f of files) { const img = new Image(); img.src = URL.createObjectURL(f); img.alt = f.name; $("previews").append(img); }
+      for (const f of files) { const img = new Image(); img.loading = "lazy"; img.src = URL.createObjectURL(f); img.alt = f.name; $("previews").append(img); }
       $("drop").classList.toggle("has-files", files.length > 0);
       $("drop-text").innerHTML = files.length ? `${files.length} photo${files.length > 1 ? "s" : ""} added · <strong>Change</strong>` : `<strong>Choose photos</strong> or drag them here`;
     };
@@ -121,7 +122,7 @@
       if (!$("photos").files.length) { fail("Add at least one photo of the damage."); $("photos").focus(); return; }
       fail("");
       busy($("submit"), true, "Sending…");
-      const form = new FormData($("form"));
+      const form = await shrinkPhotos(new FormData($("form")));
       form.set("orderId", orderId);
       try {
         const r = await api("/api/claims", { method: "POST", form, token });

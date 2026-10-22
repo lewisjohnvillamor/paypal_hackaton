@@ -1,12 +1,15 @@
 // Claim workflow: submit, attach evidence, assess, draft proposal, request info, close.
 import { randomUUID, randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { audit, now, tx } from "./db.js";
 import { hashToken, newToken } from "./auth.js";
 import { draftProposal, refundableBalance } from "./policy/refundPolicy.js";
 import { TEMPLATE_VERSION } from "./ai/jev.js";
-import { MAX_PHOTOS, SIMILAR_PHOTO_BITS, differenceHash, hashDistance } from "./images.js";
+import { IMAGE_CONCURRENCY, MAX_PHOTOS, SIMILAR_PHOTO_BITS, aiCopy, differenceHash, hashDistance, mapLimit } from "./images.js";
+import { anyNearOtherClaim } from "./photoIndex.js";
+import { pickForModel, tooManyTokens } from "./ai/select.js";
 import { PRODUCTS } from "./catalog.js";
 
 export const uploadDir = () => process.env.UPLOAD_DIR || "data/uploads";
@@ -55,18 +58,24 @@ export function createClaim(db, { orderId, lineId, quantity, statement }) {
   return { claim: db.prepare("SELECT * FROM claims WHERE id = ?").get(id), token };
 }
 
-export function addEvidence(db, claimId, images, actor = "buyer") {
+export async function addEvidence(db, claimId, images, actor = "buyer") {
   const existing = db.prepare("SELECT COUNT(*) n FROM evidence WHERE claim_id = ?").get(claimId).n;
   if (existing + images.length > MAX_PHOTOS) throw new ClaimError("TOO_MANY_PHOTOS", `Up to ${MAX_PHOTOS} photos per request.`);
   const dir = join(uploadDir(), claimId);
   mkdirSync(dir, { recursive: true });
+  // Files are written before the transaction, so the write lock is never held across disk I/O.
+  // A crash in between leaves an orphan file, never a row without its photo.
+  const stored = await mapLimit(images, 8, async (img) => {
+    const id = randomUUID();
+    await writeFile(join(dir, `${id}.jpg`), img.data, { mode: 0o600 });
+    return { id, img };
+  });
   const ts = now();
   tx(db, () => {
-    for (const img of images) {
-      const id = randomUUID();
-      writeFileSync(join(dir, `${id}.jpg`), img.data, { mode: 0o600 });
-      db.prepare("INSERT INTO evidence (id, claim_id, storage_key, sha256, phash, width, height, bytes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(id, claimId, `${claimId}/${id}.jpg`, img.sha256, img.phash ?? null, img.width, img.height, img.data.length, ts);
+    const insert = db.prepare(`INSERT INTO evidence (id, claim_id, storage_key, sha256, phash, sharpness, width, height, bytes, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (const { id, img } of stored) {
+      insert.run(id, claimId, `${claimId}/${id}.jpg`, img.sha256, img.phash ?? null, img.sharpness ?? null, img.width, img.height, img.data.length, ts);
     }
     // New evidence invalidates any earlier review: bump the version.
     db.prepare("UPDATE claims SET version = version + 1, status = CASE WHEN status = 'needs_info' THEN 'new' ELSE status END, updated_at = ? WHERE id = ?")
@@ -75,16 +84,15 @@ export function addEvidence(db, claimId, images, actor = "buyer") {
   });
 }
 
-export const readEvidence = (key) => readFileSync(join(uploadDir(), key));
+export const readEvidence = (key) => readFile(join(uploadDir(), key));
 
 // Signals from the shop's own records. Like the model's findings, each one sends the case to a
 // person; none of them can deny or pay a claim.
 export function riskFlags(db, claim, evidence, catalogHash) {
   const flags = [];
   const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(claim.order_id);
-  const others = db.prepare("SELECT phash FROM evidence WHERE claim_id != ? AND phash IS NOT NULL").all(claim.id);
   const near = (a, b) => a && b && hashDistance(a, b) <= SIMILAR_PHOTO_BITS;
-  if (evidence.some((e) => others.some((o) => near(e.phash, o.phash)))) flags.push("PHOTO_REUSED_FROM_OTHER_CLAIM");
+  if (anyNearOtherClaim(db, claim.id, evidence.map((e) => e.phash), SIMILAR_PHOTO_BITS)) flags.push("PHOTO_REUSED_FROM_OTHER_CLAIM");
   if (evidence.some((e) => near(e.phash, catalogHash))) flags.push("PHOTO_MATCHES_CATALOG");
   if (db.prepare("SELECT 1 FROM claims WHERE order_id = ? AND id != ? AND created_at <= ?").get(claim.order_id, claim.id, claim.created_at)) {
     flags.push("PRIOR_CLAIM_ON_ORDER");
@@ -102,6 +110,16 @@ export function riskFlags(db, claim, evidence, catalogHash) {
   return flags;
 }
 
+// The catalog photo and its fingerprint, read once per product.
+const catalog = new Map();
+function catalogPhoto(sku) {
+  if (!catalog.has(sku)) {
+    const reference = readFileSync(new URL(`../public/assets/${PRODUCTS[sku].refImage}`, import.meta.url));
+    catalog.set(sku, differenceHash(reference).then((hash) => ({ reference, hash })));
+  }
+  return catalog.get(sku);
+}
+
 // Run Jev on the current evidence and draft a proposal for the current claim version.
 // If Jev fails we record the error and still draft a manual-review proposal; we never invent findings.
 export async function assessClaim(db, claimId, assess, actor = "system") {
@@ -112,15 +130,25 @@ export async function assessClaim(db, claimId, assess, actor = "system") {
   }
   const line = db.prepare("SELECT * FROM order_lines WHERE id = ?").get(claim.line_id);
   const evidence = db.prepare("SELECT * FROM evidence WHERE claim_id = ? ORDER BY created_at").all(claimId);
-  const reference = readFileSync(new URL(`../public/assets/${PRODUCTS[line.sku].refImage}`, import.meta.url));
+  const { reference, hash: catalogHash } = await catalogPhoto(line.sku);
 
-  const flags = riskFlags(db, claim, evidence, await differenceHash(reference));
+  const flags = riskFlags(db, claim, evidence, catalogHash);
 
-  let result = null, error = null;
+  let result = null, error = null, sent = pickForModel(evidence);
   if (evidence.length === 0) error = "No photos uploaded";
   else {
     try {
-      result = await assess({ photos: evidence.map((e) => readEvidence(e.storage_key)), reference });
+      const copies = await mapLimit(sent, IMAGE_CONCURRENCY, async (e) => aiCopy(await readEvidence(e.storage_key)));
+      // If the photos still exceed the model's per-call budget, halve the set rather than fail.
+      for (let n = copies.length; ; n = Math.ceil(n / 2)) {
+        try {
+          result = await assess({ photos: copies.slice(0, n), reference });
+          sent = sent.slice(0, n);
+          break;
+        } catch (err) {
+          if (!tooManyTokens(err) || n === 1) throw err;
+        }
+      }
     } catch (err) {
       error = String(err?.message || err).slice(0, 300);
     }
@@ -132,10 +160,11 @@ export async function assessClaim(db, claimId, assess, actor = "system") {
     const ts = now();
     const assessmentId = randomUUID();
     db.prepare(`INSERT INTO assessments (id, claim_id, claim_version, model, template_version, findings_json, answers_json,
-      usage_json, latency_ms, error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      usage_json, latency_ms, error, photo_ids_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(assessmentId, claimId, claim.version, result?.model ?? null, TEMPLATE_VERSION,
         result ? JSON.stringify(result.findings) : null, result ? JSON.stringify(result.answers) : null,
-        result ? JSON.stringify(result.usage) : null, result?.latencyMs ?? null, error, ts);
+        result ? JSON.stringify(result.usage) : null, result?.latencyMs ?? null, error,
+        evidence.length ? JSON.stringify(sent.map((e) => e.id)) : null, ts);
 
     const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(claim.order_id);
     const ops = db.prepare("SELECT * FROM refund_ops WHERE capture_id = ?").all(order.capture_id);

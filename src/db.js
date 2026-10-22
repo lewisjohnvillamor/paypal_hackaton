@@ -1,11 +1,13 @@
 // SQLite storage (node:sqlite). Single-instance demo scope; financial uniqueness lives in constraints.
 import { DatabaseSync } from "node:sqlite";
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { mkdirSync, readdirSync, rmSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 const SCHEMA = `
 PRAGMA journal_mode = WAL;
+PRAGMA synchronous = NORMAL;
 PRAGMA foreign_keys = ON;
+PRAGMA busy_timeout = 5000;
 
 CREATE TABLE IF NOT EXISTS orders (
   id TEXT PRIMARY KEY,
@@ -142,7 +144,30 @@ CREATE TABLE IF NOT EXISTS audit (
 `;
 
 // Columns added after the first release; ALTER is skipped when the column already exists.
-const MIGRATIONS = ["ALTER TABLE evidence ADD COLUMN phash TEXT"];
+const MIGRATIONS = [
+  "ALTER TABLE evidence ADD COLUMN phash TEXT",
+  "ALTER TABLE evidence ADD COLUMN sharpness INTEGER",
+  "ALTER TABLE assessments ADD COLUMN photo_ids_json TEXT",
+];
+
+// Every lookup the app makes by foreign key or by time. Without these, each claim submission and
+// each inbox load scanned whole tables (see bench/RESULTS.md).
+const INDEXES = `
+CREATE INDEX IF NOT EXISTS evidence_by_claim ON evidence(claim_id, created_at);
+CREATE INDEX IF NOT EXISTS claims_by_order ON claims(order_id, created_at);
+CREATE INDEX IF NOT EXISTS claims_by_line ON claims(line_id, status);
+CREATE INDEX IF NOT EXISTS claims_by_created ON claims(created_at);
+CREATE INDEX IF NOT EXISTS orders_by_buyer ON orders(buyer_email);
+CREATE INDEX IF NOT EXISTS lines_by_order ON order_lines(order_id);
+CREATE INDEX IF NOT EXISTS assessments_by_claim ON assessments(claim_id, created_at);
+CREATE INDEX IF NOT EXISTS proposals_by_claim ON proposals(claim_id, created_at);
+CREATE INDEX IF NOT EXISTS approvals_by_claim ON approvals(claim_id, created_at);
+CREATE INDEX IF NOT EXISTS refund_ops_by_capture ON refund_ops(capture_id, created_at);
+CREATE INDEX IF NOT EXISTS refund_ops_by_claim ON refund_ops(claim_id, created_at);
+CREATE INDEX IF NOT EXISTS refund_ops_open ON refund_ops(status) WHERE status IN ('SUBMITTING','PENDING','UNKNOWN');
+CREATE INDEX IF NOT EXISTS audit_by_claim ON audit(claim_id, type);
+CREATE INDEX IF NOT EXISTS audit_by_op ON audit(op_id);
+`;
 
 export function openDb(path = process.env.DATABASE_PATH || "data/refund-relay.db") {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
@@ -151,10 +176,23 @@ export function openDb(path = process.env.DATABASE_PATH || "data/refund-relay.db
   for (const sql of MIGRATIONS) {
     try { db.exec(sql); } catch (err) { if (!/duplicate column/.test(err.message)) throw err; }
   }
+  db.exec(INDEXES);
   return db;
 }
 
 export const now = () => new Date().toISOString();
+
+// Online backup: a consistent copy taken while the app keeps writing (VACUUM INTO), kept next to
+// the data and pruned to the newest `keep` copies. Copy the folder off the machine, or rely on the
+// host's disk snapshots, for disaster recovery.
+export function backup(db, { dir = process.env.BACKUP_DIR || join(dirname(process.env.DATABASE_PATH || "data/refund-relay.db"), "backups"), keep = Number(process.env.BACKUP_KEEP || 7) } = {}) {
+  mkdirSync(dir, { recursive: true });
+  const file = join(dir, `refund-relay-${new Date().toISOString().replace(/[:.]/g, "-")}.db`);
+  db.prepare("VACUUM INTO ?").run(file);
+  const old = readdirSync(dir).filter((f) => f.startsWith("refund-relay-") && f.endsWith(".db")).sort().slice(0, -keep);
+  for (const f of old) rmSync(join(dir, f));
+  return { file, removed: old.length };
+}
 
 // Short synchronous transaction. Never put network I/O inside.
 export function tx(db, fn) {

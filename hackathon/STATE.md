@@ -31,6 +31,12 @@ Apple-style redesign across store, claim, tracking and merchant screens (PR #2).
 - Verified webhooks are not implemented. Reconciliation polls PayPal every 60 s and on server start.
 - Walkthrough video re-recorded with the new UI (101 s, captioned); the final judged video (spec section 15) is still to do.
 
+## Scale and production work (2026-10-22, separate PR)
+
+Up to 100 photos per claim, Jev sees the best 8 at 1024 px, background assessment queue, indexes,
+fast reused-photo index, health check, request logs, backups, graceful shutdown and `render.yaml`.
+Numbers in `bench/RESULTS.md`; review and roadmap in `PRODUCTION.md`.
+
 ## Next executable task
 
 Deploy to Render with a persistent disk, then record the 3-minute demo following spec section 15.

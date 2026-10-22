@@ -4,13 +4,17 @@ import { REASON_TEXT } from "./reasons.js";
 
 const json = (s) => (s ? JSON.parse(s) : null);
 
-export function inbox(db) {
+// Newest first, one page at a time: `before` is the created_at of the last row already shown.
+// The whole table in one response was 4.8 MB and 200 ms at 20k claims.
+export function inbox(db, { limit = 100, before = null } = {}) {
+  const n = Math.min(Math.max(Number(limit) || 100, 1), 500);
   return db.prepare(`
     SELECT c.id, c.ref, c.status, c.quantity, c.created_at, c.updated_at, l.title, l.ref_image, o.amount_cents,
       (SELECT route FROM proposals p WHERE p.claim_id = c.id ORDER BY p.created_at DESC LIMIT 1) AS route,
       (SELECT amount_cents FROM proposals p WHERE p.claim_id = c.id ORDER BY p.created_at DESC LIMIT 1) AS proposed_cents
     FROM claims c JOIN order_lines l ON l.id = c.line_id JOIN orders o ON o.id = c.order_id
-    ORDER BY c.created_at DESC`).all();
+    WHERE (? IS NULL OR c.created_at < ?)
+    ORDER BY c.created_at DESC LIMIT ?`).all(before, before, n);
 }
 
 export function caseDetail(db, claimId) {
@@ -20,6 +24,7 @@ export function caseDetail(db, claimId) {
   const line = db.prepare("SELECT * FROM order_lines WHERE id = ?").get(claim.line_id);
   const evidence = db.prepare("SELECT id, width, height, created_at FROM evidence WHERE claim_id = ? ORDER BY created_at").all(claimId);
   const assessment = db.prepare("SELECT * FROM assessments WHERE claim_id = ? ORDER BY created_at DESC LIMIT 1").get(claimId);
+  const sentToAi = new Set(json(assessment?.photo_ids_json) ?? []);
   const proposal = db.prepare("SELECT * FROM proposals WHERE claim_id = ? ORDER BY created_at DESC LIMIT 1").get(claimId);
   const ops = db.prepare("SELECT * FROM refund_ops WHERE capture_id = ? ORDER BY created_at").all(order.capture_id);
   const approvals = db.prepare("SELECT id, actor, amount_cents, override_reason, claim_version, created_at FROM approvals WHERE claim_id = ? ORDER BY created_at").all(claimId);
@@ -38,12 +43,12 @@ export function caseDetail(db, claimId) {
       refundableCents: refundableBalance(order.amount_cents, ops),
     },
     line: { title: line.title, sku: line.sku, quantity: line.quantity, unitCents: line.unit_cents, refImage: `/assets/${line.ref_image}` },
-    evidence: evidence.map((e) => ({ ...e, url: `/api/merchant/evidence/${e.id}` })),
+    evidence: evidence.map((e) => ({ ...e, url: `/api/merchant/evidence/${e.id}`, sentToAi: sentToAi.has(e.id) })),
     assessment: assessment && {
       current: assessment.claim_version === claim.version || (proposal && proposal.claim_version === claim.version),
       model: assessment.model, templateVersion: assessment.template_version, latencyMs: assessment.latency_ms,
       findings: json(assessment.findings_json), usage: json(assessment.usage_json), error: assessment.error,
-      createdAt: assessment.created_at,
+      createdAt: assessment.created_at, photosSent: sentToAi.size, photosTotal: evidence.length,
     },
     proposal: proposal && {
       id: proposal.id, route: proposal.route, amountCents: proposal.amount_cents, currency: proposal.currency,

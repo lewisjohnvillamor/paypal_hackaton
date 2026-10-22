@@ -25,7 +25,7 @@
     const id = new URLSearchParams(location.search).get("id");
     const $ = (x) => document.getElementById(x);
     const fail = (msg) => { $("error").textContent = msg; $("error").classList.toggle("hidden", !msg); };
-    let d;
+    let d, polls = 0;
 
     const FINDING = {
       evidence_usable: ["Photos usable for review", { yes: "Yes", no: "No", uncertain: "Unsure" }],
@@ -80,13 +80,19 @@
           <span class="pill ${tone}">${values[f[k]] || esc(f[k])}</span></span></div>`;
       }).join("") +
         `<div class="finding"><span>Damage type</span><span class="muted">${esc(f.damage_kind.replace("_", " "))}</span></div>
-         <p class="footnote" style="margin:12px 0 0">${esc(a.model)} · ${esc(a.templateVersion)} · ${a.latencyMs} ms · Photos only. The buyer's words are never sent to the model.</p>`;
+         <p class="footnote" style="margin:12px 0 0">${esc(a.model)} · ${esc(a.templateVersion)} · ${a.latencyMs} ms · ${a.photosTotal > a.photosSent ? `Looked at the ${a.photosSent} clearest of ${a.photosTotal} photos. ` : ""}Photos only. The buyer's words are never sent to the model.</p>`;
     }
 
     function actionsHtml() {
       const { claim, proposal, payment } = d;
       if (["refunded", "closed", "refund_processing"].includes(claim.status)) return "";
       const head = `<div class="voice merchant" style="margin-bottom:16px"><span class="avatar">${ICON.check}</span><div><div class="tag">Your decision</div><div class="small muted">Nothing moves until you approve.</div></div></div>`;
+      if (claim.status === "new" && (!proposal || !proposal.current) && polls < 40) {
+        // Assessment runs in the background queue; check back until it lands (about a minute at most).
+        polls++;
+        setTimeout(refresh, 1500);
+        return `<div class="card">${head}<p class="muted">Checking the photos with Jev…</p></div>`;
+      }
       if (!proposal || !proposal.current) {
         return `<div class="card">${head}<p class="muted">The photos changed since the last review.</p><button id="assess" class="primary lg">Review current photos</button></div>`;
       }
@@ -159,8 +165,8 @@
                 <div class="tag">Customer says</div>
                 <div class="bubble">${esc(claim.statement)}</div>
               </div></div>
-              <div class="row" style="align-items:flex-start;gap:16px;margin-top:20px">
-                ${evidence.map((e, i) => `<figure class="figure thumbs" style="margin:0"><button type="button" data-zoom="${e.url}" aria-label="Enlarge customer photo ${i + 1}"><img src="${e.url}" alt="Customer photo ${i + 1}"></button><figcaption>Customer photo${evidence.length > 1 ? " " + (i + 1) : ""}</figcaption></figure>`).join("")}
+              <div class="row" style="align-items:flex-start;gap:16px;margin-top:20px;flex-wrap:wrap">
+                ${evidence.map((e, i) => `<figure class="figure thumbs" style="margin:0"><button type="button" data-zoom="${e.url}" aria-label="Enlarge customer photo ${i + 1}"><img src="${e.url}" alt="Customer photo ${i + 1}" loading="lazy"></button><figcaption>Customer photo${evidence.length > 1 ? " " + (i + 1) : ""}${e.sentToAi && evidence.length > 8 ? " · checked by Jev" : ""}</figcaption></figure>`).join("")}
                 <figure class="figure thumbs" style="margin:0"><button type="button" data-zoom="${line.refImage}" aria-label="Enlarge your catalog photo"><img src="${line.refImage}" alt="Your catalog photo"></button><figcaption>Your catalog photo</figcaption></figure>
               </div>
             </div>
@@ -225,8 +231,11 @@
       }
     }
 
-    try { d = await api(`/api/merchant/claims/${encodeURIComponent(id)}`); render(); settle(); }
-    catch (e) { if (e.status === 401) location.href = "/merchant"; else fail(e.message); }
+    async function refresh() {
+      try { d = await api(`/api/merchant/claims/${encodeURIComponent(id)}`); render(); settle(); }
+      catch (e) { if (e.status === 401) location.href = "/merchant"; else fail(e.message); }
+    }
+    await refresh();
   </script>
 </body>
 </html>

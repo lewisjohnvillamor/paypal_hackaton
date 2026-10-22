@@ -28,6 +28,7 @@
   </main>
   <script type="module">
     import { api, usd, esc, hashToken, when, checkBadge, ICON, busy, settle } from "/app.js";
+    import { shrinkPhotos } from "/photos.js";
     const claimId = new URLSearchParams(location.search).get("claim");
     const token = hashToken();
     const $ = (id) => document.getElementById(id);
@@ -80,7 +81,7 @@
     $("more").onsubmit = async (e) => {
       e.preventDefault();
       busy($("send"), true, "Sending…");
-      try { render(await api(`/api/claims/${encodeURIComponent(claimId)}/evidence`, { method: "POST", form: new FormData($("more")), token })); fail(""); }
+      try { render(await api(`/api/claims/${encodeURIComponent(claimId)}/evidence`, { method: "POST", form: await shrinkPhotos(new FormData($("more"))), token })); fail(""); }
       catch (err) { fail(err.message); }
       busy($("send"), false);
     };

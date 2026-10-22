@@ -9,6 +9,7 @@ process.env.SESSION_SECRET ||= "test-secret-test-secret-test-secret-0000";
 process.env.MERCHANT_PASSWORD ||= "test-password";
 process.env.UPLOAD_DIR = mkdtempSync(join(tmpdir(), "rr-uploads-"));
 process.env.PAYPAL_MERCHANT_ID = "MERCHANT123";
+process.env.LOG_REQUESTS ??= "0";
 
 export function fakePayPal({ refundBehavior, ledger, payerEmail = () => "buyer@example.com" } = {}) {
   const calls = { refunds: [], orders: 0 };

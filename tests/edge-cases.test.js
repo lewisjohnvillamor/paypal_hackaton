@@ -6,7 +6,7 @@ import sharp from "sharp";
 import { readFile } from "node:fs/promises";
 import { clearFindings, fakeAssess, fakePayPal, testPhoto } from "./helpers.js";
 import { approve, fileClaim, purchase, purchaseAndClaim, setup } from "./harness.js";
-import { normalizeImage, ImageRejected } from "../src/images.js";
+import { MAX_PHOTOS, normalizeImage, ImageRejected } from "../src/images.js";
 import { normalize } from "../src/ai/jev.js";
 
 let n = 0;
@@ -86,18 +86,19 @@ test("tiny photos are padded to the model's minimum; decompression bombs and non
   const tiny = await sharp({ create: { width: 120, height: 90, channels: 3, background: "#888" } }).jpeg().toBuffer();
   const out = await normalizeImage(tiny);
   assert.ok(out.width >= 280 && out.height >= 280);
-  const bomb = await sharp({ create: { width: 8000, height: 6000, channels: 3, background: "#000" } }).png().toBuffer();
+  const bomb = await sharp({ create: { width: 10000, height: 8000, channels: 3, background: "#000" } }).png().toBuffer();
   assert.ok(bomb.length < 5 * 1024 * 1024, "small file, huge pixel count");
   await assert.rejects(normalizeImage(bomb), ImageRejected);
   await assert.rejects(normalizeImage(Buffer.from("GIF89a not really")), ImageRejected);
 });
 
-test("more than three photos are rejected", async () => {
+test("more than the photo limit (100) is rejected", async () => {
   const t = await setup({ pp: uniqueEmails() });
   try {
     const o = await purchase(t);
-    const r = await fileClaim(t, o, { photos: await Promise.all([1, 2, 3, 4].map((i) => testPhoto(i))) });
+    const r = await fileClaim(t, o, { photos: await Promise.all(Array.from({ length: MAX_PHOTOS + 1 }, (_, i) => testPhoto(i + 1))) });
     assert.equal(r.status, 400);
+    assert.match(r.body.message, /Up to 100 photos/);
   } finally { t.close(); }
 });
 
