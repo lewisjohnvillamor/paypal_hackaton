@@ -60,11 +60,11 @@ export const settle = () => setTimeout(() => document.body.classList.add("settle
 // Wording for a resolution option, shared by the buyer's choice and the merchant's case page.
 // Remedy titles and items are the merchant's own words from their remedy library.
 export function optionText(o) {
-  if (o.kind === "refund") return { title: "Full refund", detail: `${usd(o.refundCents)} back to your PayPal account. Keep or recycle the pieces.` };
+  if (o.kind === "refund") return { title: "Full refund", detail: `${usd(o.refundCents)} back to your PayPal account. No need to send anything back.` };
   const item = o.item ? o.item.charAt(0).toUpperCase() + o.item.slice(1) : "";
   return { title: o.title, detail: o.refundCents > 0 ? `${usd(o.refundCents)} back, plus ${o.item}.` : `${item}.` };
 }
-// Repair kits get the kintsugi picture; anything else a generic icon.
+// Kintsugi kits get the kintsugi picture; anything else a generic icon.
 // The amount column: a remedy that refunds nothing says so instead of "$0.00".
 export const optionAmount = (o) => (o.refundCents > 0 ? usd(o.refundCents) : "No refund");
-export const optionArt = (o) => o.kind === "refund" ? ICON.check : o.kind === "repair_kit" ? `<img src="/assets/kintsugi.svg" alt="">` : ICON.box;
+export const optionArt = (o) => o.kind === "refund" ? ICON.check : /kintsugi|gold leaf/i.test(`${o.title} ${o.item}`) ? `<img src="/assets/kintsugi.svg" alt="">` : ICON.box;

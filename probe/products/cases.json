@@ -1,0 +1,42 @@
+[
+  {
+    "file": "tee-stained.jpg",
+    "sku": "TEE-ORGANIC",
+    "expect": "stain"
+  },
+  {
+    "file": "tee-hole-green.jpg",
+    "sku": "TEE-ORGANIC",
+    "expect": "hole, but a green shirt (design mismatch)"
+  },
+  {
+    "file": "vase-cracked.jpg",
+    "sku": "VASE-GLASS",
+    "expect": "crack"
+  },
+  {
+    "file": "vase-broken.jpg",
+    "sku": "VASE-GLASS",
+    "expect": "broken into pieces"
+  },
+  {
+    "file": "headphones-snapped-hinge.jpg",
+    "sku": "HEADPHONES-OVER",
+    "expect": "snapped hinge, taped"
+  },
+  {
+    "file": "vase-intact.jpg",
+    "sku": "VASE-GLASS",
+    "expect": "intact"
+  },
+  {
+    "file": "headphones-headband-snapped.jpg",
+    "sku": "HEADPHONES-OVER",
+    "expect": "headband snapped, taped"
+  },
+  {
+    "file": "headphones-headband-snapped-2.jpg",
+    "sku": "HEADPHONES-OVER",
+    "expect": "headband snapped, taped"
+  }
+]

@@ -71,14 +71,14 @@ test("refundable balance subtracts completed refunds and open reservations, not 
 test("Jev answers normalize to yes/no/uncertain with two signals for item match", () => {
   const ans = (o) => ({
     evidence_usable: { noul: 0.95 }, visible_breakage: { noul: 0.5 }, same_kind_as_catalog: { noul: 0.9 },
-    item_kind: { choice: "mug_or_cup", confidence: 0.9 }, damage_kind: { choice: "shattered", confidence: 0.9 },
+    item_kind: { choice: "ordered_kind", confidence: 0.9 }, damage_kind: { choice: "shattered", confidence: 0.9 },
     same_design: { noul: 0.9 }, looks_like_stock_photo: { noul: 0.05 }, instructions_in_photo: { noul: 0.02 }, ...o,
   });
   const f = normalize(ans());
   assert.equal(f.evidence_usable, "yes");
   assert.equal(f.visible_breakage, "uncertain");
   assert.equal(f.product_consistency, "consistent");
-  assert.equal(normalize(ans({ item_kind: { choice: "other_tableware", confidence: 1 } })).product_consistency, "inconsistent");
+  assert.equal(normalize(ans({ item_kind: { choice: "other_item", confidence: 1 } })).product_consistency, "inconsistent");
   assert.equal(normalize(ans({ item_kind: { choice: "mug_or_cup", confidence: 0.3 } })).product_consistency, "uncertain");
   assert.equal(normalize(ans({ same_kind_as_catalog: { noul: 0.6 } })).product_consistency, "consistent");
   assert.equal(normalize(ans({ same_design: { noul: 0.1 } })).design_match, "mismatch");

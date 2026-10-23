@@ -3,13 +3,14 @@
 // assessment and proposal behind each review, so it never shows anything that was not recorded.
 import { REASON_TEXT } from "./reasons.js";
 import { toDecimal } from "./money.js";
+import { DAMAGE_LABELS as DAMAGE } from "./kinds.js";
 
 const json = (s) => (s ? JSON.parse(s) : null);
 const usd = (cents) => `$${toDecimal(cents)}`;
 const pct = (p) => (typeof p === "number" ? ` (${Math.round(p * 100)}%)` : "");
 const ROUTE = { propose: "suggests a one-click refund", manual_review: "needs your judgment", request_info: "asks the buyer for clearer photos" };
 const WORD = { yes: "yes", no: "no", uncertain: "unsure", consistent: "yes", inconsistent: "no" };
-const DAMAGE = { shattered: "broken into pieces", handle_off: "handle snapped off", crack_or_chip: "a crack or chip", none_visible: "no damage visible" };
+
 
 function reviewSteps(db, claimId, h, photoNumber) {
   const a = db.prepare("SELECT * FROM assessments WHERE claim_id = ? AND created_at <= ? ORDER BY created_at DESC LIMIT 1").get(claimId, h.at);

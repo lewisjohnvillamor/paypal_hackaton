@@ -4,11 +4,12 @@
 // server re-checks every id and amount (src/suggest/suggestions.js). Like Jev, Haiku never gets
 // the buyer's words: only the photos, Jev's reading, the product and the candidate listings.
 import Anthropic from "@anthropic-ai/sdk";
+import { DAMAGE_LABELS as DAMAGE } from "../kinds.js";
 
 export const HAIKU_MODEL = process.env.SUGGEST_MODEL || "claude-haiku-5-5";
 export const MAX_SUGGESTIONS = 2;
 
-const DAMAGE = { shattered: "broken into pieces", handle_off: "handle snapped off", crack_or_chip: "a crack or chip", none_visible: "no damage visible" };
+
 const usd = (cents) => `$${(cents / 100).toFixed(2)}`;
 
 let client;
@@ -27,7 +28,7 @@ export function buildSuggestRequest({ photos, reference, product, findings, cand
     `An image model already checked the photos: damage visible, ${DAMAGE[findings.damage_kind] ?? findings.damage_kind}.`,
     "",
     "Store listings you may suggest (and no others):",
-    ...candidates.map((c) => `- ${c.id}: ${c.title} (${c.kind.replace("_", " ")}, ${usd(c.priceCents)})`),
+    ...candidates.map((c) => `- ${c.id}: ${c.title} (${c.kind.replace("_", " ")}, ${usd(c.priceCents)}${c.stock != null ? `, ${c.stock} in stock` : ""})`),
     "",
     `Suggest up to ${MAX_SUGGESTIONS} of these listings that would genuinely put this buyer's damage right, based on what the photos show; suggest none if nothing fits.`,
     "For each one the shop sends the listing free and refunds part of the price.",
@@ -56,7 +57,7 @@ export function buildSuggestRequest({ photos, reference, product, findings, cand
   return {
     model: HAIKU_MODEL,
     max_tokens: 4000,
-    system: "You suggest practical remedies for damaged-item reports at a small homewares shop. The shop owner reviews every suggestion before the buyer sees it.",
+    system: "You suggest practical remedies for damaged-item reports at a small online shop. The shop owner reviews every suggestion before the buyer sees it.",
     messages: [{ role: "user", content }],
     output_config: { effort: "low", format: { type: "json_schema", schema } },
   };

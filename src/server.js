@@ -19,6 +19,7 @@ import { createRemedy, remedyLibrary, seedRemedies, updateRemedy } from "./remed
 import { defaultSuggester } from "./ai/haiku.js";
 import { decideSuggestion } from "./suggest/suggestions.js";
 import { assessmentQueue } from "./queue.js";
+import { PRODUCTS } from "./catalog.js";
 
 // Whole multipart request: 100 photos already shrunk by the browser fit with lots of room.
 const MAX_REQUEST_BYTES = Number(process.env.MAX_REQUEST_MB || 300) * 1024 * 1024;
@@ -102,8 +103,13 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
   // ---- Demo purchase -------------------------------------------------------------------------
   app.get("/api/config", (_req, res) => res.json({ clientId: process.env.PAYPAL_CLIENT_ID }));
 
-  app.post("/api/demo/orders", limit(10, 60e3), wrap(async (_req, res) => {
-    res.status(201).json(await startOrder(db, pp));
+  app.get("/api/products", (_req, res) => res.json(Object.values(PRODUCTS).map((p) => ({
+    sku: p.sku, title: p.title, unitCents: p.unitCents, category: p.category, image: `/assets/${p.refImage}`, blurb: p.blurb ?? "",
+  }))));
+
+  // Body { items: [{ sku, quantity }] }; an empty body buys the default demo cart.
+  app.post("/api/demo/orders", limit(10, 60e3), wrap(async (req, res) => {
+    res.status(201).json(await startOrder(db, pp, req.body?.items));
   }));
 
   app.post("/api/demo/orders/:paypalOrderId/capture", wrap(async (req, res) => {
@@ -111,6 +117,7 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
     res.json({
       orderId: order.id, captureId: order.capture_id, amount: order.amount_cents, alreadyCaptured,
       claimUrl: claimToken ? `/claim?order=${order.id}#t=${claimToken}` : null,
+      lines: db.prepare("SELECT id, sku, title, quantity, unit_cents unitCents, ref_image image FROM order_lines WHERE order_id = ?").all(order.id),
     });
   }));
 

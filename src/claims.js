@@ -147,7 +147,7 @@ export async function assessClaim(db, claimId, assess, actor = "system", suggest
       // If the photos still exceed the model's per-call budget, halve the set rather than fail.
       for (let n = copies.length; ; n = Math.ceil(n / 2)) {
         try {
-          result = await assess({ photos: copies.slice(0, n), reference, remedies });
+          result = await assess({ photos: copies.slice(0, n), reference, remedies, category: PRODUCTS[line.sku]?.category });
           sent = sent.slice(0, n);
           break;
         } catch (err) {
