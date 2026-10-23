@@ -1,5 +1,20 @@
 [
   {
+    "file": "../cases/broken-handle-white.jpg",
+    "sku": "MUG-CLASSIC",
+    "expect": "white mug, handle snapped (same product)"
+  },
+  {
+    "file": "../cases/chipped-closeup.jpg",
+    "sku": "MUG-CLASSIC",
+    "expect": "chip, but a green decorated mug (different product)"
+  },
+  {
+    "file": "../cases/broken-rocket-mug.jpg",
+    "sku": "MUG-CLASSIC",
+    "expect": "broken, but a rocket-print mug (different product)"
+  },
+  {
     "file": "tee-stained.jpg",
     "sku": "TEE-ORGANIC",
     "expect": "stain"

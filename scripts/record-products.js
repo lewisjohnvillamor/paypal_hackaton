@@ -1,16 +1,22 @@
 // Records a short captioned video of a multi-product order: the buyer fills a bag with a vase, a
 // T-shirt and headphones, pays in the PayPal sandbox (the PayPal login happens off camera), then
-// reports a stained T-shirt. Jev reads it with the T-shirt questions, Claude Haiku suggests an
-// in-stock listing, the merchant adds it and the buyer picks it: one PayPal partial refund.
+// reports the cracked vase. Jev reads it with the vase questions, Jev and Claude Haiku both confirm
+// it is the vase the shop sold, Haiku suggests an in-stock listing, the merchant adds it and the
+// buyer picks it: one PayPal partial refund. CLAIM_SKU and the photo argument pick another item.
 // Needs the app running with TYPESAFE_API_KEY and ANTHROPIC_API_KEY set.
 // Usage: CHROMIUM_PATH=... node --env-file=.env scripts/record-products.js [photo.jpg] [out-dir]
 import { chromium } from "playwright";
 import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:8888";
-const photo = process.argv[2] || "probe/products/tee-stained.jpg";
+const photo = process.argv[2] || "probe/products/vase-cracked.jpg";
 const out = process.argv[3] || "data/products-video";
-const CLAIM_SKU = process.env.CLAIM_SKU || "TEE-ORGANIC";
+const CLAIM_SKU = process.env.CLAIM_SKU || "VASE-GLASS";
+const STORY = {
+  "VASE-GLASS": { problem: "The vase arrived cracked.", statement: "The glass vase arrived with a long crack down from the rim.", jev: "Jev checks the photo with vase questions: cracks, chips, broken pieces." },
+  "TEE-ORGANIC": { problem: "One T-shirt arrived stained.", statement: "One of the two T-shirts arrived with stains on the front.", jev: "Jev checks the photo with T-shirt questions: stains, tears, seams." },
+  "HEADPHONES-OVER": { problem: "The headphones arrived broken.", statement: "The headband of the headphones is snapped.", jev: "Jev checks the photo with headphone questions: headband, hinges, cushions." },
+}[CLAIM_SKU];
 const ITEMS = [{ sku: "VASE-GLASS", quantity: 1 }, { sku: "TEE-ORGANIC", quantity: 2 }, { sku: "HEADPHONES-OVER", quantity: 1 }];
 const size = { width: 1280, height: 800 };
 mkdirSync(out, { recursive: true });
@@ -73,19 +79,19 @@ await page.goto("about:blank");
 cut.to = (Date.now() - t0) / 1000;
 log("paid and captured", cap.captureId, `$${(cap.amount / 100).toFixed(2)}`);
 
-// 2. Buyer reports the T-shirt.
+// 2. Buyer reports the damaged item.
 const line = cap.lines.find((l) => l.sku === CLAIM_SKU);
 const [path, hash] = cap.claimUrl.split("#");
 await page.goto(`${BASE}${path}&line=${encodeURIComponent(line.id)}#${hash}`);
 await page.waitForSelector("#form:not(.hidden)");
-await say(`Paid $${(cap.amount / 100).toFixed(2)} in the PayPal sandbox. One T-shirt arrived stained.`, 3500);
-await page.fill("#statement", "One of the two T-shirts arrived with yellow stains on the front.");
+await say(`Paid $${(cap.amount / 100).toFixed(2)} in the PayPal sandbox. ${STORY.problem}`, 3500);
+await page.fill("#statement", STORY.statement);
 await page.setInputFiles("#photos", photo);
 await say("They add a photo and send the request.", 2500);
 await page.click("#submit");
 await page.waitForSelector("#sent:not(.hidden)", { timeout: 60_000 });
 const statusUrl = await page.getAttribute("#status-link", "href");
-await say("Jev checks the photo with T-shirt questions: stains, tears, seams.", 3000);
+await say(STORY.jev, 3000);
 
 // 3. Merchant: inbox, case, Haiku's suggestion.
 await page.goto(`${BASE}/merchant/`);
@@ -97,14 +103,15 @@ await wait(1500);
 const caseId = new URL(BASE + statusUrl).searchParams.get("claim");
 await page.goto(`${BASE}/merchant/case?id=${encodeURIComponent(caseId)}`);
 await page.waitForSelector(".ai-suggest [data-approve]", { timeout: 90_000 });
-await say("Jev found a stain and matched the shop's stain-remover remedy.", 3500);
+await show("text=Second check");
+await say("Two independent checks confirm it is the product the shop sold: Jev, then Claude Haiku.", 4500);
 await show(".ai-suggest");
 await say("Claude Haiku suggests from listings that are in stock, with its reason.", 4500);
 await page.click(".ai-suggest [data-approve]");
 await page.waitForSelector(".ai-suggest .pill.ok", { timeout: 30_000 });
 await show(".offer-pitch");
 await say("The merchant adds it to the buyer's choices.", 3000);
-if (await page.isVisible("#reason")) await page.fill("#reason", "Stains are clear in the photo; offering choices");
+if (await page.isVisible("#reason")) await page.fill("#reason", "Damage is clear in the photo; offering choices");
 await page.click("#send-offer");
 await page.waitForSelector("text=Waiting for the buyer to choose");
 

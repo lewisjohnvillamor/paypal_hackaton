@@ -16,7 +16,7 @@ import { GateError, approveAndReserve, checkPayPalLedger, reconcile, reconcileOp
 import { caseDetail, inbox, buyerStatus } from "./views.js";
 import { acceptOffer, sendOffer } from "./offers.js";
 import { createRemedy, remedyLibrary, seedRemedies, updateRemedy } from "./remedies.js";
-import { defaultSuggester } from "./ai/haiku.js";
+import { defaultMatcher, defaultSuggester } from "./ai/haiku.js";
 import { decideSuggestion } from "./suggest/suggestions.js";
 import { assessmentQueue } from "./queue.js";
 import { PRODUCTS } from "./catalog.js";
@@ -25,7 +25,7 @@ import { PRODUCTS } from "./catalog.js";
 const MAX_REQUEST_BYTES = Number(process.env.MAX_REQUEST_MB || 300) * 1024 * 1024;
 const started = Date.now();
 
-export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence, suggest = defaultSuggester(), queue = assessmentQueue(db, assess, { suggest }) } = {}) {
+export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence, suggest = defaultSuggester(), match = defaultMatcher(), queue = assessmentQueue(db, assess, { suggest, match }) } = {}) {
   seedRemedies(db);
   const app = express();
   app.disable("x-powered-by");
@@ -205,7 +205,7 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
     res.sendFile(resolve(uploadDir(), e.storage_key), { cacheControl: false, lastModified: false });
   }));
   m.post("/claims/:id/assess", wrap(async (req, res) => {
-    await assessClaim(db, req.params.id, assess, req.actor, suggest);
+    await assessClaim(db, req.params.id, assess, req.actor, suggest, match);
     res.json(caseDetail(db, req.params.id));
   }));
   // The merchant approves or dismisses one of Claude Haiku's suggestions for this case.

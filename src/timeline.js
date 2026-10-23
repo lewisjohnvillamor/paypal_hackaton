@@ -34,6 +34,11 @@ function reviewSteps(db, claimId, h, photoNumber) {
       ].join(" · "),
       meta: `${a.model} · ${a.latency_ms} ms · photos only, never the buyer's words`,
     });
+    if (f.second_check) {
+      const c = f.second_check;
+      steps.push({ at: a.created_at, actor: "claude", title: `Claude Haiku's second check: ${{ yes: "same product as your catalog photo", no: "a different product from your catalog photo", unsure: "can't tell if it is your product" }[c.same]}`,
+        detail: c.differences, meta: `${c.model} · ${c.latencyMs} ms · photos and catalog photo only` });
+    }
     const boxed = (f.locations ?? []).map((l, i) => (l?.box ? photoNumber(sent[i]) : null)).filter(Boolean);
     if (boxed.length) {
       steps.push({ at: a.created_at, actor: "jev", title: `Jev outlined the damage in photo ${boxed.join(", ")}`, detail: "Shown on the photos above. Outlines never change the amount." });
@@ -85,6 +90,7 @@ export function agentTimeline(db, claimId) {
           meta: `${x.model} · ${x.latencyMs} ms · photos and Jev's reading only, never the buyer's words${x.dropped ? ` · ${x.dropped} failed the price check` : ""}` });
         break;
       case "suggestion.failed": steps.push({ at: h.at, actor: "claude", title: "Claude Haiku could not suggest a remedy", detail: x.error }); break;
+      case "match.failed": steps.push({ at: h.at, actor: "claude", title: "Claude Haiku's second product check failed; Jev's checks stand alone", detail: x.error }); break;
       case "suggestion.approved": add({ title: `You approved Haiku's suggestion: ${x.title}`, detail: `${x.refundUnitCents ? `$${(x.refundUnitCents / 100).toFixed(2)} back per item` : "No refund"}, plus ${x.item}.` }); break;
       case "suggestion.dismissed": add({ title: `You dismissed Haiku's suggestion: ${x.title}` }); break;
       case "claim.resolved": add({ title: "Sorted without a refund", detail: x.sends ? `Send ${x.sends}.` : undefined }); break;

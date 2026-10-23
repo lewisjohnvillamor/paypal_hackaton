@@ -1,4 +1,4 @@
-// Live check of the non-mug products: Jev reads each photo with that product's own questions,
+// Live check across the products: Jev reads each photo with that product's own questions,
 // ranks its remedies, and Claude Haiku suggests from the in-stock listings for it.
 //   node --env-file=.env probe/products-live.js
 // Needs TYPESAFE_API_KEY; Haiku runs too when ANTHROPIC_API_KEY is set.
@@ -6,13 +6,13 @@ import { readFile } from "node:fs/promises";
 import { aiCopy } from "../src/images.js";
 import { PRODUCTS } from "../src/catalog.js";
 import { assessEvidence } from "../src/ai/jev.js";
-import { resolutionOptions } from "../src/policy/refundPolicy.js";
+import { itemConfirmed, resolutionOptions } from "../src/policy/refundPolicy.js";
 import { candidatesFor } from "../src/suggest/candidates.js";
 import { checkSuggestions } from "../src/suggest/suggestions.js";
-import { suggestRemedies } from "../src/ai/haiku.js";
+import { checkItemMatch, suggestRemedies } from "../src/ai/haiku.js";
 
-// [photo in probe/products/, sku, what the photo shows]
-const CASES = JSON.parse(await readFile(new URL("products/cases.json", import.meta.url), "utf8"));
+// [photo in probe/products/, sku, what the photo shows]; PRODUCT_CASES points at another list.
+const CASES = JSON.parse(await readFile(new URL(process.env.PRODUCT_CASES || "products/cases.json", import.meta.url), "utf8"));
 const pct = (p) => (typeof p === "number" ? `${Math.round(p * 100)}%` : "-");
 
 for (const { file, sku, expect } of CASES) {
@@ -24,13 +24,16 @@ for (const { file, sku, expect } of CASES) {
   try {
     const r = await assessEvidence({ photos: [photo], reference, remedies, category: product.category });
     const f = r.findings, s = f.signals;
+    if (process.env.ANTHROPIC_API_KEY) f.second_check = await checkItemMatch({ photos: [photo], reference, product });
     console.log(`  Jev ${r.latencyMs} ms: damage ${f.visible_breakage} (${pct(s.visible_breakage)}), type ${f.damage_kind} (${pct(s.damage_kind.confidence)}), ` +
       `same kind ${f.product_consistency} (${pct(s.same_kind_as_catalog)}, ${s.item_kind.choice}), design ${f.design_match}, usable ${f.evidence_usable}, box ${f.locations?.[0]?.box ? "drawn" : "none"}`);
+    if (f.second_check) console.log(`  Haiku second check ${f.second_check.latencyMs} ms: ${f.second_check.same} | ${f.second_check.differences}`);
+    console.log(`  item confirmed: ${itemConfirmed(f) ? "yes" : "NO, offers held"}`);
     console.log(`  remedy fit: ${Object.entries(f.remedyFit ?? {}).map(([k, v]) => `${k} ${pct(v)}`).join(", ")}`);
     const options = resolutionOptions({ remedies, quantity: 1, findings: f, amountCents: product.unitCents });
     console.log(`  offered: ${options.map((o) => o.title).join(" | ") || "(refund only)"}`);
     const candidates = candidatesFor(sku, f);
-    if (process.env.ANTHROPIC_API_KEY && f.visible_breakage === "yes" && candidates.length) {
+    if (process.env.ANTHROPIC_API_KEY && f.visible_breakage === "yes" && candidates.length && itemConfirmed(f)) {
       const h = await suggestRemedies({ photos: [photo], reference, product, findings: f, candidates });
       const kept = checkSuggestions(h.suggestions, { candidates, unitCents: product.unitCents });
       console.log(`  Haiku ${h.latencyMs} ms from ${candidates.length} listings (${candidates.map((c) => c.id).join(", ")}):`);

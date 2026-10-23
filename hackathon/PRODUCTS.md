@@ -1,6 +1,6 @@
 # Several kinds of product
 
-Last updated 2026-10-23.
+Last updated 2026-10-23 (product-match layer added).
 
 The store now sells four very different products: a ceramic mug ($20), a clear glass bud vase
 ($45), an organic cotton T-shirt ($25) and wireless over-ear headphones ($120). The buyer fills a
@@ -36,28 +36,53 @@ order line, never from the buyer.
 Out of stock in the demo catalog: `L-VASE-SECOND`, `L-MENDING-KIT`, `L-HP-HEADBAND`. Tests check
 they are never offered.
 
+## Is it the product the shop sold?
+
+Two independent checks compare the claim photos with the catalog photo:
+
+1. **Jev** answers whether it is the same kind of product and whether the design matches (colour,
+   print, shape or cut).
+2. **Claude Haiku's second check** (`checkItemMatch` in `src/ai/haiku.js`) looks at the photos,
+   the catalog photo and the product name, and answers `yes`, `no` or `unsure`, with one sentence
+   on what differs. It is told to judge only what damage cannot change (colour, material, print,
+   branding), so broken pieces and stains are not read as a different product.
+
+If either says it is a different product (`itemConfirmed` in `src/policy/refundPolicy.js`), the
+case goes to the merchant with the plain refund only: no repair kits, no replacements, no Haiku
+suggestions. The "Ask the buyer" box is pre-filled with a request for a photo of the whole item
+and its label. The merchant can still refund with a written reason. "Unsure" from either check
+does not block. A failed Haiku call is recorded and Jev's checks stand alone.
+
 ## Live check (jev-1.14.0, claude-haiku-5-5), `node --env-file=.env probe/products-live.js`
 
-| Photo | Jev saw | Remedies offered | Haiku |
-|---|---|---|---|
-| T-shirt with yellow stains | damage yes 85%, stain 71%, design mismatch | refund, new one, stain kit | stain remover kit; factory-second tee |
-| Green shirt with a small hole | damage yes 84%, tear or hole 55% | refund, new one, mending kit | visible-mending embroidery kit (the iron-on kit is out of stock); factory-second tee |
-| Clear vase with a long crack | damage yes 98%, crack or chip 97%, design match | refund, new one, glass resin | recycled green glass vase |
-| Vase with its top broken off | damage yes 97%, crack or chip 88% | refund, new one | recycled green glass vase |
-| Headphones, headband snapped and taped | damage yes 92%, snapped 56% | refund, new pair | refurbished pair |
-| Headphones, headband snapped, torn cushion | damage yes 96%, cushion torn 36% | refund, new pair | replacement cushions; refurbished pair |
-| Headphones, hinge repaired with clear tape | damage unsure 26% | refund only | (not asked) |
-| Intact clear vase | damage no 5% | refund only | (not asked) |
+Haiku's second check, 2026-10-23, after tuning the prompt so damage is not read as a difference:
 
-Jev took 140-350 ms per photo; Haiku 3.6-6.4 s. The subtle taped hinge goes to the merchant as
-"unsure", which is the intended behaviour.
+| Photo | Product sold | Jev design | Haiku second check | Offers |
+|---|---|---|---|---|
+| White mug, handle snapped (`broken-handle-white`) | white mug | unsure | yes | shown |
+| Green hand-painted cup, chipped | white mug | mismatch | no | held |
+| Rocket-print mug, broken | white mug | mismatch | no | held |
+| Red Riding Hood figurine in pieces (2 photos) | white mug | - | no | held |
+| Blue mug, cartoon mug (intact) | white mug | - | no | held |
+| Patchwork white garment, stained | white T-shirt | mismatch | yes | held (Jev) |
+| Green fabric with a hole | white T-shirt | unsure | no | held |
+| Clear cylinder vase, cracked | clear vase | match | yes | shown |
+| Wavy-rim glass vessel, broken | clear vase | mismatch | unsure | held (Jev) |
+| Three different broken headphone models | black wireless headphones | mismatch | no | held |
+
+Every photo of a different product was held by at least one check; both photos of the actual
+product passed. Haiku's second check took 1.2-2.8 s and runs alongside the suggestion call.
+
+The real damage photos found for the T-shirt and headphones are of other models, so they now
+correctly get the refund only. A matching damaged T-shirt or headphone photo (the same white tee
+or the same black headphones) would get the full set of offers.
 
 ## Live sandbox run
 
 `CHROMIUM_PATH=/opt/pw-browsers/chromium node --env-file=.env scripts/record-products.js`:
-$215.00 order (vase, two T-shirts, headphones), stained T-shirt reported, Jev read a stain and
-matched the stain-kit remedy, Haiku suggested the stain kit and a factory-second tee, the merchant
-added the kit, the buyer picked it, PayPal refund `90G53154FC121611U` for $5.00 COMPLETED.
+$215.00 order (vase, two T-shirts, headphones), the cracked vase reported, Jev and Haiku both
+confirmed it is the vase sold, Haiku suggested the recycled glass vase, the merchant added it,
+the buyer picked it, PayPal refund `08173433BC803262Y` for $10.00 COMPLETED.
 
 ## Known gaps
 

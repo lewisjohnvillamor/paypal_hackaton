@@ -5,7 +5,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { audit, now, tx } from "./db.js";
 import { hashToken, newToken } from "./auth.js";
-import { draftProposal, refundableBalance, resolutionOptions } from "./policy/refundPolicy.js";
+import { draftProposal, itemConfirmed, refundableBalance, resolutionOptions } from "./policy/refundPolicy.js";
 import { TEMPLATE_VERSION } from "./ai/jev.js";
 import { IMAGE_CONCURRENCY, MAX_PHOTOS, SIMILAR_PHOTO_BITS, aiCopy, differenceHash, hashDistance, mapLimit } from "./images.js";
 import { anyNearOtherClaim } from "./photoIndex.js";
@@ -125,8 +125,9 @@ function catalogPhoto(sku) {
 
 // Run Jev on the current evidence and draft a proposal for the current claim version.
 // If Jev fails we record the error and still draft a manual-review proposal; we never invent findings.
-// suggest, when the server has a Claude key, adds Haiku's pending remedy suggestions.
-export async function assessClaim(db, claimId, assess, actor = "system", suggest = null) {
+// suggest, when the server has a Claude key, adds Haiku's pending remedy suggestions; match adds
+// Haiku's second product-match check to the findings.
+export async function assessClaim(db, claimId, assess, actor = "system", suggest = null, match = null) {
   const claim = db.prepare("SELECT * FROM claims WHERE id = ?").get(claimId);
   if (!claim) throw new ClaimError("NOT_FOUND", "No such request.", 404);
   if (!["new", "ready", "needs_info"].includes(claim.status)) {
@@ -159,7 +160,13 @@ export async function assessClaim(db, claimId, assess, actor = "system", suggest
     }
   }
 
-  const suggested = await suggestFor({ suggest, sku: line.sku, findings: result?.findings, photos: copies.slice(0, sent.length), reference });
+  // Both Haiku calls run side by side; suggestions are dropped below if the item is not confirmed.
+  const photosSent = copies.slice(0, sent.length);
+  const [suggested, matched] = await Promise.all([
+    suggestFor({ suggest, sku: line.sku, findings: result?.findings, photos: photosSent, reference }),
+    matchFor({ match, sku: line.sku, findings: result?.findings, photos: photosSent, reference }),
+  ]);
+  if (matched?.same) result = { ...result, findings: { ...result.findings, second_check: matched } };
 
   return tx(db, () => {
     const current = db.prepare("SELECT * FROM claims WHERE id = ?").get(claimId);
@@ -192,7 +199,8 @@ export async function assessClaim(db, claimId, assess, actor = "system", suggest
     db.prepare("UPDATE claims SET status = 'ready', updated_at = ? WHERE id = ?").run(ts, claimId);
     audit(db, { claimId, actor, type: error ? "assessment.failed" : "assessment.completed",
       payload: { route: draft.route, amountCents: draft.amountCents, error } });
-    if (suggested && draft.route !== "request_info" && draft.amountCents > 0) {
+    if (matched?.error) audit(db, { claimId, actor: "system", type: "match.failed", payload: { error: matched.error } });
+    if (suggested && draft.route !== "request_info" && draft.amountCents > 0 && itemConfirmed(result?.findings)) {
       if (suggested.error) audit(db, { claimId, actor: "system", type: "suggestion.failed", payload: { error: suggested.error } });
       else {
         storeSuggestions(db, { claimId, proposalId, model: suggested.model, suggestions: suggested.suggestions });
@@ -216,6 +224,17 @@ async function suggestFor({ suggest, sku, findings, photos, reference }) {
     const r = await suggest({ photos, reference, product, findings, candidates });
     const suggestions = checkSuggestions(r.suggestions, { candidates, unitCents: product.unitCents });
     return { model: r.model, latencyMs: r.latencyMs, candidates: candidates.length, suggestions, dropped: (r.suggestions?.length ?? 0) - suggestions.length };
+  } catch (err) {
+    return { error: String(err?.message || err).slice(0, 300) };
+  }
+}
+
+// Haiku's second look at whether the photos show the product sold. A failure is recorded and leaves
+// Jev's checks to stand alone; it never blocks the review.
+async function matchFor({ match, sku, findings, photos, reference }) {
+  if (!match || !findings || !photos.length) return null;
+  try {
+    return await match({ photos, reference, product: PRODUCTS[sku] });
   } catch (err) {
     return { error: String(err?.message || err).slice(0, 300) };
   }
