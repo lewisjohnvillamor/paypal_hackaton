@@ -12,7 +12,9 @@ const DAMAGE = { shattered: "broken into pieces", handle_off: "handle snapped of
 const usd = (cents) => `$${(cents / 100).toFixed(2)}`;
 
 let client;
-const anthropic = () => (client ??= new Anthropic());
+// Keys not scoped to a workspace must name one on every request.
+const workspace = process.env.ANTHROPIC_WORKSPACE_ID;
+const anthropic = () => (client ??= new Anthropic(workspace ? { defaultHeaders: { "anthropic-workspace-id": workspace } } : {}));
 
 const jpeg = (buf) => ({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: buf.toString("base64") } });
 
