@@ -40,7 +40,7 @@
 
       <div class="card">
         <label for="statement">What happened?</label>
-        <textarea id="statement" name="statement" maxlength="1000" required placeholder="For example: one mug arrived with the handle snapped off."></textarea>
+        <textarea id="statement" name="statement" maxlength="1000" required placeholder="For example: it arrived cracked, or with a stain on the front."></textarea>
 
         <label for="photos">Add photos <span class="hint">Up to 100 · JPEG or PNG. Show the damage and the item.</span></label>
         <div class="dropzone" id="drop">
@@ -96,6 +96,8 @@
       if (o.openClaimRef) fail(`You already have an open request for this order (${o.openClaimRef}).`);
       $("line").innerHTML = o.lines.map((l) => `<option value="${esc(l.id)}" data-max="${l.quantity}" data-title="${esc(l.title)}" data-price="${usd(l.unit_cents)}" data-img="${esc(l.ref_image)}">${esc(l.title)} (${l.quantity} × ${usd(l.unit_cents)})</option>`).join("");
       if (o.lines.length > 1) $("line").classList.remove("hidden");
+      const pick = new URLSearchParams(location.search).get("line");
+      if (o.lines.some((l) => l.id === pick)) $("line").value = pick;
       showLine($("line").selectedOptions[0]);
       $("form").classList.remove("hidden");
     } catch (e) { $("order-summary").textContent = ""; fail(e.message); }

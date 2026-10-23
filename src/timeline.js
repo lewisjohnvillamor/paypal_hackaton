@@ -3,13 +3,14 @@
 // assessment and proposal behind each review, so it never shows anything that was not recorded.
 import { REASON_TEXT } from "./reasons.js";
 import { toDecimal } from "./money.js";
+import { DAMAGE_LABELS as DAMAGE } from "./kinds.js";
 
 const json = (s) => (s ? JSON.parse(s) : null);
 const usd = (cents) => `$${toDecimal(cents)}`;
 const pct = (p) => (typeof p === "number" ? ` (${Math.round(p * 100)}%)` : "");
 const ROUTE = { propose: "suggests a one-click refund", manual_review: "needs your judgment", request_info: "asks the buyer for clearer photos" };
 const WORD = { yes: "yes", no: "no", uncertain: "unsure", consistent: "yes", inconsistent: "no" };
-const DAMAGE = { shattered: "broken into pieces", handle_off: "handle snapped off", crack_or_chip: "a crack or chip", none_visible: "no damage visible" };
+
 
 function reviewSteps(db, claimId, h, photoNumber) {
   const a = db.prepare("SELECT * FROM assessments WHERE claim_id = ? AND created_at <= ? ORDER BY created_at DESC LIMIT 1").get(claimId, h.at);
@@ -33,6 +34,11 @@ function reviewSteps(db, claimId, h, photoNumber) {
       ].join(" · "),
       meta: `${a.model} · ${a.latency_ms} ms · photos only, never the buyer's words`,
     });
+    if (f.second_check) {
+      const c = f.second_check;
+      steps.push({ at: a.created_at, actor: "claude", title: `Claude Haiku's second check: ${{ yes: "same product as your catalog photo", no: "a different product from your catalog photo", unsure: "can't tell if it is your product" }[c.same]}`,
+        detail: c.differences, meta: `${c.model} · ${c.latencyMs} ms · photos and catalog photo only` });
+    }
     const boxed = (f.locations ?? []).map((l, i) => (l?.box ? photoNumber(sent[i]) : null)).filter(Boolean);
     if (boxed.length) {
       steps.push({ at: a.created_at, actor: "jev", title: `Jev outlined the damage in photo ${boxed.join(", ")}`, detail: "Shown on the photos above. Outlines never change the amount." });
@@ -84,6 +90,7 @@ export function agentTimeline(db, claimId) {
           meta: `${x.model} · ${x.latencyMs} ms · photos and Jev's reading only, never the buyer's words${x.dropped ? ` · ${x.dropped} failed the price check` : ""}` });
         break;
       case "suggestion.failed": steps.push({ at: h.at, actor: "claude", title: "Claude Haiku could not suggest a remedy", detail: x.error }); break;
+      case "match.failed": steps.push({ at: h.at, actor: "claude", title: "Claude Haiku's second product check failed; Jev's checks stand alone", detail: x.error }); break;
       case "suggestion.approved": add({ title: `You approved Haiku's suggestion: ${x.title}`, detail: `${x.refundUnitCents ? `$${(x.refundUnitCents / 100).toFixed(2)} back per item` : "No refund"}, plus ${x.item}.` }); break;
       case "suggestion.dismissed": add({ title: `You dismissed Haiku's suggestion: ${x.title}` }); break;
       case "claim.resolved": add({ title: "Sorted without a refund", detail: x.sends ? `Send ${x.sends}.` : undefined }); break;

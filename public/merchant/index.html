@@ -51,7 +51,8 @@
     let filter = "all", rows = [];
     const ROUTE = { propose: "Suggested refund", manual_review: "Needs your judgment", request_info: "Ask for photos" };
 
-    const DAMAGE = { shattered: "Broken", handle_off: "Handle off", crack_or_chip: "Crack or chip", none_visible: "None seen" };
+    const DAMAGE = { shattered: "Broken", handle_off: "Handle off", crack_or_chip: "Crack or chip", stain: "Stain", tear_or_hole: "Tear or hole",
+      seam_or_print: "Seam or print", snapped: "Snapped", cushion_torn: "Cushion torn", cosmetic: "Scratches", none_visible: "None seen" };
     const OUTCOME = (r) => r.chosen_option && r.chosen_option !== "refund" ? `Buyer chose: ${r.chosen_title}`
       : r.status === "refunded" ? "Refunded" : r.status === "closed" ? "Closed" : r.status === "offer_sent" ? "Buyer choosing" : ROUTE[r.route] || "";
     const pct = (p) => `${(p * 100).toFixed(2)}%`;

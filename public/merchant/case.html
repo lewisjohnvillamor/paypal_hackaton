@@ -29,15 +29,16 @@
 
     const FINDING = {
       evidence_usable: ["Photos usable for review", { yes: "Yes", no: "No", uncertain: "Unsure" }],
-      visible_breakage: ["Visible breakage", { yes: "Yes", no: "None seen", uncertain: "Unsure" }],
+      visible_breakage: ["Visible damage", { yes: "Yes", no: "None seen", uncertain: "Unsure" }],
       product_consistency: ["Looks like the ordered item", { consistent: "Yes", inconsistent: "No", uncertain: "Unsure" }],
     };
+    const DESIGN = { match: ["Yes", "ok"], mismatch: ["No", "bad"], uncertain: ["Unsure", "warn"] };
     const SIGNAL = { evidence_usable: "evidence_usable", visible_breakage: "visible_breakage", product_consistency: "same_kind_as_catalog" };
     const TONE = { yes: "ok", consistent: "ok", no: "bad", inconsistent: "bad", uncertain: "warn" };
     const REASON = {
       EVIDENCE_NOT_USABLE: "Photos aren't usable. Ask the buyer for clearer ones.",
       EVIDENCE_QUALITY_UNCERTAIN: "Photo quality is borderline.",
-      NO_BREAKAGE_SEEN: "The model saw no breakage. That isn't a denial; look at the photos yourself.",
+      NO_BREAKAGE_SEEN: "The model saw no damage. That isn't a denial; look at the photos yourself.",
       BREAKAGE_UNCERTAIN: "The model is unsure whether damage is visible.",
       ITEM_MAY_NOT_MATCH_ORDER: "The item may not be the product ordered.",
       ITEM_MATCH_UNCERTAIN: "The model is unsure the item matches the product ordered.",
@@ -102,7 +103,9 @@
           ${typeof p === "number" ? `<span class="meter" role="img" style="color:var(--${tone === "ok" ? "green-fill" : tone === "bad" ? "red" : "orange"})" title="Model confidence ${p.toFixed(2)}" aria-label="Confidence ${Math.round(p * 100)} percent"><i style="width:${Math.round(p * 100)}%"></i></span>` : ""}
           <span class="pill ${tone}">${values[f[k]] || esc(f[k])}</span></span></div>`;
       }).join("") +
-        `<div class="finding"><span>Damage type</span><span class="muted">${esc(f.damage_kind.replaceAll("_", " "))}</span></div>
+        `<div class="finding"><span>Same design as your catalog photo</span><span class="val"><span class="pill ${DESIGN[f.design_match]?.[1] ?? ""}">${DESIGN[f.design_match]?.[0] ?? "Unsure"}</span></span></div>
+         ${f.second_check ? `<div class="finding"><span>Second check · Claude Haiku<div class="small muted">${esc(f.second_check.differences)}</div></span><span class="val"><span class="pill ${TONE[f.second_check.same] ?? ""}">${{ yes: "Same product", no: "Different product", unsure: "Unsure" }[f.second_check.same]}</span></span></div>` : ""}
+         <div class="finding"><span>Damage type</span><span class="muted">${esc(f.damage_kind.replaceAll("_", " "))}</span></div>
          <p class="footnote" style="margin:12px 0 0">${esc(a.model)} · ${esc(a.templateVersion)} · ${a.latencyMs} ms · ${a.photosTotal > a.photosSent ? `Looked at the ${a.photosSent} clearest of ${a.photosTotal} photos. ` : ""}Photos only. The buyer's words are never sent to the model.</p>`;
     }
 
@@ -150,7 +153,7 @@
         <p class="footnote center" style="margin:10px 0 0">Sends one partial refund to PayPal against the original capture.</p>
         <details class="more"><summary>More options</summary>
           <label for="info">Ask the buyer for more photos</label>
-          <div class="row"><input id="info" placeholder="Please photograph the handle and the box." style="flex:1"><button id="request-info">Ask</button></div>
+          <div class="row"><input id="info" placeholder="Please photograph the damage and the whole item." value="${proposal.reasons.includes("OFFERS_HELD_ITEM_MISMATCH") ? "Please send a photo of the whole item and its label or tag, so we can confirm it is the one you ordered." : ""}" style="flex:1"><button id="request-info">Ask</button></div>
           <label for="close-reason">Close without a refund</label>
           <div class="row"><input id="close-reason" placeholder="Reason the buyer will see" style="flex:1"><button id="close" class="danger">Close</button></div>
           <p style="margin:16px 0 0"><button id="assess" class="plain">Run the AI review again</button></p>
