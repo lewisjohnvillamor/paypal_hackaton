@@ -25,13 +25,13 @@ const size = { width: 1280, height: 800 };
 const C = "probe/cases/", P = "probe/products/";
 // Photos per path. DEMO_PHOTOS=<dir> swaps in <dir>/<name>.jpg (or .png) where present, e.g. damaged
 // versions of the store's own catalog photos; 4a is blurred from 4b when only 4b is given.
-const DEMO = process.env.DEMO_PHOTOS;
+const DEMO = process.env.DEMO_PHOTOS ?? (existsSync("demo-photos") ? "demo-photos" : undefined);
 const PHOTO = Object.fromEntries(Object.entries({
-  "1-kit-chipped-mug": PHOTO["1-kit-chipped-mug"],
+  "1-kit-chipped-mug": C + "chipped-closeup.jpg",
   "2-vase-cracked": P + "vase-cracked.jpg",
   "3-wrong-product-mug": C + "broken-rocket-mug.jpg",
   "4a-blurry-mug": C + "blurred-broken-mug.jpg",
-  "4b-clear-mug-handle-off": PHOTO["4b-clear-mug-handle-off"],
+  "4b-clear-mug-handle-off": C + "broken-handle-white.jpg",
   "5-mug-in-pieces": C + "broken-shards-bubblewrap.jpg",
 }).map(([k, f]) => [k, (DEMO && [".jpg", ".jpeg", ".png"].map((x) => `${DEMO}/${k}${x}`).find(existsSync)) || f]));
 if (DEMO && !["4a-blurry-mug"].some((k) => PHOTO[k].startsWith(DEMO)) && PHOTO["4b-clear-mug-handle-off"].startsWith(DEMO)) {
@@ -121,6 +121,16 @@ setup.refund = await fileClaim(await buy([{ sku: "MUG-CLASSIC", quantity: 4 }]),
 setup.blurry = await fileClaim(await buy([{ sku: "MUG-CLASSIC", quantity: 1 }]), "MUG-CLASSIC", [PHOTO["4a-blurry-mug"]], "The handle snapped off in the post.");
 setup.wrong = await fileClaim(await buy([{ sku: "MUG-CLASSIC", quantity: 1 }]), "MUG-CLASSIC", [PHOTO["3-wrong-product-mug"]], "My mug arrived broken.");
 setup.vase = await fileClaim(await buy([{ sku: "VASE-GLASS", quantity: 1 }, { sku: "TEE-ORGANIC", quantity: 2 }]), "VASE-GLASS", [PHOTO["2-vase-cracked"]], "The vase arrived with a long crack down from the rim.");
+// Other products, left for the shop to review: they fill the inbox shown at the end.
+if (DEMO) {
+  const extra = [["TEE-ORGANIC", "7-tee-stained", "The T-shirt arrived with a brown stain on the front."],
+    ["HEADPHONES-OVER", "8-headphones-cushion-torn", "One ear cushion is torn open."],
+    ["HEADPHONES-OVER", "10-headphones-headband-snapped", "The headband is snapped in two."]];
+  for (const [sku, name, text] of extra) {
+    const f = [".jpg", ".png"].map((x) => `${DEMO}/${name}${x}`).find(existsSync);
+    if (f) setup[name] = await fileClaim(await buy([{ sku, quantity: 1 }]), sku, [f], text);
+  }
+}
 const kitOrder = PREVIEW ? await buy(STORE_CART) : null; // live: bought on camera below
 log("photos", JSON.stringify(PHOTO));
 for (const [k, c] of Object.entries(setup)) log(k, (await assessed(c.id)).proposal.route);
@@ -399,7 +409,7 @@ await say("Every step is recorded: who acted, what they saw, and why.", 3600);
 await go(`${BASE}/merchant`);
 await page.waitForSelector(".ag-row", { timeout: 30_000 }).catch(() => {});
 await wait(600);
-await say("Five requests, five fair outcomes, and the shop stayed in control of every one.", 4000);
+await say(Object.keys(setup).length > 4 ? "Mugs, glass, clothing, electronics: each product gets its own damage checks." : "Five requests, five fair outcomes, and the shop stayed in control of every one.", 4000);
 await go(`${BASE}/merchant/remedies`);
 await wait(1500);
 await say("Shops write their own remedies in plain words. The AI only offers what they wrote.", 4000);
