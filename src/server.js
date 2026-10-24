@@ -201,7 +201,8 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
   m.get("/evidence/:id", wrap(async (req, res) => {
     const e = db.prepare("SELECT * FROM evidence WHERE id = ?").get(req.params.id);
     if (!e) throw new ClaimError("NOT_FOUND", "No such photo.", 404);
-    res.set({ "Content-Type": "image/jpeg", "Cache-Control": "private, no-store", "Content-Disposition": "inline" });
+    // A photo never changes under its id, so the browser may keep it: redraws don't refetch or flicker.
+    res.set({ "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=86400, immutable", "Content-Disposition": "inline" });
     res.sendFile(resolve(uploadDir(), e.storage_key), { cacheControl: false, lastModified: false });
   }));
   m.post("/claims/:id/assess", wrap(async (req, res) => {

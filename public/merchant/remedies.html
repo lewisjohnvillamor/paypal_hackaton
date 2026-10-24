@@ -20,9 +20,9 @@
   </header>
   <main class="wide">
     <section id="library" class="hidden">
-      <p class="eyebrow">Juniper Clay Co.</p>
+      <p class="eyebrow">Juniper Market</p>
       <h1>Remedies</h1>
-      <p class="lede">What you can offer instead of a full refund. When a buyer reports damage, Jev compares their photos with each active remedy's "when it fits" description, and only the ones that fit go on the list you approve. A full refund is always one of the choices. When nothing here fits, Claude Haiku can suggest one of your other store listings on the case itself, and you decide whether to add it.</p>
+      <p class="lede">What you can offer instead of a full refund. When a buyer reports damage, AI compares their photos with each active remedy's "when it fits" description, and only the ones that fit go on the list you approve. A full refund is always one of the choices. When nothing here fits, the AI can suggest one of your other store listings on the case itself, and you decide whether to add it.</p>
       <div id="notice" class="notice hidden" role="status"></div>
       <div id="products"></div>
     </section>
@@ -50,7 +50,7 @@
         { headerName: "On", field: "active", width: 72, cellDataType: "boolean", editable: true },
         { headerName: "Offer to the buyer", field: "title", width: 240, editable: true },
         { headerName: "What you send", field: "item", flex: 1, minWidth: 220, editable: true, wrapText: true, autoHeight: true },
-        { headerName: "When it fits (Jev reads this)", field: "fits", flex: 1.4, minWidth: 260, editable: true, wrapText: true, autoHeight: true,
+        { headerName: "When it fits (the AI reads this)", field: "fits", flex: 1.4, minWidth: 260, editable: true, wrapText: true, autoHeight: true,
           cellEditor: "agLargeTextCellEditor", cellEditorPopup: true, cellEditorParams: { maxLength: 400, rows: 6, cols: 50 } },
         { headerName: "Refund per item", field: "refundUnitCents", width: 140, type: "rightAligned", editable: true,
           valueFormatter: (x) => usd(x.value), valueParser: (x) => Math.round(Number(String(x.newValue).replace(/[$,]/g, "")) * 100) },
@@ -105,7 +105,7 @@
           const made = await api("/api/merchant/remedies", { method: "POST", merchant: true, body: {
             sku: f.dataset.sku, title: v.title, item: v.item, fits: v.fits, kind: v.kind,
             refundUnitCents: Math.round(Number(String(v.refund).replace(/[$,]/g, "")) * 100) } });
-          say(`Added "${made.title}". Jev will consider it on the next report.`, "ok");
+          say(`Added "${made.title}". The AI will consider it on the next report.`, "ok");
           await load();
         } catch (err) { say(err.message, "bad"); }
       }));

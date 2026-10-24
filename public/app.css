@@ -273,6 +273,8 @@ details.more[open] summary::after { transform: rotate(-135deg) translateY(-2px);
 .option { display: grid; grid-template-columns: 56px 1fr auto; gap: 14px; align-items: center; text-align: left; width: 100%; padding: 16px; border-radius: 16px; background: var(--surface); border: 1.5px solid var(--border); color: var(--text); font: inherit; min-height: 0; cursor: pointer; transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), transform 0.2s var(--ease); }
 .option:hover { border-color: var(--blue); box-shadow: var(--shadow-lift); background: var(--surface); }
 .option[disabled] { cursor: default; opacity: 1; }
+.option.selected { border-color: var(--blue); box-shadow: 0 0 0 3px rgb(0 113 227 / 0.2); transform: translateY(-1px); }
+.confirm-wrap { margin-top: 16px; }
 .option.chosen { border-color: #d4a23a; box-shadow: 0 0 0 3px rgb(212 162 58 / 0.25); }
 .option .art { width: 56px; height: 56px; border-radius: 12px; background: var(--surface-2); display: grid; place-items: center; overflow: hidden; }
 .option .art img { width: 52px; height: 52px; }
@@ -419,3 +421,8 @@ footer.foot { max-width: 1040px; margin: 0 auto; padding: 0 22px 40px; color: va
 ol.timeline li.claude { --dot: var(--claude); }
 .pill.claude { color: var(--claude); background: var(--tint-claude); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pill.gold { color: #e6b75a; } }
+
+/* Model names, versions and IDs: kept for audits, shown on request. */
+body:not(.show-tech) .tech { display: none; }
+.ask-block.lead { margin-top: 18px; padding: 16px; border-radius: 16px; background: var(--tint-orange); }
+.ask-block textarea { min-height: 72px; }
