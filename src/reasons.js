@@ -7,7 +7,7 @@ export const REASON_TEXT = {
   ITEM_MAY_NOT_MATCH_ORDER: "The item may not be the kind of product ordered.",
   ITEM_MATCH_UNCERTAIN: "The model is unsure the item is the kind of product ordered.",
   DESIGN_MISMATCH: "This looks like a different design from the one you sold (colour, print or shape differ from your catalog photo).",
-  SECOND_CHECK_DIFFERENT_ITEM: "A second check by Claude Haiku says the photos show a different product from your catalog photo.",
+  SECOND_CHECK_DIFFERENT_ITEM: "A second AI check says the photos show a different product from your catalog photo.",
   OFFERS_HELD_ITEM_MISMATCH: "Repair kits and other remedies are held back until the item is confirmed as yours. Ask for a photo of the label, or decide yourself.",
   STOCK_PHOTO_SUSPECTED: "The photo looks like a professional or stock image, not the buyer's own snapshot.",
   INSTRUCTIONS_IN_PHOTO: "The photo contains written text aimed at the reviewer. It was ignored; check it yourself.",
