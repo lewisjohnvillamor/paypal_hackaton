@@ -66,7 +66,7 @@
     <section id="shop-view">
       <p class="eyebrow">Juniper Market</p>
       <h1>Home, clothing and tech.</h1>
-      <p class="lede">A demo store with four very different products. Buy with PayPal, then report a problem with any item and watch the shop review and resolve it.</p>
+      <p class="lede">Everyday things, made to last. Pay with PayPal, and if anything arrives damaged, report it from your receipt and we’ll put it right.</p>
 
       <div class="shop">
         <div class="products" id="products" aria-live="polite"></div>
@@ -75,12 +75,12 @@
           <p id="bag-empty" class="small muted" style="margin:0 0 8px">Add something to get started.</p>
           <div id="bag-lines"></div>
           <div class="kv-row" style="margin-top:8px"><span>Total</span><span class="total amount" id="bag-total">$0.00</span></div>
-          <p class="footnote" style="margin:4px 0 16px">Free shipping · No tax in this demo</p>
+          <p class="footnote" style="margin:4px 0 16px">Free shipping on every order</p>
           <div id="checkout" class="checkout locked">
             <div id="paypal-buttons" aria-label="Pay with PayPal"></div>
             <p class="checkout-hint small muted">Add an item to check out with PayPal.</p>
           </div>
-          <div class="notice" style="margin-bottom:0">
+          <div class="notice demo-note" style="margin-bottom:0">
             <span aria-hidden="true" style="color:var(--blue)" data-icon="lock"></span>
             <span>This is the PayPal <b>sandbox</b>. Sign in with the sandbox Personal account; no real money moves.</span>
           </div>
@@ -101,7 +101,7 @@
     </section>
     <div id="error" class="notice bad hidden" role="alert"></div>
   </main>
-  <footer class="foot">Hackathon prototype · PayPal sandbox only · Product photos under Creative Commons licences; authors and licences in probe/cases.json and probe/products/sources.json.</footer>
+  <footer class="foot demo-note">Hackathon prototype · PayPal sandbox only · Product photos under Creative Commons licences; authors and licences in probe/cases.json and probe/products/sources.json.</footer>
 
   <script type="module">
     import { api, usd, esc, ICON, checkBadge } from "/app.js";
@@ -213,8 +213,7 @@
           ${r.claimUrl ? `<a class="button" data-report href="${esc(`${path}&line=${encodeURIComponent(l.id)}#${hash}`)}">Report a problem</a>` : ""}
         </li>`).join("");
       $("receipt").innerHTML = `
-        <div class="kv-row"><span>PayPal order</span><span class="mono">${esc(orderID)}</span></div>
-        <div class="kv-row"><span>Capture</span><span class="mono">${esc(r.captureId)}</span></div>`;
+        <div class="kv-row"><span>PayPal order</span><span class="mono">${esc(orderID)}</span></div>`;
       $("shop-view").classList.add("hidden");
       $("done").classList.remove("hidden");
       window.scrollTo({ top: 0 });

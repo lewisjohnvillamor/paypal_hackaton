@@ -147,6 +147,9 @@ await context.addInitScript(() => {
       "transition:transform .55s cubic-bezier(.22,1,.36,1);transform:translate(640px,460px)";
     c.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 2l16 9.5-7 1.5-3.8 6.5z" fill="#111" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>';
     document.body.appendChild(c);
+    const st = document.createElement("style");
+    st.textContent = ".demo-note{display:none!important}";
+    document.head.appendChild(st);
     const pos = sessionStorage.getItem("__cursor");
     if (pos) c.style.transform = pos;
   });
@@ -229,14 +232,14 @@ async function openCase(id, settle = "#approve, #send-offer, #request-info, .ask
 }
 
 // 0. Title
-await card("Refund Relay", "When an order arrives damaged, AI reads the photos and the shop puts it right in minutes, paid back through PayPal.", 4200);
+await card("Refund Relay", "Something arrived broken? Snap a photo, and the shop puts it right in minutes, paid back through PayPal.", 4200);
 
 // 1. The store and the PayPal checkout
 await go(BASE);
 await page.waitForSelector(".tile");
-await say("Juniper Market sells mugs, vases, T-shirts and headphones.", 3000);
+await say("Meet Juniper Market: mugs, vases, T-shirts and headphones.", 3000);
 for (const { sku, quantity } of STORE_CART) for (let i = 0; i < quantity; i++) { await tap(`[data-tile="${sku}"] [data-d="1"]`); await wait(350); }
-await say("The bag updates in place as the buyer shops.", 2600);
+await say("Pick what you like, and it drops into your bag.", 2600);
 let kitCap = kitOrder, popupInfo = null;
 if (!PREVIEW) {
   await page.waitForSelector("#paypal-buttons iframe", { timeout: 30_000 });
@@ -258,7 +261,7 @@ if (!PREVIEW) {
   await wait(1500);
   const loginTo = now() - popupOpen;
   await say("", 0, popup);
-  await say("Paid in the PayPal sandbox. No real money moves.", 2600, popup);
+  await say("Paid in a couple of taps with PayPal.", 2600, popup);
   const closed = popup.waitForEvent("close", { timeout: 90_000 });
   await pay.click();
   await closed;
@@ -268,7 +271,7 @@ if (!PREVIEW) {
   await wait(300);
   cutEnd();
   await wait(800);
-  await say("Order confirmed. Every item gets its own “Report a problem” link.", 3400);
+  await say("Order confirmed. If anything goes wrong, every item has its own “Report a problem” link.", 3400);
   const href = await page.locator('[data-report]').first().getAttribute("href");
   const orderId = new URL(BASE + href).searchParams.get("order");
   kitCap = { orderId, claimUrl: href };
@@ -280,11 +283,11 @@ if (!PREVIEW) {
 
 // 2. Path 1: chipped mug -> repair kit
 await page.waitForSelector("#form:not(.hidden)");
-await say("A mug arrived chipped. The buyer tells the shop what happened.", 3000);
+await say("One mug arrived chipped. Just say what happened…", 3000);
 await slowType("#statement", "One mug has a chip in the rim.");
 await moveTo(page.locator("#drop"));
 await page.setInputFiles("#photos", PHOTO["1-kit-chipped-mug"]);
-await say("…and adds a photo.", 1600);
+await say("…and add a photo.", 1600);
 await tap("#submit");
 await page.waitForSelector("#sent:not(.hidden)", { timeout: 60_000 });
 const kitStatus = await page.getAttribute("#status-link", "href");
@@ -294,44 +297,44 @@ await say("Sent. The shop has it in seconds.", 2600);
 await go(`${BASE}/merchant`);
 await page.waitForSelector(".ag-row", { timeout: 30_000 }).catch(() => {});
 await wait(600);
-await say("The shop's inbox: every request, with what the AI found at a glance.", 3600);
+await say("Over at the shop, every request lands in one inbox, already checked.", 3600);
 await tap('.ag-center-cols-container .ag-row[row-index="0"]');
 await page.waitForSelector(".card", { timeout: 30_000 });
-await say("AI checks the photo against the shop's own catalog photo…", 1500);
+await say("The photo is compared with the shop's own product photo…", 1500);
 cutStart();
 await page.waitForSelector("#send-offer", { timeout: 90_000 });
 cutEnd();
 await wait(500);
-await say("…and outlines the damage it found.", 3000);
+await say("…and the damage is outlined.", 3000);
 await glide(".finding:nth-of-type(4)");
-await say("It confirms the photo shows the product the shop sold, and the photo is usable.", 3600);
+await say("It's the same mug the shop sold, and the photo is clear.", 3600);
 await glide(".offer-pitch");
-await say("It matched repair kits from the shop's remedy library to this damage.", 3600);
+await say("A small chip can be mended, so the shop's own repair kits are ready to offer.", 3600);
 await giveReason("Chip is clear in the photo");
 await tap("#send-offer");
 await page.waitForSelector("text=Waiting for the buyer", { timeout: 30_000 });
-await say("One click: the buyer gets to choose. Every amount is already approved.", 3200);
+await say("One click, and the customer gets to choose.", 3200);
 
 await go(BASE + kitStatus);
 await page.waitForSelector("[data-option]");
-await say("The buyer sees every option, including a full refund.", 3000);
+await say("The customer sees every option, including a full refund.", 3000);
 await tap('[data-option="kintsugi"]');
 await say("They keep the mug, mend it with a kintsugi kit, and take $12 back.", 3000);
 await tap("#confirm");
 await page.waitForSelector(".option.chosen", { timeout: 60_000 });
 await wait(600);
-await say("PayPal refunds $12 straight away. The kit ships free.", 3600);
+await say("$12 is back in their PayPal account straight away. The kit ships free.", 3600);
 
 // 3. Path 2: cracked vase -> an in-stock listing the AI suggests
 await openCase(setup.vase.id);
-await say("A cracked vase. Beyond the remedy library…", 2600);
+await say("A cracked vase this time…", 2600);
 await glide(".ai-suggest");
-await say("…AI suggests something else the store has in stock, with its reasoning.", 3600);
+await say("…and the shop is shown something else it has in stock that would make up for it.", 3600);
 const add = page.locator(".ai-suggest [data-approve]").first();
 if (await add.count()) {
   await tap(".ai-suggest [data-approve]");
   await page.waitForSelector(".ai-suggest .pill.ok", { timeout: 30_000 });
-  await say("The shop adds it to the buyer's choices. Nothing reaches the buyer unapproved.", 3400);
+  await say("The shop adds it to the choices with one click. Nothing goes out without the shop's OK.", 3400);
 }
 await giveReason("Crack is clear in the photo");
 await tap("#send-offer");
@@ -340,32 +343,32 @@ await go(BASE + setup.vase.statusUrl);
 await page.waitForSelector("[data-option]");
 const pick = (await page.locator('[data-option^="ai_"]').count()) ? '[data-option^="ai_"]' : '[data-option]:nth-child(2)';
 await tap(pick);
-await say("The buyer takes the suggested vase and part of their money back.", 2800);
+await say("The customer takes the shop's suggestion.", 2800);
 await tap("#confirm");
 await page.waitForSelector(".option.chosen", { timeout: 60_000 });
 await wait(1800);
 
 // 4. Path 3: a different product -> remedies held, the shop asks for a label photo
 await openCase(setup.wrong.id);
-await say("This photo shows a printed mug. The shop sold a plain white one.", 3200);
+await say("This photo shows a printed mug, but the shop sold a plain white one.", 3200);
 await glide(".finding:nth-of-type(4)");
-await say("Two independent AI checks flag a different product…", 3000);
+await say("It's flagged as a different product…", 3000);
 await glide(".ask-block");
-await say("…so repair kits are held back, and the shop asks for a photo of the label.", 3400);
+await say("…so nothing is offered yet, and the shop simply asks for a photo of the label.", 3400);
 await tap("#request-info");
 await page.waitForSelector("text=You asked the buyer", { timeout: 30_000 });
 await go(BASE + setup.wrong.statusUrl);
 await page.waitForSelector("#more:not(.hidden)");
-await say("The buyer sees exactly what the shop needs.", 3000);
+await say("The customer sees exactly what the shop needs.", 3000);
 
 // 5. Path 4: an unclear photo -> clearer photo -> re-checked -> free replacement
 await openCase(setup.blurry.id);
-await say("This photo is too blurry to judge. No amount is drafted.", 3200);
+await say("This photo is too blurry to tell, so the shop asks for a clearer one.", 3200);
 await tap("#request-info");
 await page.waitForSelector("text=You asked the buyer", { timeout: 30_000 });
 await go(BASE + setup.blurry.statusUrl);
 await page.waitForSelector("#more:not(.hidden)");
-await say("The buyer sends a clear photo from their phone.", 2400);
+await say("The customer sends a clear photo from their phone.", 2400);
 await moveTo(page.locator("#drop"));
 await page.setInputFiles("#photos", PHOTO["4b-clear-mug-handle-off"]);
 await wait(700);
@@ -378,7 +381,7 @@ cutStart();
 await page.waitForSelector("#send-offer, #approve", { timeout: 90_000 });
 cutEnd();
 await wait(500);
-await say("Re-checked in seconds: the handle snapped off, and a new mug fits best.", 3400);
+await say("Checked again in seconds: the handle snapped off, so a new mug is the best fix.", 3400);
 if (await page.isVisible("#send-offer")) {
   await giveReason("Snapped handle is clear in the new photo");
   await tap("#send-offer");
@@ -390,20 +393,20 @@ if (await page.isVisible("#send-offer")) {
   await tap("#confirm");
   await page.waitForSelector(".option.chosen", { timeout: 60_000 });
   await wait(600);
-  await say("A free replacement is on its way. No refund needed.", 3400);
+  await say("A free replacement is on its way.", 3400);
 }
 
 // 6. Path 5: a mug in pieces -> one-click PayPal refund
 await openCase(setup.refund.id);
-await say("Sometimes a straight refund is simplest.", 2600);
+await say("And sometimes a straight refund is simplest.", 2600);
 await glide("#approve");
 if (await page.isVisible("#reason")) await slowType("#reason", "Mug clearly in pieces");
 await tap("#approve");
 await page.waitForSelector("text=PayPal refund completed", { timeout: 60_000 });
 await wait(600);
-await say("One click, one PayPal partial refund, with its PayPal refund ID.", 3600);
+await say("One click, and the money is back with the customer through PayPal.", 3600);
 await glide("text=How this case was handled", "start");
-await say("Every step is recorded: who acted, what they saw, and why.", 3600);
+await say("Every step is on record: who did what, and why.", 3600);
 
 // 7. The shop's overview and the remedy library
 await go(`${BASE}/merchant`);
@@ -412,7 +415,7 @@ await wait(600);
 await say(Object.keys(setup).length > 4 ? "Mugs, glass, clothing, electronics: each product gets its own damage checks." : "Five requests, five fair outcomes, and the shop stayed in control of every one.", 4000);
 await go(`${BASE}/merchant/remedies`);
 await wait(1500);
-await say("Shops write their own remedies in plain words. The AI only offers what they wrote.", 4000);
+await say("Shops set their own remedies in plain words, and only those are ever offered.", 4000);
 
 await card("Turn a broken order into the next sale.", "Refund Relay · built on PayPal", 3800);
 

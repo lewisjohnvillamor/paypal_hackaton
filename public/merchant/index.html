@@ -99,7 +99,7 @@
         doesExternalFilterPass: (n) => n.data.status === filter,
         onRowClicked: (e) => (location.href = `/merchant/case?id=${encodeURIComponent(e.data.id)}`),
         rowClass: "grid-row", suppressCellFocus: false,
-        overlayNoRowsTemplate: `<span class="muted">No requests yet. Buy the demo order in the store, then report a problem.</span>`,
+        overlayNoRowsTemplate: `<span class="muted">No requests yet. They appear here when a buyer reports a problem.</span>`,
         // Enter on a focused row opens the case, like a click.
         onCellKeyDown: (e) => { if (e.event.key === "Enter") location.href = `/merchant/case?id=${encodeURIComponent(e.data.id)}`; },
       });
@@ -130,7 +130,7 @@
           <div><div class="amt">${r.proposed_cents ? usd(r.proposed_cents) : "—"}</div><div class="small muted" style="text-align:right">${esc(r.status === "refunded" ? "Refunded" : r.status === "closed" ? "Closed" : ROUTE[r.route] || "")}</div></div>
           ${ICON.chevron}
         </a>`).join("")
-        : `<div class="empty"><h3>No requests yet</h3><p class="small" style="margin:0">Buy the demo order in the <a href="/">store</a>, then report a problem.</p></div>`;
+        : `<div class="empty"><h3>No requests yet</h3><p class="small" style="margin:0">They appear here when a buyer reports a problem.</p></div>`;
     }
     async function load() {
       try {
