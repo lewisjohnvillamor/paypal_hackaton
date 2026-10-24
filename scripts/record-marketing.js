@@ -14,7 +14,8 @@
 // PREVIEW=1 runs against a server with test doubles (no PayPal popup; the checkout scene is skipped).
 // Then: node scripts/stitch-marketing.js [out-dir]  ->  <out-dir>/refund-relay-marketing.mp4
 import { chromium } from "playwright";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import sharp from "sharp";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:8888";
 const PREVIEW = process.env.PREVIEW === "1";
@@ -22,6 +23,22 @@ const PACE = Number(process.env.PACE || 0.85); // caption hold time multiplier
 const out = process.argv[2] || "data/marketing";
 const size = { width: 1280, height: 800 };
 const C = "probe/cases/", P = "probe/products/";
+// Photos per path. DEMO_PHOTOS=<dir> swaps in <dir>/<name>.jpg (or .png) where present, e.g. damaged
+// versions of the store's own catalog photos; 4a is blurred from 4b when only 4b is given.
+const DEMO = process.env.DEMO_PHOTOS;
+const PHOTO = Object.fromEntries(Object.entries({
+  "1-kit-chipped-mug": PHOTO["1-kit-chipped-mug"],
+  "2-vase-cracked": P + "vase-cracked.jpg",
+  "3-wrong-product-mug": C + "broken-rocket-mug.jpg",
+  "4a-blurry-mug": C + "blurred-broken-mug.jpg",
+  "4b-clear-mug-handle-off": PHOTO["4b-clear-mug-handle-off"],
+  "5-mug-in-pieces": C + "broken-shards-bubblewrap.jpg",
+}).map(([k, f]) => [k, (DEMO && [".jpg", ".jpeg", ".png"].map((x) => `${DEMO}/${k}${x}`).find(existsSync)) || f]));
+if (DEMO && !["4a-blurry-mug"].some((k) => PHOTO[k].startsWith(DEMO)) && PHOTO["4b-clear-mug-handle-off"].startsWith(DEMO)) {
+  PHOTO["4a-blurry-mug"] = `${out}/4a-blurry-mug.jpg`;
+  mkdirSync(out, { recursive: true });
+  writeFileSync(PHOTO["4a-blurry-mug"], await sharp(PHOTO["4b-clear-mug-handle-off"]).blur(18).jpeg({ quality: 85 }).toBuffer());
+}
 mkdirSync(out, { recursive: true });
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -79,7 +96,7 @@ async function fileClaim(cap, sku, photos, statement) {
   form.set("lineId", cap.lines.find((l) => l.sku === sku).id);
   form.set("quantity", "1");
   form.set("statement", statement);
-  for (const f of photos) form.append("photos", new Blob([readFileSync(f)], { type: "image/jpeg" }), f.split("/").pop());
+  for (const f of photos) form.append("photos", new Blob([readFileSync(f)], { type: f.endsWith(".png") ? "image/png" : "image/jpeg" }), f.split("/").pop());
   for (let i = 0; ; i++) {
     const r = await fetch(`${BASE}/api/claims`, { method: "POST", body: form, headers: { "X-Claim-Token": claimToken(cap) } });
     const body = await r.json();
@@ -100,11 +117,12 @@ async function assessed(id) {
 log("setting up orders and requests off camera");
 const STORE_CART = [{ sku: "MUG-CLASSIC", quantity: 2 }, { sku: "VASE-GLASS", quantity: 1 }, { sku: "TEE-ORGANIC", quantity: 1 }];
 const setup = {};
-setup.refund = await fileClaim(await buy([{ sku: "MUG-CLASSIC", quantity: 4 }]), "MUG-CLASSIC", [C + "broken-shards-bubblewrap.jpg"], "One of the four mugs arrived in pieces.");
-setup.blurry = await fileClaim(await buy([{ sku: "MUG-CLASSIC", quantity: 1 }]), "MUG-CLASSIC", [C + "blurred-broken-mug.jpg"], "The handle snapped off in the post.");
-setup.wrong = await fileClaim(await buy([{ sku: "MUG-CLASSIC", quantity: 1 }]), "MUG-CLASSIC", [C + "broken-rocket-mug.jpg"], "My mug arrived broken.");
-setup.vase = await fileClaim(await buy([{ sku: "VASE-GLASS", quantity: 1 }, { sku: "TEE-ORGANIC", quantity: 2 }]), "VASE-GLASS", [P + "vase-cracked.jpg"], "The vase arrived with a long crack down from the rim.");
+setup.refund = await fileClaim(await buy([{ sku: "MUG-CLASSIC", quantity: 4 }]), "MUG-CLASSIC", [PHOTO["5-mug-in-pieces"]], "One of the four mugs arrived in pieces.");
+setup.blurry = await fileClaim(await buy([{ sku: "MUG-CLASSIC", quantity: 1 }]), "MUG-CLASSIC", [PHOTO["4a-blurry-mug"]], "The handle snapped off in the post.");
+setup.wrong = await fileClaim(await buy([{ sku: "MUG-CLASSIC", quantity: 1 }]), "MUG-CLASSIC", [PHOTO["3-wrong-product-mug"]], "My mug arrived broken.");
+setup.vase = await fileClaim(await buy([{ sku: "VASE-GLASS", quantity: 1 }, { sku: "TEE-ORGANIC", quantity: 2 }]), "VASE-GLASS", [PHOTO["2-vase-cracked"]], "The vase arrived with a long crack down from the rim.");
 const kitOrder = PREVIEW ? await buy(STORE_CART) : null; // live: bought on camera below
+log("photos", JSON.stringify(PHOTO));
 for (const [k, c] of Object.entries(setup)) log(k, (await assessed(c.id)).proposal.route);
 
 // ---- On camera ------------------------------------------------------------------------------
@@ -255,7 +273,7 @@ await page.waitForSelector("#form:not(.hidden)");
 await say("A mug arrived chipped. The buyer tells the shop what happened.", 3000);
 await slowType("#statement", "One mug has a chip in the rim.");
 await moveTo(page.locator("#drop"));
-await page.setInputFiles("#photos", C + "chipped-closeup.jpg");
+await page.setInputFiles("#photos", PHOTO["1-kit-chipped-mug"]);
 await say("…and adds a photo.", 1600);
 await tap("#submit");
 await page.waitForSelector("#sent:not(.hidden)", { timeout: 60_000 });
@@ -339,7 +357,7 @@ await go(BASE + setup.blurry.statusUrl);
 await page.waitForSelector("#more:not(.hidden)");
 await say("The buyer sends a clear photo from their phone.", 2400);
 await moveTo(page.locator("#drop"));
-await page.setInputFiles("#photos", C + "broken-handle-white.jpg");
+await page.setInputFiles("#photos", PHOTO["4b-clear-mug-handle-off"]);
 await wait(700);
 await tap("#send");
 await page.waitForSelector("#flash .notice", { timeout: 30_000 });
