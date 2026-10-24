@@ -37,7 +37,7 @@ const PHOTO = Object.fromEntries(Object.entries({
 if (DEMO && !["4a-blurry-mug"].some((k) => PHOTO[k].startsWith(DEMO)) && PHOTO["4b-clear-mug-handle-off"].startsWith(DEMO)) {
   PHOTO["4a-blurry-mug"] = `${out}/4a-blurry-mug.jpg`;
   mkdirSync(out, { recursive: true });
-  writeFileSync(PHOTO["4a-blurry-mug"], await sharp(PHOTO["4b-clear-mug-handle-off"]).blur(18).jpeg({ quality: 85 }).toBuffer());
+  writeFileSync(PHOTO["4a-blurry-mug"], await sharp(PHOTO["4b-clear-mug-handle-off"]).blur(30).jpeg({ quality: 85 }).toBuffer());
 }
 mkdirSync(out, { recursive: true });
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
