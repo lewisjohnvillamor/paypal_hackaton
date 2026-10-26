@@ -1,6 +1,6 @@
 # Refund Relay
 
-A small shop gets a "my mug arrived broken" message with photos. Refund Relay links that message to the original PayPal payment, has an AI model check the photos, drafts a refund from the shop's policy, and sends the refund through PayPal once the merchant approves it.
+A small shop gets a "this arrived damaged" message with photos: a broken mug, a cracked vase, a stained T-shirt, snapped headphones. Refund Relay links that message to the original PayPal payment, has an AI model check the photos, drafts a refund from the shop's policy, and sends the refund through PayPal once the merchant approves it.
 
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/). It runs on the PayPal **sandbox** only. This is a prototype, not production software.
 
@@ -8,9 +8,9 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/). It 
 
 ## What happens
 
-1. **Purchase.** The buyer pays $80 for four $20 mugs with PayPal Checkout. The server sets the price, captures the payment, checks the amount, currency and payee, and gives the buyer a private claim link.
-2. **Complaint.** The buyer picks the item and quantity, describes the problem, and uploads up to 100 photos. The page shrinks them in the browser before sending.
-3. **Evidence check.** [Jev](https://docs.typesafe.ai) (TypeSafe, `jev-1.14.0`) answers narrow typed questions about the photos: are they usable, is breakage visible, is it the same kind of product as the catalog photo. Only the photos go to the model, never the buyer's text, so a complaint cannot talk the model into anything.
+1. **Purchase.** The buyer fills a bag from four very different products (mug, glass vase, T-shirt, headphones) and pays with PayPal Checkout. The server sets the price from its catalog, captures the payment, checks the amount, currency and payee, and gives the buyer a private claim link.
+2. **Complaint.** The buyer clicks "Report a problem" next to an item, picks the quantity, describes the problem, and uploads up to 100 photos. The page shrinks them in the browser before sending.
+3. **Evidence check.** [Jev](https://docs.typesafe.ai) (TypeSafe, `jev-1.14.0`) answers narrow typed questions about the photos: are they usable, is damage visible, what kind of damage, is it the same kind of product as the catalog photo. The questions and damage types come from the product kind (`src/kinds.js`), so a T-shirt is checked for stains and tears and headphones for a snapped headband or torn cushion. See [hackathon/PRODUCTS.md](hackathon/PRODUCTS.md). Only the photos go to the model, never the buyer's text, so a complaint cannot talk the model into anything.
 4. **Policy.** A pure function turns the findings into a draft: "propose $20.00", "needs your judgment", or "ask for better photos". A negative finding never denies a claim by itself.
 5. **Approval.** The merchant sees the customer's words, the model's observations and the PayPal payment side by side, and clicks **Approve $20.00 refund**. A different amount, or approving a case the policy did not propose, requires a written reason.
 6. **Refund.** One idempotent PayPal partial refund runs against the original capture. The app shows PayPal's real refund ID and status.
@@ -37,7 +37,7 @@ npm start               # http://localhost:8888
 
 - Store: `http://localhost:8888`. Pay with a sandbox **Personal** account.
 - Merchant console: `http://localhost:8888/merchant`. Sign in with `MERCHANT_PASSWORD`.
-- Sample damage photos for the claim form are in `probe/cases/`. `broken-handle-white.jpg` usually gets a one-click proposal; `damage-not-shown.jpg` goes to manual review, and `broken-rocket-mug.jpg` is flagged as a different design from the catalog mug.
+- Sample damage photos for the vase, T-shirt and headphones are in `probe/products/`; mug photos are in `probe/cases/`. `broken-handle-white.jpg` usually gets a one-click proposal; `damage-not-shown.jpg` goes to manual review, and `broken-rocket-mug.jpg` is flagged as a different design from the catalog mug.
 
 ### Hosted demo for judges
 
@@ -112,7 +112,7 @@ hackathon/                  state, probe report, screenshots
 
 ## Credits
 
-Photos in `probe/cases/` and the catalog photo are Creative Commons or CC0 works. Authors, licences and sources are listed in [`probe/cases.json`](probe/cases.json). The two blurred cases are modified copies made for the probe.
+Photos in `probe/cases/`, `probe/products/` and the catalog photos are Creative Commons or CC0 works (`probe/products/sources.json` for the newer ones). Authors, licences and sources are listed in [`probe/cases.json`](probe/cases.json). The two blurred cases are modified copies made for the probe.
 
 ## Licence
 

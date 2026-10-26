@@ -87,39 +87,46 @@ export function approveAndReserve(db, { claimId, claimVersion, proposalId, amoun
       throw new GateError("REASON_REQUIRED", "Give a reason when approving an amount or case the policy did not propose.");
     }
 
-    const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(claim.order_id);
-    if (!order.capture_id || order.capture_status !== "COMPLETED") {
-      throw new GateError("CAPTURE_NOT_VERIFIED", "The original payment is not a verified, completed capture.");
-    }
-    const ops = db.prepare("SELECT * FROM refund_ops WHERE capture_id = ?").all(order.capture_id);
-    if (ops.some((o) => OPEN.includes(o.status))) {
-      throw new GateError("REFUND_IN_PROGRESS", "A refund on this payment is still being settled. Reconcile it first.");
-    }
-    const refundable = refundableBalance(order.amount_cents, ops);
-    if (amountCents > refundable) {
-      throw new GateError("INSUFFICIENT_REFUNDABLE_BALANCE", `Only ${toDecimal(refundable)} USD is refundable on this payment.`);
-    }
-
-    const ts = now();
-    const approvalId = randomUUID();
-    db.prepare(`INSERT INTO approvals (id, claim_id, claim_version, proposal_id, proposal_snapshot, actor,
-      amount_cents, currency, override_reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'USD', ?, ?)`)
-      .run(approvalId, claimId, claim.version, proposal.id, JSON.stringify(proposal), actor, amountCents, overridden ? why : null, ts);
-
-    const opId = randomUUID();
-    const body = {
-      amount: { currency_code: "USD", value: toDecimal(amountCents) },
-      custom_id: opId,
-      note_to_payer: `Refund for request ${claim.ref}, reviewed by the merchant.`,
-    };
-    db.prepare(`INSERT INTO refund_ops (id, order_id, capture_id, claim_id, approval_id, request_id, request_body,
-      amount_cents, currency, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'USD', 'SUBMITTING', ?, ?)`)
-      .run(opId, order.id, order.capture_id, claimId, approvalId, randomUUID(), JSON.stringify(body), amountCents, ts, ts);
-
-    db.prepare("UPDATE claims SET status = 'refund_processing', version = version + 1, updated_at = ? WHERE id = ?").run(ts, claimId);
-    audit(db, { claimId, opId, actor, type: "refund.approved", payload: { amountCents, overrideReason: overridden ? why : null } });
-    return { op: db.prepare("SELECT * FROM refund_ops WHERE id = ?").get(opId), duplicate: false };
+    return { op: reserve(db, { claim, proposal, amountCents, actor, overrideReason: overridden ? why : null }), duplicate: false };
   });
+}
+
+// Inside the caller's transaction: record the approval, reserve the funds, persist the PayPal
+// request. Shared by a merchant's direct approval and a buyer's pick from a merchant-approved offer.
+export function reserve(db, { claim, proposal, amountCents, actor, overrideReason = null, note }) {
+  const claimId = claim.id;
+  const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(claim.order_id);
+  if (!order.capture_id || order.capture_status !== "COMPLETED") {
+    throw new GateError("CAPTURE_NOT_VERIFIED", "The original payment is not a verified, completed capture.");
+  }
+  const ops = db.prepare("SELECT * FROM refund_ops WHERE capture_id = ?").all(order.capture_id);
+  if (ops.some((o) => OPEN.includes(o.status))) {
+    throw new GateError("REFUND_IN_PROGRESS", "A refund on this payment is still being settled. Reconcile it first.");
+  }
+  const refundable = refundableBalance(order.amount_cents, ops);
+  if (amountCents > refundable) {
+    throw new GateError("INSUFFICIENT_REFUNDABLE_BALANCE", `Only ${toDecimal(refundable)} USD is refundable on this payment.`);
+  }
+
+  const ts = now();
+  const approvalId = randomUUID();
+  db.prepare(`INSERT INTO approvals (id, claim_id, claim_version, proposal_id, proposal_snapshot, actor,
+    amount_cents, currency, override_reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'USD', ?, ?)`)
+    .run(approvalId, claimId, claim.version, proposal.id, JSON.stringify(proposal), actor, amountCents, overrideReason, ts);
+
+  const opId = randomUUID();
+  const body = {
+    amount: { currency_code: "USD", value: toDecimal(amountCents) },
+    custom_id: opId,
+    note_to_payer: note ?? `Refund for request ${claim.ref}, reviewed by the merchant.`,
+  };
+  db.prepare(`INSERT INTO refund_ops (id, order_id, capture_id, claim_id, approval_id, request_id, request_body,
+    amount_cents, currency, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'USD', 'SUBMITTING', ?, ?)`)
+    .run(opId, order.id, order.capture_id, claimId, approvalId, randomUUID(), JSON.stringify(body), amountCents, ts, ts);
+
+  db.prepare("UPDATE claims SET status = 'refund_processing', version = version + 1, updated_at = ? WHERE id = ?").run(ts, claimId);
+  audit(db, { claimId, opId, actor, type: "refund.approved", payload: { amountCents, overrideReason } });
+  return db.prepare("SELECT * FROM refund_ops WHERE id = ?").get(opId);
 }
 
 // Record a provider answer and move the op (and claim) to the matching state.

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f5f7">
-  <title>Report a problem · Juniper Clay Co.</title>
+  <title>Report a problem · Juniper Market</title>
   <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
@@ -16,7 +16,7 @@
   </header>
   <main class="narrow">
     <div id="intro">
-      <p class="eyebrow">Juniper Clay Co.</p>
+      <p class="eyebrow">Juniper Market</p>
       <h1>Something wrong?<br>Let's fix it.</h1>
       <p class="lede" id="order-summary">Loading your order…</p>
     </div>
@@ -25,10 +25,13 @@
     <form id="form" class="hidden" novalidate>
       <div class="card">
         <div class="product" id="item-card"></div>
-        <select id="line" name="lineId" required class="hidden" aria-label="Which item?"></select>
+        <div id="line-pick" class="hidden">
+          <label for="line" style="margin-top:16px">Which item?</label>
+          <select id="line" name="lineId" required></select>
+        </div>
         <hr>
         <div class="row spread">
-          <div id="qty-label"><b>How many arrived damaged?</b></div>
+          <div id="qty-label"><b>How many have a problem?</b></div>
           <div class="stepper" role="group" aria-labelledby="qty-label">
             <button type="button" id="qty-minus" aria-label="One fewer">−</button>
             <output id="qty-out" aria-live="polite">1</output>
@@ -40,7 +43,7 @@
 
       <div class="card">
         <label for="statement">What happened?</label>
-        <textarea id="statement" name="statement" maxlength="1000" required placeholder="For example: one mug arrived with the handle snapped off."></textarea>
+        <textarea id="statement" name="statement" maxlength="1000" required placeholder="For example: it arrived cracked, or with a stain on the front."></textarea>
 
         <label for="photos">Add photos <span class="hint">Up to 100 · JPEG or PNG. Show the damage and the item.</span></label>
         <div class="dropzone" id="drop">
@@ -51,7 +54,7 @@
         </div>
       </div>
 
-      <p class="footnote" style="margin:16px 4px">An AI model (Jev, by TypeSafe) looks at your photos to help the shop review them. It never sees your written description. The shop makes every refund decision, and PayPal's own resolution options stay open to you.</p>
+      <p class="footnote" style="margin:16px 4px">AI looks at your photos to help the shop review them quickly. It never sees your written description. The shop makes every decision, and PayPal's own resolution options stay open to you.</p>
       <button class="primary lg" type="submit" id="submit">Send to the shop</button>
     </form>
 
@@ -61,7 +64,7 @@
         <h1>Request sent.</h1>
         <p class="muted" style="margin:0">Reference <b id="ref"></b></p>
         <ol class="tracker" style="--n:3;margin:28px 0 28px">
-          <li class="done">Sent</li><li class="now">Shop reviews</li><li>Refund</li>
+          <li class="done">Sent</li><li class="now">Shop reviews</li><li>Resolved</li>
         </ol>
         <a id="status-link" class="button primary lg" href="#">Track your request</a>
         <p class="footnote" style="margin:12px 0 0">Bookmark this link. It's private to you.</p>
@@ -86,7 +89,9 @@
     function showLine(opt) {
       max = Number(opt.dataset.max);
       $("item-card").innerHTML = `<img src="/assets/${esc(opt.dataset.img)}" alt="">
-        <div><h2>${esc(opt.dataset.title)}</h2><div class="muted small">${max} × ${esc(opt.dataset.price)} in this order</div></div>`;
+        <div><h2>${esc(opt.dataset.title)}</h2><div class="muted small">${max} × ${esc(opt.dataset.price)} in this order</div>
+        ${$("line").options.length > 1 && $("line-pick").classList.contains("hidden") ? `<button type="button" class="plain small" id="change-item" style="min-height:0;padding:4px 0">Different item?</button>` : ""}</div>`;
+      $("change-item") && ($("change-item").onclick = () => { $("line-pick").classList.remove("hidden"); $("change-item").remove(); $("line").focus(); });
       setQty(1);
     }
 
@@ -96,15 +101,20 @@
       $("order-summary").textContent = `Your ${usd(o.amountCents)} order, paid with PayPal on ${new Date(o.capturedAt).toLocaleDateString(undefined, { dateStyle: "long" })}. Tell the shop what happened and add a photo.`;
       if (o.openClaimRef) {
         const known = myOrders().find((x) => x.orderId === orderId && x.ref === o.openClaimRef);
-        $("error").innerHTML = `You already have an open request for this order (${esc(o.openClaimRef)}).` +
-          (known?.statusUrl ? ` <a href="${esc(known.statusUrl)}">Track it</a>.` : "");
+        $("error").innerHTML = `You already have an open request on this order (${esc(o.openClaimRef)}).` +
+          (known?.statusUrl ? ` <a href="${esc(known.statusUrl)}">Track it</a>.` : "") +
+          " Once the shop has resolved it, you can report another item here.";
         $("error").classList.remove("hidden");
+        throw null;
       }
       $("line").innerHTML = o.lines.map((l) => `<option value="${esc(l.id)}" data-max="${l.quantity}" data-title="${esc(l.title)}" data-price="${usd(l.unit_cents)}" data-img="${esc(l.ref_image)}">${esc(l.title)} (${l.quantity} × ${usd(l.unit_cents)})</option>`).join("");
-      if (o.lines.length > 1) $("line").classList.remove("hidden");
+      // Arriving from "Report a problem" on one item: that item is shown, and the picker only on request.
+      const pick = new URLSearchParams(location.search).get("line");
+      if (o.lines.some((l) => l.id === pick)) $("line").value = pick;
+      else if (o.lines.length > 1) $("line-pick").classList.remove("hidden");
       showLine($("line").selectedOptions[0]);
       $("form").classList.remove("hidden");
-    } catch (e) { $("order-summary").textContent = ""; fail(e.message); }
+    } catch (e) { if (e) { $("order-summary").textContent = ""; fail(e.message); } }
 
     $("line").onchange = (e) => showLine(e.target.selectedOptions[0]);
     $("qty-minus").onclick = () => setQty(Number($("quantity").value) - 1);

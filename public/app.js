@@ -22,6 +22,8 @@ export const STATUS = {
   new: ["New", "info"],
   needs_info: ["Waiting on buyer", "warn"],
   ready: ["To review", "info"],
+  offer_sent: ["Buyer choosing", "info"],
+  resolved: ["Resolved", "ok"],
   refund_processing: ["Refunding", "warn"],
   refunded: ["Refunded", "ok"],
   closed: ["Closed", ""],
@@ -40,6 +42,7 @@ export const ICON = {
   store: svg('<path d="M4 9l1.5-5h13L20 9"/><path d="M4 9v11h16V9"/><path d="M4 9c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3"/>'),
   photo: svg('<rect x="3" y="5" width="18" height="15" rx="3"/><circle cx="9" cy="10.5" r="1.8"/><path d="M21 16l-5-5-8 9"/>'),
   info: svg('<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>'),
+  box: svg('<path d="M3.5 7.5L12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5L12 12l8.5-4.5M12 12v9"/>'),
   lock: svg('<rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 018 0v3"/>'),
   chevron: `<svg class="chev" viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 1.5l5 5-5 5"/></svg>`,
 };
@@ -69,3 +72,14 @@ export function rememberOrder(orderId, fields) {
     localStorage.setItem(MINE, JSON.stringify(all.slice(0, 10)));
   } catch {}
 }
+// Wording for a resolution option, shared by the buyer's choice and the merchant's case page.
+// Remedy titles and items are the merchant's own words from their remedy library.
+export function optionText(o) {
+  if (o.kind === "refund") return { title: "Full refund", detail: `${usd(o.refundCents)} back to your PayPal account. No need to send anything back.` };
+  const item = o.item ? o.item.charAt(0).toUpperCase() + o.item.slice(1) : "";
+  return { title: o.title, detail: o.refundCents > 0 ? `${usd(o.refundCents)} back, plus ${o.item}.` : `${item}.` };
+}
+// Kintsugi kits get the kintsugi picture; anything else a generic icon.
+// The amount column: a remedy that refunds nothing says so instead of "$0.00".
+export const optionAmount = (o) => (o.refundCents > 0 ? usd(o.refundCents) : "No refund");
+export const optionArt = (o) => o.kind === "refund" ? ICON.check : /kintsugi|gold leaf/i.test(`${o.title} ${o.item}`) ? `<img src="/assets/kintsugi.svg" alt="">` : ICON.box;

@@ -72,6 +72,17 @@ export const fakeAssess = (findings = clearFindings) => async () => ({
   model: "fake-jev (test double)", findings, answers: {}, usage: { input_tokens: 0, output_tokens: 0 }, latencyMs: 1,
 });
 
+// Claude Haiku test double: records what it was sent and answers with the given suggestions.
+export function fakeSuggest(suggestions = []) {
+  const calls = [];
+  const fn = async (input) => {
+    calls.push(input);
+    return { model: "fake-haiku (test double)", latencyMs: 1, usage: {}, suggestions: typeof suggestions === "function" ? suggestions(input) : suggestions };
+  };
+  fn.calls = calls;
+  return fn;
+}
+
 // A distinct photo per seed, so record-based duplicate checks only fire when a test means them to.
 export function testPhoto(seed = Math.floor(Math.random() * 1e9)) {
   const w = 400, h = 300, px = Buffer.alloc(w * h * 3);

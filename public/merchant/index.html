@@ -8,18 +8,21 @@
   <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-grid.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-theme-quartz.css">
   <link rel="stylesheet" href="/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/ag-grid-community.min.js" defer></script>
 </head>
 <body>
   <header class="top">
     <a class="brand" href="/merchant"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span>Refund Relay <span class="ctx">Merchant</span></a>
-    <nav><a href="/">Store</a><a href="#" id="logout" class="hidden">Sign out</a></nav>
+    <nav><a href="/merchant/remedies">Remedies</a><a href="/">Store</a><a href="#" id="logout" class="hidden">Sign out</a></nav>
   </header>
-  <main>
+  <main class="wide">
     <form id="login" class="card hidden center" style="max-width:400px;margin:40px auto 0;padding:40px 32px">
       <div class="check blue" aria-hidden="true" style="animation:none"><span style="color:#fff;display:grid"><span data-icon="lock"></span></span></div>
       <h2 style="font-size:28px;margin-bottom:4px">Sign in</h2>
-      <p class="muted small" style="margin:0 0 24px">Juniper Clay Co. merchant console</p>
+      <p class="muted small" style="margin:0 0 24px">Juniper Market merchant console</p>
       <label for="password" class="sr-only">Password</label>
       <input id="password" type="password" autocomplete="current-password" placeholder="Password" required>
       <div id="demo-hint" class="notice hidden" style="text-align:left"></div>
@@ -28,19 +31,81 @@
     </form>
 
     <section id="inbox" class="hidden">
-      <p class="eyebrow">Juniper Clay Co.</p>
+      <p class="eyebrow">Juniper Market</p>
       <h1>Refund requests</h1>
       <p class="lede">Damaged-item reports on your PayPal orders. Nothing is refunded until you approve it.</p>
-      <div class="segmented" id="filters" role="group" aria-label="Filter by status" style="margin-bottom:16px"></div>
+      <div class="grid-tools">
+        <div class="segmented" id="filters" role="group" aria-label="Filter by status"></div>
+        <div class="row" style="gap:8px">
+          <input id="search" type="search" placeholder="Search requests" aria-label="Search requests">
+          <button type="button" id="export" class="hidden">Export CSV</button>
+        </div>
+      </div>
+      <div id="grid" class="ag-theme-quartz inbox-grid hidden" role="region" aria-label="Refund requests"></div>
       <div class="card flush" id="rows"></div>
     </section>
   </main>
   <script type="module">
-    import { api, usd, esc, pill, when, STATUS, ICON, settle } from "/app.js";
+    import { api, usd, esc, pill, when, STATUS, ICON, settle, optionText } from "/app.js";
     document.querySelectorAll("[data-icon]").forEach((el) => (el.outerHTML = ICON[el.dataset.icon]));
     const $ = (id) => document.getElementById(id);
     let filter = "all", rows = [];
     const ROUTE = { propose: "Suggested refund", manual_review: "Needs your judgment", request_info: "Ask for photos" };
+
+    const DAMAGE = { shattered: "Broken", handle_off: "Handle off", crack_or_chip: "Crack or chip", stain: "Stain", tear_or_hole: "Tear or hole",
+      seam_or_print: "Seam or print", snapped: "Snapped", cushion_torn: "Cushion torn", cosmetic: "Scratches", none_visible: "None seen" };
+    const OUTCOME = (r) => r.chosen_option && r.chosen_option !== "refund" ? `Buyer chose: ${r.chosen_title}`
+      : r.status === "refunded" ? "Refunded" : r.status === "closed" ? "Closed" : r.status === "offer_sent" ? "Buyer choosing"
+      : r.status === "needs_info" ? "Asked for a photo" : r.status === "new" ? "AI checking" : ROUTE[r.route] || "";
+    const pct = (p) => `${(p * 100).toFixed(2)}%`;
+    let grid = null;
+
+    // The photo Jev outlined, with its outline; the wrapper takes the photo's own shape so the
+    // box (fractions of the photo) lands where Jev put it.
+    function thumbCell({ data: r }) {
+      const el = document.createElement("span");
+      el.className = "grid-thumb";
+      el.innerHTML = r.thumb ? `<img src="/api/merchant/evidence/${encodeURIComponent(r.thumb.id)}" alt="" loading="lazy">${r.thumb.box ? `<i style="top:${pct(r.thumb.box.top)};left:${pct(r.thumb.box.left)};width:${pct(r.thumb.box.right - r.thumb.box.left)};height:${pct(r.thumb.box.bottom - r.thumb.box.top)}"></i>` : ""}` : "";
+      return el;
+    }
+    const html = (fn) => (p) => { const el = document.createElement("span"); el.innerHTML = fn(p.data, p.value); return el; };
+
+    const columns = [
+      { headerName: "", field: "thumb", cellRenderer: thumbCell, width: 76, sortable: false, filter: false, resizable: false, pinned: "left", getQuickFilterText: () => "" },
+      { headerName: "Request", field: "ref", width: 112, pinned: "left", cellClass: "mono-cell" },
+      { headerName: "Status", field: "status", width: 146, cellRenderer: html((r) => pill(r.status)), getQuickFilterText: (p) => STATUS[p.value]?.[0] ?? p.value },
+      { headerName: "Item", field: "title", flex: 1, minWidth: 170, tooltipValueGetter: (p) => p.data.title, valueGetter: (p) => `${p.data.title} × ${p.data.quantity}` },
+      { headerName: "AI saw", field: "damage_kind", width: 120, valueFormatter: (p) => DAMAGE[p.value] ?? "—" },
+      { headerName: "Breakage", field: "breakage", width: 112, type: "rightAligned",
+        cellRenderer: html((r) => r.breakage == null ? "—" : `<span class="meter" style="color:var(--${r.breakage >= 0.8 ? "green-fill" : r.breakage <= 0.2 ? "red" : "orange"})"><i style="width:${Math.round(r.breakage * 100)}%"></i></span> ${Math.round(r.breakage * 100)}%`) },
+      { headerName: "Flags", field: "concerns", width: 84, headerTooltip: "Concerns the refund policy raised", type: "rightAligned", valueFormatter: (p) => p.value == null ? "—" : p.value === 0 ? "None" : String(p.value) },
+      { headerName: "Remedies", field: "remedies", width: 140, sortable: true, comparator: (a, b, x, y) => (a + x.data.ai_suggestions) - (b + y.data.ai_suggestions),
+        cellRenderer: html((r) => `${r.remedies ? `<span class="pill gold" title="Library remedies the AI matched">${r.remedies} fit</span>` : ""}${r.ai_suggestions ? ` <span class="pill claude" title="AI suggestions from your store, open or added">${r.ai_suggestions} AI</span>` : ""}`) },
+      { headerName: "Drafted", field: "proposed_cents", width: 100, hide: true, type: "rightAligned", valueFormatter: (p) => p.value ? usd(p.value) : "—" },
+      { headerName: "Refunded", field: "refunded_cents", width: 112, type: "rightAligned", valueFormatter: (p) => p.value ? usd(p.value) : "—" },
+      { headerName: "Outcome", colId: "outcome", flex: 1.3, minWidth: 200, tooltipValueGetter: (p) => OUTCOME(p.data), valueGetter: (p) => OUTCOME(p.data) },
+      { headerName: "Reported", field: "created_at", width: 132, hide: matchMedia("(max-width: 1400px)").matches, sort: "desc", valueFormatter: (p) => p.value ? new Date(p.value).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "" },
+    ];
+
+    function makeGrid() {
+      if (grid || !window.agGrid) return;
+      const dark = matchMedia("(prefers-color-scheme: dark)");
+      const theme = () => $("grid").classList.toggle("ag-theme-quartz-dark", dark.matches);
+      theme(); dark.addEventListener?.("change", theme);
+      grid = agGrid.createGrid($("grid"), {
+        columnDefs: columns, rowData: [], rowHeight: 60, headerHeight: 44, animateRows: true, domLayout: "autoHeight", pagination: true, paginationPageSize: 20, paginationPageSizeSelector: false,
+        defaultColDef: { sortable: true, resizable: true, filter: true, suppressHeaderMenuButton: false },
+        getRowId: (p) => p.data.id,
+        isExternalFilterPresent: () => filter !== "all",
+        doesExternalFilterPass: (n) => n.data.status === filter,
+        onRowClicked: (e) => (location.href = `/merchant/case?id=${encodeURIComponent(e.data.id)}`),
+        rowClass: "grid-row", suppressCellFocus: false,
+        overlayNoRowsTemplate: `<span class="muted">No requests yet. They appear here when a buyer reports a problem.</span>`,
+        // Enter on a focused row opens the case, like a click.
+        onCellKeyDown: (e) => { if (e.event.key === "Enter") location.href = `/merchant/case?id=${encodeURIComponent(e.data.id)}`; },
+      });
+      $("grid").classList.remove("hidden"); $("rows").classList.add("hidden"); $("export").classList.remove("hidden");
+    }
 
     function draw() {
       const counts = Object.fromEntries(Object.keys(STATUS).map((k) => [k, rows.filter((r) => r.status === k).length]));
@@ -48,6 +113,13 @@
       $("filters").innerHTML = keys.map((k) =>
         `<button type="button" data-f="${k}" aria-pressed="${k === filter}">${k === "all" ? "All" : STATUS[k][0]} <span class="count">${k === "all" ? rows.length : counts[k]}</span></button>`).join("");
       $("filters").querySelectorAll("button").forEach((b) => (b.onclick = () => { filter = b.dataset.f; draw(); }));
+      makeGrid();
+      if (grid) {
+        grid.setGridOption("rowData", rows);
+        grid.onFilterChanged();
+        return;
+      }
+      // Fallback list when the grid library could not load.
       const shown = rows.filter((r) => filter === "all" || r.status === filter);
       $("rows").innerHTML = shown.length ? shown.map((r) => `
         <a class="inbox-row" href="/merchant/case?id=${encodeURIComponent(r.id)}">
@@ -59,7 +131,7 @@
           <div><div class="amt">${r.proposed_cents ? usd(r.proposed_cents) : "—"}</div><div class="small muted" style="text-align:right">${esc(r.status === "refunded" ? "Refunded" : r.status === "closed" ? "Closed" : ROUTE[r.route] || "")}</div></div>
           ${ICON.chevron}
         </a>`).join("")
-        : `<div class="empty"><h3>No requests yet</h3><p class="small" style="margin:0">Buy the demo order in the <a href="/">store</a>, then report a problem.</p></div>`;
+        : `<div class="empty"><h3>No requests yet</h3><p class="small" style="margin:0">They appear here when a buyer reports a problem.</p></div>`;
     }
     async function load() {
       try {
@@ -83,7 +155,10 @@
       try { await api("/api/merchant/login", { method: "POST", body: { password: $("password").value } }); load(); }
       catch (err) { $("login-error").textContent = err.status === 401 ? "That password isn't right. Try again." : err.message; $("login-error").classList.remove("hidden"); }
     };
+    $("search").oninput = (e) => grid?.setGridOption("quickFilterText", e.target.value);
+    $("export").onclick = () => grid?.exportDataAsCsv({ fileName: "refund-requests.csv", columnKeys: ["ref", "status", "title", "damage_kind", "breakage", "concerns", "remedies", "proposed_cents", "refunded_cents", "outcome", "created_at"] });
     $("logout").onclick = async (e) => { e.preventDefault(); await api("/api/merchant/logout", { method: "POST" }); location.reload(); };
+    window.addEventListener("load", () => rows.length && draw()); // the grid script is deferred
     load();
     setInterval(() => !$("inbox").classList.contains("hidden") && load(), 10000);
   </script>

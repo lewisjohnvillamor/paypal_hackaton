@@ -16,6 +16,81 @@ Screenshots of the latest run are in `hackathon/screenshots/` (desktop and `m-*`
 
 Apple-style redesign across store, claim, tracking and merchant screens (PR #2). Tokens and rationale: `DESIGN.md`. axe WCAG AA: 0 violations on store, inbox and case pages in both themes. The walkthrough video was re-recorded with the new UI.
 
+## Damage boxes (2026-10-22)
+
+Each photo Jev sees also gets its own small call with a `box` question ("where is the damage?") and a
+per-photo damage check. The merchant case page outlines the damage on the thumbnails, in the
+enlarged photo, and in a large photo at the top of "What Jev saw". A box is drawn only when that
+call is at least 0.7 sure the photo shows damage, because Jev returns a box even for an intact mug
+(four live runs each: chip 0.85-0.87, intact mugs 0.43-0.55). Boxes over 85% of the photo are
+dropped, and hairline ones are widened to 8%.
+Boxes are display only; policy never reads them. Live check (jev-1.14.0): snapped handle, chip and
+cracked glass were all outlined in the right place, intact mugs got no box, about 300-600 ms for
+the whole assessment. Screenshots: `screenshots/6-damage-boxes.png`, `6b-damage-zoom.png`.
+
+## Kintsugi repair offers (2026-10-22)
+
+When Jev reads the damage as a chip, crack or snapped handle (damage-type confidence 0.5 or more,
+visible breakage "yes"), the proposal carries three options the merchant can send instead of
+deciding alone: full refund ($20), keep it with a free kintsugi kit ($12 back), or the 24k
+gold-leaf kit ($3 back: the $9 kit price comes off the refund, so the buyer never pays twice).
+The merchant clicks "Let the buyer choose"; that approves every amount on the list. The buyer
+picks on the status page, and the pick becomes one PayPal partial refund through the same gate as
+a direct approval (`reserve` in `src/refunds/execute.js`, `src/offers.js`). A shattered mug, or an
+unsure damage type, gets the plain refund only. Superseded by the remedy library below.
+
+Live sandbox run (`E2E_OFFER=1 node --env-file=.env scripts/e2e-sandbox.js probe/cases/chipped-closeup.jpg`):
+buyer picked the gold-leaf kit, refund `0XM259959W007021K` for $3.00 COMPLETED. Screenshots
+`screenshots/7-*.png` to `9-*.png`. Not built yet: real kit fulfilment (the merchant sees "Send:
+<kit>" on the case), and offering a replacement.
+
+## Remedy library: Jev suggests the remedy (2026-10-22)
+
+The fixed kintsugi rule above is replaced by a merchant-owned remedy library (`remedies` table,
+`src/remedies.js`, page `/merchant/remedies`, an editable AG Grid). Each remedy has a title, what
+the merchant sends, a refund per item (always below the price paid), a kind (repair kit, spare
+part, replacement, other) and a plain-language "when it fits" sentence. On every review Jev gets
+one yes/no question per active remedy ("does the damage in the photos match this description?",
+`rankRemedies` in `src/ai/jev.js`, run in parallel with the main call); remedies scoring 0.5 or
+more are offered, best fit first, at most 3, next to the full refund (`resolutionOptions`). The AI
+picks from the merchant's list, so it can never invent an item or an amount. Only merchant-written
+text goes to Jev with the photos; the buyer's words still never do. Seeded from `src/catalog.js`:
+kintsugi kit ($12 back), 24k gold-leaf kit ($3 back), replacement (no refund).
+
+A replacement settles the case with no PayPal call (status `resolved`; the order line counts as
+handled for later claims). Live Jev fits, two runs each: chip, kintsugi 0.81-0.83 and replacement
+0.83-0.84; snapped handle, replacement 0.97 and kintsugi 0.08 or less; shards, replacement
+0.52-0.65; broken-in-packing, replacement 0.43-0.80 (noisy around the 0.5 cut); intact mug, 0.16
+or less. Screenshots `screenshots/12-*.png` to `16-*.png` (fit numbers in those are recorded
+values played back through the test double). Free-form AI suggestions outside the library are
+deliberately not built before the deadline.
+
+## Claude Haiku remedy suggestions (2026-10-22)
+
+Beyond the merchant's library, Claude Haiku 5.5 (`src/ai/haiku.js`) can suggest other store
+listings as remedies. The server first narrows the listings (`LISTINGS` in `src/catalog.js`) to the
+ordered product's category and the damage Jev saw (`src/suggest/candidates.js`, at most 12); Haiku
+gets the photos, Jev's reading and that list, never the buyer's words, and its answer is a JSON
+schema whose listing id must be one of the candidates (effort low). The server re-checks every
+suggestion (`checkSuggestions`: known id, integer refund, listing price plus refund at or under the
+price paid, at most 2) and stores it as pending. The merchant adds or dismisses each one on the
+case page; only added ones join the buyer's choices (`offerOptions`), and a pick is refunded through
+the same gate. Runs only when Jev clearly saw damage on usable photos; a Haiku failure is logged on
+the timeline and never blocks the review. Off unless `ANTHROPIC_API_KEY` is set. Pricing (checked
+2026-10-22): $0.10 / $0.50 per MTok, about $1 per 1,000 claims. Not yet run against the live API;
+screenshots `screenshots/17-*.png` to `19-*.png` use the test double.
+
+## Agent timeline and AG Grid inbox (2026-10-22)
+
+- Case page: "How this case was handled" lists every step with who acted (buyer, Jev, refund
+  policy, merchant, PayPal), what Jev saw with its confidences and latency, what the policy
+  drafted and why, the buyer's pick, and PayPal's refund ID. Built from the audit log and stored
+  assessments in `src/timeline.js`; nothing is shown that was not recorded.
+- Merchant inbox is an AG Grid Community 32.3.3 grid (CDN): outlined-photo thumbnails, status,
+  Jev's damage type, breakage confidence meter, concern count, how many remedies fit, drafted and refunded amounts, outcome; sort, column filters, quick search, status
+  segments, CSV export, Enter or click opens a case. Falls back to the old list if the CDN fails.
+  Screenshots `screenshots/10-*.png`, `11-agent-timeline.png`.
+
 ## Gates
 
 - Gate 1 (financial loop): done, in an earlier thread and again here.

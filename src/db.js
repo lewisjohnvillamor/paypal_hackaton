@@ -47,9 +47,9 @@ CREATE TABLE IF NOT EXISTS claims (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
--- MVP: one active case per capture/order.
-CREATE UNIQUE INDEX IF NOT EXISTS one_active_claim_per_order
-  ON claims(order_id) WHERE status NOT IN ('closed', 'refunded');
+-- MVP: one active case per capture/order. 'resolved' = settled without money moving (a replacement).
+CREATE UNIQUE INDEX IF NOT EXISTS one_active_claim_per_order_v2
+  ON claims(order_id) WHERE status NOT IN ('closed', 'refunded', 'resolved');
 
 CREATE TABLE IF NOT EXISTS claim_links (
   order_id TEXT PRIMARY KEY REFERENCES orders(id),
@@ -132,6 +132,58 @@ CREATE TABLE IF NOT EXISTS refund_ops (
 CREATE UNIQUE INDEX IF NOT EXISTS one_open_op_per_capture
   ON refund_ops(capture_id) WHERE status IN ('SUBMITTING','PENDING','UNKNOWN');
 
+-- Resolution options the merchant approved and sent to the buyer. The buyer's pick becomes the
+-- refund; every option's amount was approved by the merchant when the offer was sent.
+CREATE TABLE IF NOT EXISTS offers (
+  id TEXT PRIMARY KEY,
+  claim_id TEXT NOT NULL REFERENCES claims(id),
+  claim_version INTEGER NOT NULL,
+  proposal_id TEXT NOT NULL REFERENCES proposals(id),
+  options_json TEXT NOT NULL,
+  actor TEXT NOT NULL,
+  reason TEXT,
+  status TEXT NOT NULL CHECK (status IN ('open','accepted')),
+  chosen_option TEXT,
+  op_id TEXT REFERENCES refund_ops(id),
+  created_at TEXT NOT NULL,
+  decided_at TEXT,
+  UNIQUE (claim_id, claim_version)
+);
+
+-- The merchant's remedy library: what can put a damaged item right besides a full refund. Jev
+-- judges which ones fit the photos; refund_unit_cents is what the buyer gets back per unit.
+CREATE TABLE IF NOT EXISTS remedies (
+  id TEXT PRIMARY KEY,
+  sku TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('repair_kit','spare_part','replacement','other')),
+  title TEXT NOT NULL,
+  item TEXT NOT NULL,
+  fits TEXT NOT NULL,
+  refund_unit_cents INTEGER NOT NULL CHECK (refund_unit_cents >= 0),
+  active INTEGER NOT NULL DEFAULT 1,
+  position INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS suggestions (
+  id TEXT PRIMARY KEY,
+  claim_id TEXT NOT NULL REFERENCES claims(id),
+  proposal_id TEXT NOT NULL REFERENCES proposals(id),
+  listing_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  title TEXT NOT NULL,
+  item TEXT NOT NULL,
+  item_price_cents INTEGER NOT NULL,
+  why TEXT NOT NULL,
+  refund_unit_cents INTEGER NOT NULL CHECK (refund_unit_cents >= 0),
+  model TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending','approved','dismissed')),
+  decided_by TEXT,
+  created_at TEXT NOT NULL,
+  decided_at TEXT,
+  UNIQUE (proposal_id, listing_id)
+);
+
 CREATE TABLE IF NOT EXISTS audit (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   claim_id TEXT,
@@ -145,6 +197,7 @@ CREATE TABLE IF NOT EXISTS audit (
 
 // Columns added after the first release; ALTER is skipped when the column already exists.
 const MIGRATIONS = [
+  "DROP INDEX IF EXISTS one_active_claim_per_order",
   "ALTER TABLE evidence ADD COLUMN phash TEXT",
   "ALTER TABLE evidence ADD COLUMN sharpness INTEGER",
   "ALTER TABLE assessments ADD COLUMN photo_ids_json TEXT",
@@ -153,6 +206,9 @@ const MIGRATIONS = [
 // Every lookup the app makes by foreign key or by time. Without these, each claim submission and
 // each inbox load scanned whole tables (see bench/RESULTS.md).
 const INDEXES = `
+CREATE INDEX IF NOT EXISTS offers_by_claim ON offers(claim_id, created_at);
+CREATE INDEX IF NOT EXISTS suggestions_by_proposal ON suggestions(proposal_id, created_at);
+CREATE INDEX IF NOT EXISTS remedies_by_sku ON remedies(sku, active, position);
 CREATE INDEX IF NOT EXISTS evidence_by_claim ON evidence(claim_id, created_at);
 CREATE INDEX IF NOT EXISTS claims_by_order ON claims(order_id, created_at);
 CREATE INDEX IF NOT EXISTS claims_by_line ON claims(line_id, status);

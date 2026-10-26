@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="20 24 86 78" role="img" aria-label="A white mug mended with a gold seam">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7d774"/>
+      <stop offset="0.5" stop-color="#d4a23a"/>
+      <stop offset="1" stop-color="#f3cf6b"/>
+    </linearGradient>
+    <linearGradient id="m" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e6e6ea"/>
+    </linearGradient>
+  </defs>
+  <path d="M78 46h8a14 14 0 010 28h-8" fill="none" stroke="#d9d9de" stroke-width="7"/>
+  <path d="M78 46h8a14 14 0 010 28h-8" fill="none" stroke="url(#g)" stroke-width="2.4" stroke-dasharray="7 30" stroke-linecap="round"/>
+  <rect x="26" y="34" width="54" height="62" rx="9" fill="url(#m)" stroke="#d1d1d6" stroke-width="1.5"/>
+  <ellipse cx="53" cy="35" rx="27" ry="5" fill="#f2f2f5" stroke="#d1d1d6" stroke-width="1.5"/>
+  <path d="M40 31l4 14-7 10 9 13-4 12 6 16" fill="none" stroke="url(#g)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M46 68l12-5 9 6 13-3" fill="none" stroke="url(#g)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
