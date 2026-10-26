@@ -82,6 +82,6 @@ test("a failed second check is recorded and leaves Jev's checks to stand alone",
     const d = (await t.merchant("GET", `/claims/${c.claimId}`)).body;
     assert.equal(d.assessment.findings.second_check, undefined);
     assert.ok(d.proposal.options.length > 1);
-    assert.ok(d.timeline.some((s) => /second product check failed/.test(s.title)));
+    assert.ok(d.timeline.some((s) => /second AI product check failed/.test(s.title)));
   } finally { t.close(); }
 });
