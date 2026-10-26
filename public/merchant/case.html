@@ -242,7 +242,7 @@
       }).join("");
     }
 
-    const ACTOR = { buyer: "Buyer", jev: "AI · Photo check", claude: "AI · Assistant", policy: "Refund policy", merchant: "You", paypal: "PayPal", system: "System" };
+    const ACTOR = { agent: "Your refund agent", buyer: "Buyer", jev: "AI · Photo check", claude: "AI · Assistant", policy: "Refund policy", merchant: "You", paypal: "PayPal", system: "System" };
     // The agent timeline: who did what, in order, with what each one saw.
     function timelineHtml(steps) {
       const time = (iso) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" });

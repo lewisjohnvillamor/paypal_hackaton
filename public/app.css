@@ -426,3 +426,21 @@ ol.timeline li.claude { --dot: var(--claude); }
 body:not(.show-tech) .tech { display: none; }
 .ask-block.lead { margin-top: 18px; padding: 16px; border-radius: 16px; background: var(--tint-orange); }
 .ask-block textarea { min-height: 72px; }
+
+/* Refund agent */
+ol.timeline li.agent { --dot: var(--purple); }
+.agent-examples { margin: 10px 0 16px; gap: 8px; }
+button.chip { min-height: 32px; padding: 6px 12px; font-size: 14px; border-radius: var(--r-pill); }
+ol.agent-rules { margin: 8px 0 0; padding-left: 22px; display: grid; gap: 8px; font-size: 16px; line-height: 1.45; }
+ol.agent-rules li::marker { color: var(--purple); font-weight: 600; }
+.agent-on { border: 1.5px solid var(--purple); margin-bottom: 20px; }
+.agent-budget { margin-top: 16px; display: grid; gap: 8px; }
+.meter.wide { width: 100%; height: 6px; border-radius: 3px; }
+.meter.wide i { background: var(--purple); }
+#write, #preview, #activity { margin-bottom: 20px; }
+.agent-log li, .agent-log li > a { display: grid; grid-template-columns: 128px 1fr auto; gap: 12px; align-items: start; padding: 12px 0; border-bottom: 0.5px solid var(--separator); color: var(--text); }
+.agent-log li > a { padding: 0; border: 0; }
+.agent-log li:has(> a) { display: block; }
+.agent-log li:last-child { border-bottom: 0; }
+.agent-log .pill { justify-content: center; }
+@media (max-width: 600px) { .agent-log li, .agent-log li > a { grid-template-columns: 1fr; gap: 4px; } .agent-log .pill { justify-self: start; } }

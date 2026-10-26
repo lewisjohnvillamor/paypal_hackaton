@@ -16,7 +16,9 @@ import { GateError, approveAndReserve, checkPayPalLedger, reconcile, reconcileOp
 import { caseDetail, inbox, buyerStatus } from "./views.js";
 import { acceptOffer, sendOffer } from "./offers.js";
 import { createRemedy, remedyLibrary, seedRemedies, updateRemedy } from "./remedies.js";
-import { defaultMatcher, defaultSuggester } from "./ai/haiku.js";
+import { defaultMatcher, defaultRuleParser, defaultSuggester } from "./ai/haiku.js";
+import { activeMandate, agentSpent, replay, runAgent, saveMandate, stopMandate } from "./agent/autopilot.js";
+import { RuleError, checkRules, describeRules, ruleVocabulary } from "./agent/rules.js";
 import { decideSuggestion } from "./suggest/suggestions.js";
 import { assessmentQueue } from "./queue.js";
 import { PRODUCTS } from "./catalog.js";
@@ -25,7 +27,8 @@ import { PRODUCTS } from "./catalog.js";
 const MAX_REQUEST_BYTES = Number(process.env.MAX_REQUEST_MB || 300) * 1024 * 1024;
 const started = Date.now();
 
-export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence, suggest = defaultSuggester(), match = defaultMatcher(), queue = assessmentQueue(db, assess, { suggest, match }) } = {}) {
+export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence, suggest = defaultSuggester(), match = defaultMatcher(), parseRules = defaultRuleParser(),
+  queue = assessmentQueue(db, assess, { suggest, match, after: (claimId) => runAgent(db, pp, claimId) }) } = {}) {
   seedRemedies(db);
   const app = express();
   app.disable("x-powered-by");
@@ -91,7 +94,7 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
   };
 
   const wrap = (fn) => (req, res) => Promise.resolve(fn(req, res)).catch((err) => {
-    if (err instanceof GateError || err instanceof ClaimError || err instanceof OrderError || err instanceof ImageRejected) {
+    if (err instanceof GateError || err instanceof ClaimError || err instanceof OrderError || err instanceof ImageRejected || err instanceof RuleError) {
       const status = err.status || ({ CAPTURE_NOT_REFUNDABLE: 409, EXTERNAL_REFUND_DETECTED: 409, NOT_FOUND: 404, STALE_CASE: 409, REFUND_IN_PROGRESS: 409, NOT_READY: 409, NO_OPTIONS: 409, TOO_MANY_REMEDIES: 409 }[err.code] ?? 400);
       return res.status(status).json({ error: err.code || "IMAGE_REJECTED", message: err.message, debugId: err.debugId });
     }
@@ -240,6 +243,39 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
   m.get("/remedies", (_req, res) => res.json(remedyLibrary(db)));
   m.post("/remedies", wrap(async (req, res) => res.status(201).json(createRemedy(db, req.body))));
   m.patch("/remedies/:id", wrap(async (req, res) => res.json(updateRemedy(db, req.params.id, req.body))));
+  // ---- The refund agent's rules ----
+  // What is on, what the agent did lately, and what it has sent in the last 24 hours.
+  m.get("/agent", (_req, res) => {
+    const recent = db.prepare(`SELECT a.type, a.payload, a.at, c.id claim_id, c.ref, c.status, l.title FROM audit a
+      JOIN claims c ON c.id = a.claim_id JOIN order_lines l ON l.id = c.line_id
+      WHERE a.type IN ('agent.acted', 'agent.left_for_merchant') ORDER BY a.id DESC LIMIT 20`).all()
+      .map((r) => ({ ...JSON.parse(r.payload), acted: r.type === "agent.acted", at: r.at, claimId: r.claim_id, ref: r.ref, status: r.status, title: r.title }));
+    res.json({ mandate: activeMandate(db), spentCents: agentSpent(db), recent, canWrite: !!parseRules });
+  });
+  // Plain English in, checked rules and their read-back out. Nothing is turned on here.
+  m.post("/agent/preview", limit(20, 60e3), wrap(async (req, res) => {
+    const text = String(req.body?.text ?? "").trim();
+    if (text.length < 8 || text.length > 1000) throw new RuleError("Write your rules in 8 to 1000 characters.");
+    if (!parseRules) throw Object.assign(new RuleError("Writing rules in plain English needs the AI, which is off on this server."), { status: 503 });
+    let parsed;
+    try {
+      parsed = await parseRules({ text, ...ruleVocabulary() });
+    } catch (err) {
+      throw Object.assign(new RuleError(`The AI could not read those rules (${String(err.message).slice(0, 120)}). Try again.`), { status: 502 });
+    }
+    let checked;
+    try {
+      checked = checkRules(parsed);
+    } catch (err) {
+      if (err instanceof RuleError && parsed.notUnderstood) err.message += ` The AI said: ${parsed.notUnderstood}`;
+      throw err;
+    }
+    res.json({ text, ...checked, readback: describeRules(checked), notUnderstood: parsed.notUnderstood || null, model: parsed.model, replay: replay(db, checked) });
+  }));
+  m.post("/agent", wrap(async (req, res) => {
+    res.json(saveMandate(db, { text: req.body?.text, rules: req.body?.rules, model: req.body?.model ?? null, actor: req.actor }));
+  }));
+  m.delete("/agent", (req, res) => { stopMandate(db, req.actor); res.json({ mandate: null }); });
   m.post("/refunds/:id/reconcile", wrap(async (req, res) => {
     const op = await reconcile(db, pp, req.params.id, req.actor);
     res.json(caseDetail(db, op.claim_id));

@@ -13,7 +13,8 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/). It 
 3. **Evidence check.** [Jev](https://docs.typesafe.ai) (TypeSafe, `jev-1.14.0`) answers narrow typed questions about the photos: are they usable, is damage visible, what kind of damage, is it the same kind of product as the catalog photo. The questions and damage types come from the product kind (`src/kinds.js`), so a T-shirt is checked for stains and tears and headphones for a snapped headband or torn cushion. See [hackathon/PRODUCTS.md](hackathon/PRODUCTS.md). Only the photos go to the model, never the buyer's text, so a complaint cannot talk the model into anything.
 4. **Policy.** A pure function turns the findings into a draft: "propose $20.00", "needs your judgment", or "ask for better photos". A negative finding never denies a claim by itself.
 5. **Approval.** The merchant sees the customer's words, the model's observations and the PayPal payment side by side, and clicks **Approve $20.00 refund**. A different amount, or approving a case the policy did not propose, requires a written reason.
-6. **Refund.** One idempotent PayPal partial refund runs against the original capture. The app shows PayPal's real refund ID and status.
+6. **Or the refund agent does it.** On the [Refund agent page](hackathon/screenshots/27-agent-activity.png) the merchant writes standing rules in plain English, such as "Refund chipped mugs under $25 on your own. Ask me about anything above that." Claude Haiku turns the words into a structure (products, damage types, a limit per request, a daily limit); the server checks it and reads it back in its own words, and the merchant turns it on. After every review the agent refunds through PayPal with no click when a clear case fits a rule, or leaves it for the merchant with one sentence on why ("$40.00 is above your $25.00 limit", "None of your rules covers the clear glass bud vase"). A rule can also say to offer the buyer the remedy list instead. See `src/agent/`.
+7. **Refund.** One idempotent PayPal partial refund runs against the original capture. The app shows PayPal's real refund ID and status.
 
 ## Money safety
 
@@ -24,6 +25,7 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/). It 
 - Database constraints allow one open refund per capture, one approval per case version, and one active request per order. Duplicate clicks get the existing operation back.
 - New photos or a status change bump the case version, so an earlier approval goes stale.
 - Open refunds are reconciled with PayPal when the server starts and every 60 seconds.
+- The refund agent goes through the same gate as a merchant's click (ledger check, reservation, idempotent submit). It acts only on a case the policy proposed with no concerns, only inside the checked rules the merchant turned on (never their raw words), never above $200 on one request, and never past the daily limit; it decides again inside the reservation transaction so two cases cannot both fit under the same limit.
 
 ## Run it
 
@@ -86,6 +88,8 @@ src/paypal/client.js        OAuth, Orders v2, captures, refunds (sandbox only)
 src/ai/jev.js               Jev questions and normalised findings
 src/policy/refundPolicy.js  pure refund policy
 src/refunds/execute.js      approval, reservation, submission, reconciliation
+src/agent/rules.js          the refund agent's rules: check, read-back, decide (pure)
+src/agent/autopilot.js      the refund agent: acts on a fresh proposal, or leaves it with a reason
 src/claims.js, orders.js    workflow
 src/ai/select.js            which photos the model sees
 src/queue.js                bounded assessment queue
