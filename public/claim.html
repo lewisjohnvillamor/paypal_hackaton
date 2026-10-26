@@ -72,14 +72,14 @@
     </div>
   </main>
   <script type="module">
-    import { api, usd, esc, hashToken, ICON, checkBadge, busy } from "/app.js";
+    import { api, usd, esc, hashToken, ICON, checkBadge, busy, myOrders, rememberOrder } from "/app.js";
     import { shrinkPhotos } from "/photos.js";
     document.querySelectorAll("[data-icon]").forEach((el) => (el.outerHTML = ICON[el.dataset.icon]));
     const orderId = new URLSearchParams(location.search).get("order");
     const token = hashToken();
     const $ = (id) => document.getElementById(id);
     const fail = (msg) => { $("error").textContent = msg; $("error").classList.toggle("hidden", !msg); };
-    let max = 1;
+    let max = 1, paidCents;
 
     function setQty(n) {
       n = Math.min(Math.max(1, n), max);
@@ -97,8 +97,16 @@
 
     try {
       const o = await api(`/api/claim-link/${encodeURIComponent(orderId)}`, { token });
+      paidCents = o.amountCents;
       $("order-summary").textContent = `Your ${usd(o.amountCents)} order, paid with PayPal on ${new Date(o.capturedAt).toLocaleDateString(undefined, { dateStyle: "long" })}. Tell the shop what happened and add a photo.`;
-      if (o.openClaimRef) { fail(`You already have an open request on this order (${o.openClaimRef}). Once the shop has resolved it, you can report another item here.`); throw null; }
+      if (o.openClaimRef) {
+        const known = myOrders().find((x) => x.orderId === orderId && x.ref === o.openClaimRef);
+        $("error").innerHTML = `You already have an open request on this order (${esc(o.openClaimRef)}).` +
+          (known?.statusUrl ? ` <a href="${esc(known.statusUrl)}">Track it</a>.` : "") +
+          " Once the shop has resolved it, you can report another item here.";
+        $("error").classList.remove("hidden");
+        throw null;
+      }
       $("line").innerHTML = o.lines.map((l) => `<option value="${esc(l.id)}" data-max="${l.quantity}" data-title="${esc(l.title)}" data-price="${usd(l.unit_cents)}" data-img="${esc(l.ref_image)}">${esc(l.title)} (${l.quantity} × ${usd(l.unit_cents)})</option>`).join("");
       // Arriving from "Report a problem" on one item: that item is shown, and the picker only on request.
       const pick = new URLSearchParams(location.search).get("line");
@@ -136,6 +144,7 @@
         const r = await api("/api/claims", { method: "POST", form, token });
         $("ref").textContent = r.ref;
         $("status-link").href = r.statusUrl;
+        rememberOrder(orderId, { amount: paidCents, claimUrl: location.pathname + location.search + location.hash, statusUrl: r.statusUrl, ref: r.ref });
         $("sent-check").innerHTML = checkBadge("blue");
         $("form").classList.add("hidden"); $("intro").classList.add("hidden"); $("sent").classList.remove("hidden");
         window.scrollTo({ top: 0 });

@@ -39,12 +39,19 @@ npm start               # http://localhost:8888
 - Merchant console: `http://localhost:8888/merchant`. Sign in with `MERCHANT_PASSWORD`.
 - Sample damage photos for the vase, T-shirt and headphones are in `probe/products/`; mug photos are in `probe/cases/`. `broken-handle-white.jpg` usually gets a one-click proposal; `damage-not-shown.jpg` goes to manual review, and `broken-rocket-mug.jpg` is flagged as a different design from the catalog mug.
 
+### Hosted demo for judges
+
+Set `PUBLIC_DEMO=1` to print the sandbox sign-ins on the pages themselves: the merchant password on the merchant sign-in screen, and `DEMO_BUYER_EMAIL` / `DEMO_BUYER_PASSWORD` (a sandbox **Personal** account) under the PayPal button. It is off by default and the app refuses to run outside the PayPal sandbox, so nothing real can be refunded. Judges can also skip the PayPal sign-in and use **Debit or Credit Card** with a test card from PayPal's [card generator](https://developer.paypal.com/tools/sandbox/card-testing/).
+
+The store keeps each buyer's private claim and tracking links in the browser, so a reload after paying does not lose them.
+
 ### Tests and checks
 
 ```sh
-npm test                                     # 41 tests: money, policy, duplicate/concurrent approvals, tampering,
+npm test                                     # 51 tests: money, policy, duplicate/concurrent approvals, tampering,
                                              # stale approvals, timeouts, restart recovery, access control, edge cases
 npm run probe                                # live Jev run over 19 labelled photos (uses your API key)
+npm run probe:stability -- 5                 # each photo 5 times: does the refund route ever change between runs?
 node --env-file=.env scripts/e2e-sandbox.js  # full live run in a headless browser (needs the app running and Playwright)
 ```
 
@@ -100,7 +107,7 @@ hackathon/                  state, probe report, screenshots
 
 - Single merchant, USD only, sandbox only, one active request per order.
 - Delivery date is a labelled synthetic value (the capture time), not carrier data.
-- Refunds made outside the app, and formal PayPal disputes, are not reconciled. Ordinary refund requests are not PayPal disputes, and buyers keep PayPal's own resolution options.
+- Refunds made outside the app are detected before every refund and block the case until reconciled; formal PayPal disputes are not detected. Ordinary refund requests are not PayPal disputes, and buyers keep PayPal's own resolution options.
 - Photos are not proof of fraud, cause, or liability. The model helps the merchant review; the merchant decides.
 
 ## Credits

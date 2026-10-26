@@ -200,3 +200,20 @@ test("non-image uploads are rejected before a claim is created", async () => {
     assert.equal(t.db.prepare("SELECT COUNT(*) n FROM claims").get().n, 0);
   } finally { t.close(); }
 });
+
+test("demo sign-ins are published only when PUBLIC_DEMO=1", async () => {
+  const t = await setup();
+  const saved = { ...process.env };
+  try {
+    delete process.env.PUBLIC_DEMO;
+    assert.equal((await t.call("GET", "/api/config")).body.demo, null);
+    Object.assign(process.env, { PUBLIC_DEMO: "1", DEMO_BUYER_EMAIL: "judge@example.com" });
+    const { demo } = (await t.call("GET", "/api/config")).body;
+    assert.equal(demo.merchantPassword, process.env.MERCHANT_PASSWORD);
+    assert.equal(demo.buyerEmail, "judge@example.com");
+    assert.equal(demo.buyerPassword, null);
+  } finally {
+    for (const k of ["PUBLIC_DEMO", "DEMO_BUYER_EMAIL"]) if (k in saved) process.env[k] = saved[k]; else delete process.env[k];
+    t.close();
+  }
+});

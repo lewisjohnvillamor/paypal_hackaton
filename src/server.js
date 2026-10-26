@@ -101,7 +101,7 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
   });
 
   // ---- Demo purchase -------------------------------------------------------------------------
-  app.get("/api/config", (_req, res) => res.json({ clientId: process.env.PAYPAL_CLIENT_ID }));
+  app.get("/api/config", (_req, res) => res.json({ clientId: process.env.PAYPAL_CLIENT_ID, demo: publicDemo() }));
 
   app.get("/api/products", (_req, res) => res.json(Object.values(PRODUCTS).map((p) => ({
     sku: p.sku, title: p.title, unitCents: p.unitCents, category: p.category, image: `/assets/${p.refImage}`, blurb: p.blurb ?? "",
@@ -112,7 +112,7 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
     res.status(201).json(await startOrder(db, pp, req.body?.items));
   }));
 
-  app.post("/api/demo/orders/:paypalOrderId/capture", wrap(async (req, res) => {
+  app.post("/api/demo/orders/:paypalOrderId/capture", limit(20, 60e3), wrap(async (req, res) => {
     const { order, claimToken, alreadyCaptured } = await captureOrder(db, pp, req.params.paypalOrderId);
     res.json({
       orderId: order.id, captureId: order.capture_id, amount: order.amount_cents, alreadyCaptured,
@@ -256,6 +256,17 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
     next(err);
   });
   return { app, db, queue };
+}
+
+// A hosted demo for judges can print its sandbox sign-ins on the store and merchant pages. Off
+// unless PUBLIC_DEMO=1, and only ever for the sandbox (the PayPal client refuses live mode).
+export function publicDemo(env = process.env) {
+  if (env.PUBLIC_DEMO !== "1") return null;
+  return {
+    merchantPassword: env.MERCHANT_PASSWORD,
+    buyerEmail: env.DEMO_BUYER_EMAIL || null,
+    buyerPassword: env.DEMO_BUYER_PASSWORD || null,
+  };
 }
 
 // Fail at boot, not on the first buyer, when configuration is missing.

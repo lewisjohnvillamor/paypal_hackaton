@@ -96,3 +96,17 @@ Run on 2026-10-22: 19 photos, the 18 from Gate 2 plus one with a note asking the
 The item-kind rule was also changed in v2. The item-type answer now leads, and the catalog comparison only has to reach 0.5. On the same photos this scores 12 right, 1 wrong, 1 unsure, against 10 right, 0 wrong, 4 unsure for v1. This rule was tuned on these photos, so it is not a held-out result. The one new mistake, a pottery shard read as a mug, is still sent to manual review by the design check.
 
 Median latency was 219 ms, up from 194 ms with three extra questions in the same request. Each request used about 5,000 input tokens.
+
+## Run-to-run stability (2026-10-22)
+
+Jev's scores move a little between identical calls. `npm run probe:stability -- 5` assesses each of the 19 photos five times and checks whether the route the merchant sees (one-click proposal, manual review, or ask for photos) ever changes. Raw output: `probe/results/stability-2026-10-22T13-04-38-985Z.json`.
+
+| Measure | Result |
+| --- | --- |
+| Cases whose route changed between runs | 0 of 19 (95 assessments) |
+| Demo photo `broken-handle-white.jpg` | one-click proposal 5 of 5 times (item match 0.73 to 0.89, cut-off 0.5) |
+| Cases where a single finding flipped | item match 3, breakage 1, photo usable 1 |
+| Wrong definite answers | 2 photos, each still routed to manual review: the broken plate read as "no breakage", the pottery shard read as a mug (its design check sends it to a person) |
+| Latency | median 202 ms, p90 307 ms |
+
+The flips happen on photos that another finding already sends to a person (a different design, damage not shown), so they change the wording of the reasons, not the outcome. Taking the median of three Jev calls was tried: it did not reduce flips on this set and tripled token use, so it was not kept.
