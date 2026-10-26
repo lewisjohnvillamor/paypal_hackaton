@@ -4,11 +4,58 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f5f7">
-  <title>Juniper Clay Co. · Refund Relay demo</title>
+  <title>Juniper Market</title>
   <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/app.css">
+  <style>
+    .shop { display: grid; gap: 24px; }
+    @media (min-width: 900px) { .shop { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; } .bag { position: sticky; top: 76px; } }
+    .products { display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+    .tile { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+    .tile + .tile { margin-top: 0; }
+    .tile img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--surface-2); }
+    .tile .body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+    .tile h3 { font-size: 17px; font-weight: 600; letter-spacing: -0.02em; margin: 0; }
+    .tile .foot-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 12px; }
+    .tile .cost { font-size: 19px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+    .cat { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-2); }
+    .tile .buy { display: inline-flex; justify-content: flex-end; min-width: 132px; height: 44px; align-items: center; }
+    .tile .buy > button { min-width: 132px; }
+    .tile .stepper button { width: 36px; height: 34px; font-size: 20px; }
+    .tile .stepper output { min-width: 28px; font-size: 15px; }
+    .bag-row { display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 0.5px solid var(--separator); font-size: 15px; overflow: hidden; }
+    .bag-row:last-child { border-bottom: 0; }
+    .bag-row img { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; }
+    .bag-row .name { min-width: 0; line-height: 1.3; }
+    .bag-row .qty { display: block; }
+    .bag-row .amount { font-weight: 600; }
+    .bag-row.entering { animation: row-in 0.35s var(--ease) both; }
+    .bag-row.leaving { animation: row-out 0.28s var(--ease) both; pointer-events: none; }
+    @keyframes row-in { from { opacity: 0; transform: translateX(16px); max-height: 0; padding: 0; } to { opacity: 1; transform: none; max-height: 64px; } }
+    @keyframes row-out { from { opacity: 1; max-height: 64px; } to { opacity: 0; transform: translateX(-16px); max-height: 0; padding: 0; border-width: 0; } }
+    .pop-in { animation: pop 0.25s var(--ease) both; }
+    output.bump, h2.bump { animation: bump 0.3s var(--ease); }
+    @keyframes bump { 40% { transform: scale(1.18); } }
+    .checkout { position: relative; transition: opacity 0.3s var(--ease); }
+    .checkout.locked #paypal-buttons { opacity: 0.35; pointer-events: none; filter: grayscale(1); transition: opacity 0.3s var(--ease), filter 0.3s var(--ease); }
+    .checkout-hint { margin: 6px 0 0; text-align: center; transition: opacity 0.3s var(--ease); }
+    .checkout:not(.locked) .checkout-hint { opacity: 0; height: 0; margin: 0; overflow: hidden; }
+    .tile img { transition: transform 0.5s var(--ease); }
+    .tile:hover img { transform: scale(1.03); }
+    .tile { transition: box-shadow 0.3s var(--ease); }
+    .tile:hover { box-shadow: var(--shadow-lift); }
+    .bag .kv-row { min-height: 0; padding: 8px 0; font-size: 15px; }
+    .bag .kv-row > :first-child { flex: 1; min-width: 0; }
+    .bag .kv-row > :last-child { flex: none; }
+    .bag .total { font-size: 22px; font-weight: 700; letter-spacing: -0.03em; }
+    .order-lines li { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 0.5px solid var(--separator); }
+    .order-lines li:last-child { border-bottom: 0; }
+    .order-lines img { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; flex: none; }
+    .order-lines .grow { flex: 1; min-width: 0; text-align: left; }
+    .order-lines a.button { white-space: nowrap; }
+  </style>
 </head>
 <body>
   <header class="top">
@@ -16,68 +63,175 @@
     <nav><a href="/merchant">Merchant</a></nav>
   </header>
   <main>
-    <section id="shop">
-      <p class="eyebrow">Juniper Clay Co.</p>
-      <h1>Classic white ceramic mug.</h1>
-      <p class="lede">Glazed stoneware, made in small batches. Buy a set of four with PayPal, then report one as broken and watch the shop review and refund it.</p>
+    <section id="shop-view">
+      <p class="eyebrow">Juniper Market</p>
+      <h1>Home, clothing and tech.</h1>
+      <p class="lede">Everyday things, made to last. Pay with PayPal, and if anything arrives damaged, report it from your receipt and we’ll put it right.</p>
 
-      <div class="grid two">
-        <div class="card flush"><img src="/assets/catalog-mug.jpg" alt="White ceramic mug under a coffee machine" style="width:100%;aspect-ratio:1;object-fit:cover"></div>
-        <div class="card">
-          <div class="row spread" style="align-items:baseline">
-            <h2 style="margin:0">Set of four</h2>
-            <span class="price amount">$80.00</span>
+      <div class="shop">
+        <div class="products" id="products" aria-live="polite"></div>
+        <aside class="card bag" aria-labelledby="bag-title">
+          <div class="card-head" style="margin-bottom:8px"><h2 id="bag-title">Your bag</h2><span id="bag-count" class="small muted"></span></div>
+          <p id="bag-empty" class="small muted" style="margin:0 0 8px">Add something to get started.</p>
+          <div id="bag-lines"></div>
+          <div class="kv-row" style="margin-top:8px"><span>Total</span><span class="total amount" id="bag-total">$0.00</span></div>
+          <p class="footnote" style="margin:4px 0 16px">Free shipping on every order</p>
+          <div id="checkout" class="checkout locked">
+            <div id="paypal-buttons" aria-label="Pay with PayPal"></div>
+            <p class="checkout-hint small muted">Add an item to check out with PayPal.</p>
           </div>
-          <p class="small muted" style="margin:4px 0 20px">4 × $20.00 · Free shipping · No tax in this demo</p>
-          <div id="paypal-buttons" aria-label="Pay with PayPal"></div>
-          <div class="notice" style="margin-bottom:0">
+          <div class="notice demo-note" style="margin-bottom:0">
             <span aria-hidden="true" style="color:var(--blue)" data-icon="lock"></span>
             <span>This is the PayPal <b>sandbox</b>. Sign in with the sandbox Personal account; no real money moves.</span>
           </div>
-        </div>
+        </aside>
       </div>
     </section>
 
     <section id="done" class="hidden">
-      <div class="card hero" style="max-width:560px;margin:0 auto">
+      <div class="card hero" style="max-width:600px;margin:0 auto">
         <div id="done-check"></div>
         <h1>Thank you.</h1>
         <p class="muted" style="margin:0 0 4px">Your payment went through. PayPal sent you a receipt.</p>
         <div class="big amount" id="paid"></div>
-        <div style="text-align:left;margin:8px 0 24px" id="receipt"></div>
-        <a id="claim-link" class="button primary lg" href="#">Report a problem with this order</a>
-        <p class="footnote" style="margin:12px 0 0">This link is private to you. It's how the shop knows the request is yours.</p>
+        <ul class="order-lines" id="order-lines" style="list-style:none;padding:0;margin:8px 0 8px"></ul>
+        <div style="text-align:left;margin:0 0 20px" id="receipt"></div>
+        <p class="footnote" style="margin:0">Each "Report a problem" link is private to you. It's how the shop knows the request is yours.</p>
       </div>
     </section>
     <div id="error" class="notice bad hidden" role="alert"></div>
   </main>
-  <footer class="foot">Hackathon prototype · PayPal sandbox only · Product photo “white coffee mug on coffeemaker”, CC BY 2.0, via Openverse.</footer>
+  <footer class="foot demo-note">Hackathon prototype · PayPal sandbox only · Product photos under Creative Commons licences; authors and licences in probe/cases.json and probe/products/sources.json.</footer>
 
   <script type="module">
     import { api, usd, esc, ICON, checkBadge } from "/app.js";
     document.querySelectorAll("[data-icon]").forEach((el) => (el.outerHTML = ICON[el.dataset.icon]));
-    const fail = (msg) => { const e = document.getElementById("error"); e.textContent = msg; e.classList.remove("hidden"); };
+    const $ = (id) => document.getElementById(id);
+    const fail = (msg) => { $("error").textContent = msg; $("error").classList.toggle("hidden", !msg); };
+    const CATEGORY = { "ceramic-mug": "Kitchen", "glass-vase": "Home", "cotton-tee": "Clothing", headphones: "Electronics" };
+
+    const products = await api("/api/products");
+    // The bag starts empty; the PayPal button wakes up once something is in it.
+    const bag = new Map(products.map((p) => [p.sku, 0]));
+    const cart = () => products.filter((p) => bag.get(p.sku) > 0).map((p) => ({ sku: p.sku, quantity: bag.get(p.sku) }));
+    const bySku = (sku) => products.find((p) => p.sku === sku);
+
+    // The grid is drawn once. A bag change only touches the tile's buy control and the bag rows,
+    // so photos never reload and nothing jumps.
+    const control = (p, n) => n
+      ? `<div class="stepper pop-in" role="group" aria-label="${esc(p.title)} quantity">
+          <button type="button" data-sku="${esc(p.sku)}" data-d="-1" aria-label="One fewer">−</button>
+          <output aria-live="polite">${n}</output>
+          <button type="button" data-sku="${esc(p.sku)}" data-d="1" aria-label="One more" ${n >= 10 ? "disabled" : ""}>+</button>
+        </div>`
+      : `<button type="button" class="primary pop-in" data-sku="${esc(p.sku)}" data-d="1">Add to bag</button>`;
+    $("products").innerHTML = products.map((p) => `<article class="card tile" data-tile="${esc(p.sku)}">
+        <img src="${esc(p.image)}" alt="${esc(p.title)}">
+        <div class="body">
+          <span class="cat">${esc(CATEGORY[p.category] ?? "")}</span>
+          <h3>${esc(p.title)}</h3>
+          <span class="small muted">${esc(p.blurb)}</span>
+          <div class="foot-row"><span class="cost">${usd(p.unitCents)}</span><span class="buy">${control(p, 0)}</span></div>
+        </div>
+      </article>`).join("");
+
+    function updateTile(sku, before) {
+      const n = bag.get(sku), buy = document.querySelector(`[data-tile="${sku}"] .buy`);
+      if (!before !== !n) { buy.innerHTML = control(bySku(sku), n); return; } // add button <-> stepper
+      const out = buy.querySelector("output");
+      if (out) {
+        out.textContent = n;
+        out.classList.remove("bump"); void out.offsetWidth; out.classList.add("bump");
+        buy.querySelector('[data-d="1"]').disabled = n >= 10;
+      }
+    }
+
+    // Bag rows are keyed by SKU: a new item slides in, a removed one folds away, a changed one updates in place.
+    function updateBag() {
+      const box = $("bag-lines"), lines = cart();
+      $("bag-empty").classList.toggle("hidden", lines.length > 0);
+      for (const row of box.querySelectorAll("[data-line]")) {
+        if (!bag.get(row.dataset.line) && !row.classList.contains("leaving")) {
+          row.classList.add("leaving");
+          row.addEventListener("animationend", () => row.remove(), { once: true });
+        }
+      }
+      for (const l of lines) {
+        const p = bySku(l.sku);
+        let row = box.querySelector(`[data-line="${l.sku}"]:not(.leaving)`);
+        if (!row) {
+          row = document.createElement("div");
+          row.className = "bag-row entering"; row.dataset.line = l.sku;
+          row.innerHTML = `<img src="${esc(p.image)}" alt=""><span class="name">${esc(p.title)}<span class="qty small muted"></span></span><span class="amount"></span>`;
+          box.append(row);
+          row.addEventListener("animationend", () => row.classList.remove("entering"), { once: true });
+        }
+        row.querySelector(".qty").textContent = `Qty ${l.quantity}`;
+        row.querySelector(".amount").textContent = usd(p.unitCents * l.quantity);
+      }
+      const total = lines.reduce((s, l) => s + bySku(l.sku).unitCents * l.quantity, 0);
+      tween($("bag-total"), total);
+      const count = lines.reduce((s, l) => s + l.quantity, 0);
+      $("bag-count").textContent = count ? `${count} item${count > 1 ? "s" : ""}` : "";
+      $("checkout").classList.toggle("locked", !lines.length);
+    }
+
+    // The total counts to its new value instead of snapping.
+    let shown = 0, frame = 0;
+    function tween(el, to) {
+      cancelAnimationFrame(frame);
+      const from = shown, t0 = performance.now(), ms = 360;
+      const step = (t) => {
+        const k = Math.min(1, (t - t0) / ms), e = 1 - (1 - k) ** 3;
+        shown = Math.round(from + (to - from) * e);
+        el.textContent = usd(shown);
+        if (k < 1) frame = requestAnimationFrame(step);
+      };
+      frame = requestAnimationFrame(step);
+    }
+
+    $("products").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-sku]");
+      if (!b || b.disabled) return;
+      const sku = b.dataset.sku, before = bag.get(sku);
+      bag.set(sku, Math.max(0, Math.min(10, before + Number(b.dataset.d))));
+      updateTile(sku, before);
+      updateBag();
+      if (!before) { const fab = $("bag-title"); fab.classList.remove("bump"); void fab.offsetWidth; fab.classList.add("bump"); }
+      // Keep keyboard focus on the control that replaced the clicked one.
+      if (!before !== !bag.get(sku)) document.querySelector(`[data-tile="${sku}"] .buy [data-d="1"]`)?.focus({ preventScroll: true });
+    });
+    updateBag();
+
+    function showOrder(orderID, r) {
+      const [path, hash] = (r.claimUrl ?? "").split("#");
+      $("done-check").innerHTML = checkBadge();
+      $("paid").textContent = usd(r.amount);
+      $("order-lines").innerHTML = (r.lines ?? []).map((l) => `<li>
+          <img src="/assets/${esc(l.image)}" alt="">
+          <div class="grow"><b>${esc(l.title)}</b><div class="small muted">${l.quantity} × ${usd(l.unitCents)}</div></div>
+          ${r.claimUrl ? `<a class="button" data-report href="${esc(`${path}&line=${encodeURIComponent(l.id)}#${hash}`)}">Report a problem</a>` : ""}
+        </li>`).join("");
+      $("receipt").innerHTML = `
+        <div class="kv-row"><span>PayPal order</span><span class="mono">${esc(orderID)}</span></div>`;
+      $("shop-view").classList.add("hidden");
+      $("done").classList.remove("hidden");
+      window.scrollTo({ top: 0 });
+    }
+
     const { clientId } = await api("/api/config");
     const s = document.createElement("script");
     s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD&intent=capture`;
     s.onload = () => paypal.Buttons({
       // PayPal's own button styles only: gold, pill, standard label.
       style: { layout: "vertical", color: "gold", shape: "pill", label: "paypal", height: 50 },
-      createOrder: async () => (await api("/api/demo/orders", { method: "POST" })).paypalOrderId,
+      // The browser only sends SKUs and quantities; the server prices the order.
+      createOrder: async () => {
+        if (!cart().length) throw new Error("Your bag is empty.");
+        return (await api("/api/demo/orders", { method: "POST", body: { items: cart() } })).paypalOrderId;
+      },
       onApprove: async ({ orderID }) => {
-        try {
-          const r = await api(`/api/demo/orders/${orderID}/capture`, { method: "POST" });
-          document.getElementById("done-check").innerHTML = checkBadge();
-          document.getElementById("paid").textContent = usd(r.amount);
-          document.getElementById("receipt").innerHTML = `
-            <div class="kv-row"><span>Item</span><span>Classic white ceramic mug × 4</span></div>
-            <div class="kv-row"><span>PayPal order</span><span class="mono">${esc(orderID)}</span></div>
-            <div class="kv-row"><span>Capture</span><span class="mono">${esc(r.captureId)}</span></div>`;
-          if (r.claimUrl) document.getElementById("claim-link").href = r.claimUrl;
-          document.getElementById("shop").classList.add("hidden");
-          document.getElementById("done").classList.remove("hidden");
-          window.scrollTo({ top: 0 });
-        } catch (e) { fail(e.message); }
+        try { showOrder(orderID, await api(`/api/demo/orders/${orderID}/capture`, { method: "POST" })); } catch (e) { fail(e.message); }
       },
       onError: (err) => fail("PayPal couldn't complete the payment. Try again in a moment. (" + err + ")"),
     }).render("#paypal-buttons");

@@ -86,7 +86,7 @@ test("an approved suggestion joins the buyer's choices and its pick is refunded 
     assert.deepEqual(t.pp.calls.refunds[0].body.amount, { currency_code: "USD", value: "10.00" });
     assert.match(t.pp.calls.refunds[0].body.note_to_payer, /Mosaic coaster kit .*ships separately/);
     const after = await c.detail();
-    assert.ok(after.timeline.some((s) => s.title === "You approved Haiku's suggestion: Turn the pieces into coasters"));
+    assert.ok(after.timeline.some((s) => s.title === "You added the AI's suggestion: Turn the pieces into coasters"));
     // Once the offer is out, a suggestion can no longer be changed.
     assert.equal((await t.merchant("POST", `/claims/${c.claimId}/suggestions/${sid}`, { approve: false })).status, 409);
   } finally { t.close(); }
@@ -125,6 +125,6 @@ test("Haiku is not asked when Jev saw no clear damage, and a Haiku failure never
     const d = await c.detail();
     assert.equal(d.claim.status, "ready");
     assert.deepEqual(d.proposal.suggestions, []);
-    assert.ok(d.timeline.some((s) => s.title === "Claude Haiku could not suggest a remedy" && s.detail === "overloaded"));
+    assert.ok(d.timeline.some((s) => s.title === "The AI could not suggest a remedy" && s.detail === "overloaded"));
   } finally { t2.close(); }
 });

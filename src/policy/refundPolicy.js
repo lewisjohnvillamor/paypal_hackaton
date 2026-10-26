@@ -37,6 +37,8 @@ export function draftProposal({ line, quantity, findings, deliveredAt, claimedAt
     if (findings.product_consistency === "inconsistent") reasons.push("ITEM_MAY_NOT_MATCH_ORDER");
     if (findings.product_consistency === "uncertain") reasons.push("ITEM_MATCH_UNCERTAIN");
     if (findings.design_match === "mismatch") reasons.push("DESIGN_MISMATCH");
+    if (findings.second_check?.same === "no") reasons.push("SECOND_CHECK_DIFFERENT_ITEM");
+    if (!itemConfirmed(findings)) reasons.push("OFFERS_HELD_ITEM_MISMATCH");
     if (findings.stock_photo_suspected) reasons.push("STOCK_PHOTO_SUSPECTED");
     if (findings.instructions_in_photo) reasons.push("INSTRUCTIONS_IN_PHOTO");
     const clear = findings.evidence_usable === "yes" && findings.visible_breakage === "yes" &&
@@ -55,6 +57,16 @@ export function draftProposal({ line, quantity, findings, deliveredAt, claimedAt
   };
 }
 
+// The product-match layer. Two independent checks compare the photos with the catalog photo: Jev's
+// kind and design questions, and Claude Haiku's second check (findings.second_check, when the
+// server has a key). If either says it is a different product, nothing but the plain refund is put
+// in front of the buyer, and the merchant decides; a repair kit for an item the shop never sold
+// makes no sense. "Unsure" from either does not block, since broken pieces rarely look identical.
+export function itemConfirmed(findings) {
+  return !!findings && findings.design_match !== "mismatch" && findings.product_consistency !== "inconsistent" &&
+    findings.second_check?.same !== "no";
+}
+
 // Remedies Jev judged to fit at least this well are offered. Over two live runs per photo, the
 // kintsugi kits scored 0.73-0.83 on a chipped mug and at most 0.18 on mugs in pieces, and the
 // replacement 0.43-0.97 on broken mugs; see hackathon/STATE.md.
@@ -67,6 +79,7 @@ export const MAX_OFFERED_REMEDIES = 3;
 // per-unit amount, capped by the drafted refund; it can be $0 (a replacement). Pure: no I/O.
 export function resolutionOptions({ remedies = [], quantity, findings, amountCents }) {
   if (!findings || !(amountCents > 0) || findings.visible_breakage !== "yes" || findings.evidence_usable === "no") return [];
+  if (!itemConfirmed(findings)) return [];
   const fit = findings.remedyFit ?? {};
   const picked = remedies
     .filter((r) => typeof fit[r.id] === "number" && fit[r.id] >= REMEDY_FIT)

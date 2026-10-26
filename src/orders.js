@@ -16,8 +16,24 @@ export class OrderError extends Error {
   }
 }
 
-export async function startOrder(db, paypal) {
-  const lines = DEMO_CART.map(({ sku, quantity }) => ({ ...PRODUCTS[sku], quantity }));
+// The buyer's cart: known SKUs and whole quantities only. Prices always come from the catalog.
+export const MAX_PER_LINE = 10;
+export function cartLines(items) {
+  const cart = Array.isArray(items) && items.length ? items : DEMO_CART;
+  const qty = new Map();
+  for (const { sku, quantity } of cart) {
+    if (!PRODUCTS[sku]) throw new OrderError("INVALID_CART", "That product isn't in the store.", 400);
+    if (!Number.isInteger(quantity) || quantity < 0) throw new OrderError("INVALID_CART", "Quantities must be whole numbers.", 400);
+    qty.set(sku, (qty.get(sku) ?? 0) + quantity);
+  }
+  const lines = [...qty].filter(([, q]) => q > 0).map(([sku, quantity]) => ({ ...PRODUCTS[sku], quantity }));
+  if (!lines.length) throw new OrderError("INVALID_CART", "Your bag is empty.", 400);
+  if (lines.some((l) => l.quantity > MAX_PER_LINE)) throw new OrderError("INVALID_CART", `Up to ${MAX_PER_LINE} of each item.`, 400);
+  return lines;
+}
+
+export async function startOrder(db, paypal, items) {
+  const lines = cartLines(items);
   const totalCents = lines.reduce((s, l) => s + l.unitCents * l.quantity, 0);
   const id = randomUUID();
   const res = await paypal.createOrder({
