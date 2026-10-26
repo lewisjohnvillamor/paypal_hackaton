@@ -37,6 +37,8 @@ export function draftProposal({ line, quantity, findings, deliveredAt, claimedAt
     if (findings.product_consistency === "inconsistent") reasons.push("ITEM_MAY_NOT_MATCH_ORDER");
     if (findings.product_consistency === "uncertain") reasons.push("ITEM_MATCH_UNCERTAIN");
     if (findings.design_match === "mismatch") reasons.push("DESIGN_MISMATCH");
+    if (findings.second_check?.same === "no") reasons.push("SECOND_CHECK_DIFFERENT_ITEM");
+    if (!itemConfirmed(findings)) reasons.push("OFFERS_HELD_ITEM_MISMATCH");
     if (findings.stock_photo_suspected) reasons.push("STOCK_PHOTO_SUSPECTED");
     if (findings.instructions_in_photo) reasons.push("INSTRUCTIONS_IN_PHOTO");
     const clear = findings.evidence_usable === "yes" && findings.visible_breakage === "yes" &&
@@ -55,29 +57,40 @@ export function draftProposal({ line, quantity, findings, deliveredAt, claimedAt
   };
 }
 
-// Damage the buyer can mend at home. A shattered mug, or a case where the model is unsure what
-// it saw, only ever gets the plain refund.
-const REPAIRABLE = ["handle_off", "crack_or_chip"];
+// The product-match layer. Two independent checks compare the photos with the catalog photo: Jev's
+// kind and design questions, and Claude Haiku's second check (findings.second_check, when the
+// server has a key). If either says it is a different product, nothing but the plain refund is put
+// in front of the buyer, and the merchant decides; a repair kit for an item the shop never sold
+// makes no sense. "Unsure" from either does not block, since broken pieces rarely look identical.
+export function itemConfirmed(findings) {
+  return !!findings && findings.design_match !== "mismatch" && findings.product_consistency !== "inconsistent" &&
+    findings.second_check?.same !== "no";
+}
+
+// Remedies Jev judged to fit at least this well are offered. Over two live runs per photo, the
+// kintsugi kits scored 0.73-0.83 on a chipped mug and at most 0.18 on mugs in pieces, and the
+// replacement 0.43-0.97 on broken mugs; see hackathon/STATE.md.
+export const REMEDY_FIT = 0.5;
+export const MAX_OFFERED_REMEDIES = 3;
 
 // Resolution options the merchant can put to the buyer instead of deciding alone: the full refund
-// (always first, always available) and, for repairable damage, keeping the item with a repair kit
-// and a smaller refund. An upgraded kit is sold by taking its price off the refund, so the buyer
-// never pays a second time. Pure: amounts come from the catalog and the drafted refund.
-export function resolutionOptions({ repair, quantity, findings, amountCents }) {
-  if (!repair || !findings || !(amountCents > 0)) return [];
-  const kind = findings.signals?.damage_kind;
-  const repairable = findings.visible_breakage === "yes" && REPAIRABLE.includes(findings.damage_kind) &&
-    (kind?.confidence ?? 0) >= 0.5;
-  if (!repairable) return [];
-  const options = [{ id: "refund", kind: "refund", refundCents: amountCents }];
-  const repairCents = Math.min(repair.refundUnitCents * quantity, amountCents);
-  if (repairCents > 0 && repairCents < amountCents) {
-    options.push({ id: "repair", kind: "repair", kit: repair.kit, refundCents: repairCents });
-    const up = repair.upgrade;
-    const upCents = up ? repairCents - up.unitCents * quantity : 0;
-    if (up && upCents > 0) options.push({ id: "repair_gold", kind: "repair", kit: up.kit, refundCents: upCents, kitPriceCents: up.unitCents * quantity });
-  }
-  return options.length > 1 ? options : [];
+// (always first, always available) and up to three remedies from the merchant's library that Jev
+// judged to fit the damage in the photos, best fit first. A remedy's refund is the merchant's
+// per-unit amount, capped by the drafted refund; it can be $0 (a replacement). Pure: no I/O.
+export function resolutionOptions({ remedies = [], quantity, findings, amountCents }) {
+  if (!findings || !(amountCents > 0) || findings.visible_breakage !== "yes" || findings.evidence_usable === "no") return [];
+  if (!itemConfirmed(findings)) return [];
+  const fit = findings.remedyFit ?? {};
+  const picked = remedies
+    .filter((r) => typeof fit[r.id] === "number" && fit[r.id] >= REMEDY_FIT)
+    .sort((a, b) => fit[b.id] - fit[a.id])
+    .slice(0, MAX_OFFERED_REMEDIES)
+    .map((r) => ({
+      id: r.id, kind: r.kind, title: r.title, item: r.item, fit: fit[r.id],
+      refundCents: Math.min(r.refundUnitCents * quantity, amountCents),
+    }))
+    .filter((o) => o.refundCents < amountCents); // a remedy worth the full refund adds nothing
+  return picked.length ? [{ id: "refund", kind: "refund", title: "Full refund", refundCents: amountCents }, ...picked] : [];
 }
 
 // Funds still refundable on a capture: captured minus completed refunds minus open reservations.

@@ -30,6 +30,14 @@ All tokens live at the top of `public/app.css` and have dark-mode values.
 
 Rendered by the PayPal JS SDK with official style options only (`color: gold`, `shape: pill`, `label: paypal`, `height: 50`). We never restyle or overlay the iframe, and keep "Powered by PayPal".
 
+## Polish pass (2026-10-22)
+
+- Inbox grid fits a 1440 px screen without sideways scrolling, grows with its rows (pages of 20), and shows remedies as a gold "N fit" pill (library matches) next to a clay "N AI" pill (Claude Haiku suggestions still open or added). The drafted amount stays in the CSV.
+- Case page: one offer block holds the library matches, then Claude Haiku's suggestions with "Add to the offer" and "Dismiss", then "Let the buyer choose". When no library remedy fits, the block says so and shows Haiku's suggestions alone.
+- Claude Haiku has its own colour (clay, `--claude`) in the timeline and pills, apart from Jev's blue.
+- Buyer success headline is short: "Refund sent. A 24k gold-leaf kintsugi kit is on its way."
+- Contrast: filled buttons use `--action` (#0071e3) in both themes so white text stays above 4.5:1; link-blue, secondary grey, red, gold and clay text darkened (light) or lightened (dark) to pass AA on their tints.
+
 ## Accessibility check
 
-axe-core 4.10 (WCAG 2 A/AA rules) on store, inbox and case pages in light and dark mode: 0 violations. Focus rings on every control, labels on all inputs, `role="alert"` on errors, `aria-live` on the tracker.
+axe-core 4.10 (WCAG 2 A/AA rules), re-run 2026-10-22 on the store, claim form, inbox, remedies, eight case states and eight buyer status states, light, dark and phone: no colour or labelling violations. One remains inside AG Grid itself (`scrollable-region-focusable` on its viewports); the grid cells are keyboard-navigable through AG Grid's own focus handling, and forcing a tabindex on the viewport broke its ARIA roles, so it is left as is. Focus rings on every control, labels on all inputs, `role="alert"` on errors, `aria-live` on the tracker.

@@ -18,6 +18,7 @@
     "bench": "node --disable-warning=ExperimentalWarning bench/run.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.1.0",
     "@typesafe-ai/sdk": "^0.7.0",
     "express": "^4.22.3",
     "multer": "^2.4.0",

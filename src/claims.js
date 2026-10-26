@@ -5,12 +5,15 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { audit, now, tx } from "./db.js";
 import { hashToken, newToken } from "./auth.js";
-import { draftProposal, refundableBalance, resolutionOptions } from "./policy/refundPolicy.js";
+import { draftProposal, itemConfirmed, refundableBalance, resolutionOptions } from "./policy/refundPolicy.js";
 import { TEMPLATE_VERSION } from "./ai/jev.js";
 import { IMAGE_CONCURRENCY, MAX_PHOTOS, SIMILAR_PHOTO_BITS, aiCopy, differenceHash, hashDistance, mapLimit } from "./images.js";
 import { anyNearOtherClaim } from "./photoIndex.js";
 import { pickForModel, tooManyTokens } from "./ai/select.js";
 import { PRODUCTS } from "./catalog.js";
+import { activeRemedies } from "./remedies.js";
+import { candidatesFor } from "./suggest/candidates.js";
+import { checkSuggestions, storeSuggestions } from "./suggest/suggestions.js";
 
 export const uploadDir = () => process.env.UPLOAD_DIR || "data/uploads";
 const STATUS_TOKEN_DAYS = 30;
@@ -35,10 +38,10 @@ export function createClaim(db, { orderId, lineId, quantity, statement }) {
     throw new ClaimError("INVALID", `Quantity must be between 1 and ${line.quantity}.`);
   }
   // Units already refunded on earlier requests cannot be claimed again.
-  const resolved = db.prepare("SELECT COALESCE(SUM(quantity), 0) n FROM claims WHERE line_id = ? AND status = 'refunded'").get(lineId).n;
+  const resolved = db.prepare("SELECT COALESCE(SUM(quantity), 0) n FROM claims WHERE line_id = ? AND status IN ('refunded', 'resolved')").get(lineId).n;
   if (quantity > line.quantity - resolved) {
     throw new ClaimError("UNITS_ALREADY_RESOLVED",
-      `${resolved} of ${line.quantity} were already refunded; you can report at most ${line.quantity - resolved} more.`, 409);
+      `${resolved} of ${line.quantity} were already refunded or replaced; you can report at most ${line.quantity - resolved} more.`, 409);
   }
   const token = newToken();
   const ts = now();
@@ -122,7 +125,9 @@ function catalogPhoto(sku) {
 
 // Run Jev on the current evidence and draft a proposal for the current claim version.
 // If Jev fails we record the error and still draft a manual-review proposal; we never invent findings.
-export async function assessClaim(db, claimId, assess, actor = "system") {
+// suggest, when the server has a Claude key, adds Haiku's pending remedy suggestions; match adds
+// Haiku's second product-match check to the findings.
+export async function assessClaim(db, claimId, assess, actor = "system", suggest = null, match = null) {
   const claim = db.prepare("SELECT * FROM claims WHERE id = ?").get(claimId);
   if (!claim) throw new ClaimError("NOT_FOUND", "No such request.", 404);
   if (!["new", "ready", "needs_info"].includes(claim.status)) {
@@ -133,16 +138,17 @@ export async function assessClaim(db, claimId, assess, actor = "system") {
   const { reference, hash: catalogHash } = await catalogPhoto(line.sku);
 
   const flags = riskFlags(db, claim, evidence, catalogHash);
+  const remedies = activeRemedies(db, line.sku);
 
-  let result = null, error = null, sent = pickForModel(evidence);
+  let result = null, error = null, sent = pickForModel(evidence), copies = [];
   if (evidence.length === 0) error = "No photos uploaded";
   else {
     try {
-      const copies = await mapLimit(sent, IMAGE_CONCURRENCY, async (e) => aiCopy(await readEvidence(e.storage_key)));
+      copies = await mapLimit(sent, IMAGE_CONCURRENCY, async (e) => aiCopy(await readEvidence(e.storage_key)));
       // If the photos still exceed the model's per-call budget, halve the set rather than fail.
       for (let n = copies.length; ; n = Math.ceil(n / 2)) {
         try {
-          result = await assess({ photos: copies.slice(0, n), reference });
+          result = await assess({ photos: copies.slice(0, n), reference, remedies, category: PRODUCTS[line.sku]?.category });
           sent = sent.slice(0, n);
           break;
         } catch (err) {
@@ -153,6 +159,14 @@ export async function assessClaim(db, claimId, assess, actor = "system") {
       error = String(err?.message || err).slice(0, 300);
     }
   }
+
+  // Both Haiku calls run side by side; suggestions are dropped below if the item is not confirmed.
+  const photosSent = copies.slice(0, sent.length);
+  const [suggested, matched] = await Promise.all([
+    suggestFor({ suggest, sku: line.sku, findings: result?.findings, photos: photosSent, reference }),
+    matchFor({ match, sku: line.sku, findings: result?.findings, photos: photosSent, reference }),
+  ]);
+  if (matched?.same) result = { ...result, findings: { ...result.findings, second_check: matched } };
 
   return tx(db, () => {
     const current = db.prepare("SELECT * FROM claims WHERE id = ?").get(claimId);
@@ -174,18 +188,56 @@ export async function assessClaim(db, claimId, assess, actor = "system") {
       refundableCents: refundableBalance(order.amount_cents, ops), flags,
     });
     const options = draft.route === "request_info" ? [] : resolutionOptions({
-      repair: PRODUCTS[line.sku]?.repair, quantity: draft.calculation.quantity, findings: result?.findings ?? null, amountCents: draft.amountCents,
+      remedies, quantity: draft.calculation.quantity, findings: result?.findings ?? null, amountCents: draft.amountCents,
     });
+    const proposalId = randomUUID();
     db.prepare(`INSERT INTO proposals (id, claim_id, claim_version, assessment_id, policy_version, route, amount_cents,
       currency, calc_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(randomUUID(), claimId, claim.version, assessmentId, draft.policyVersion, draft.route, draft.amountCents,
+      .run(proposalId, claimId, claim.version, assessmentId, draft.policyVersion, draft.route, draft.amountCents,
         draft.currency, JSON.stringify({ reasons: draft.reasons, calculation: draft.calculation, options }), ts);
 
     db.prepare("UPDATE claims SET status = 'ready', updated_at = ? WHERE id = ?").run(ts, claimId);
     audit(db, { claimId, actor, type: error ? "assessment.failed" : "assessment.completed",
       payload: { route: draft.route, amountCents: draft.amountCents, error } });
+    if (matched?.error) audit(db, { claimId, actor: "system", type: "match.failed", payload: { error: matched.error } });
+    if (suggested && draft.route !== "request_info" && draft.amountCents > 0 && itemConfirmed(result?.findings)) {
+      if (suggested.error) audit(db, { claimId, actor: "system", type: "suggestion.failed", payload: { error: suggested.error } });
+      else {
+        storeSuggestions(db, { claimId, proposalId, model: suggested.model, suggestions: suggested.suggestions });
+        audit(db, { claimId, actor: "system", type: "suggestion.created", payload: {
+          model: suggested.model, latencyMs: suggested.latencyMs, candidates: suggested.candidates,
+          titles: suggested.suggestions.map((x) => x.title), dropped: suggested.dropped } });
+      }
+    }
     return draft;
   });
+}
+
+// Ask Haiku only when Jev clearly saw damage on usable photos, with the store's listings narrowed
+// to this product and damage first. A failure is recorded and never blocks the review.
+async function suggestFor({ suggest, sku, findings, photos, reference }) {
+  if (!suggest || !findings || findings.visible_breakage !== "yes" || findings.evidence_usable === "no" || !photos.length) return null;
+  const candidates = candidatesFor(sku, findings);
+  if (!candidates.length) return null;
+  const product = PRODUCTS[sku];
+  try {
+    const r = await suggest({ photos, reference, product, findings, candidates });
+    const suggestions = checkSuggestions(r.suggestions, { candidates, unitCents: product.unitCents });
+    return { model: r.model, latencyMs: r.latencyMs, candidates: candidates.length, suggestions, dropped: (r.suggestions?.length ?? 0) - suggestions.length };
+  } catch (err) {
+    return { error: String(err?.message || err).slice(0, 300) };
+  }
+}
+
+// Haiku's second look at whether the photos show the product sold. A failure is recorded and leaves
+// Jev's checks to stand alone; it never blocks the review.
+async function matchFor({ match, sku, findings, photos, reference }) {
+  if (!match || !findings || !photos.length) return null;
+  try {
+    return await match({ photos, reference, product: PRODUCTS[sku] });
+  } catch (err) {
+    return { error: String(err?.message || err).slice(0, 300) };
+  }
 }
 
 export function requestInfo(db, claimId, message, actor) {

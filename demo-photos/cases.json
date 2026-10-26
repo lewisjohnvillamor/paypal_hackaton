@@ -1,0 +1,13 @@
+[
+  { "file": "../../demo-photos/1-kit-chipped-mug.jpg", "sku": "MUG-CLASSIC", "expect": "same mug, chip -> kintsugi kits fit" },
+  { "file": "../../demo-photos/2-vase-cracked.jpg", "sku": "VASE-GLASS", "expect": "same vase, crack -> resin kit or replacement" },
+  { "file": "../../demo-photos/4b-clear-mug-handle-off.jpg", "sku": "MUG-CLASSIC", "expect": "same mug, handle off -> replacement" },
+  { "file": "../../demo-photos/5-mug-in-pieces.jpg", "sku": "MUG-CLASSIC", "expect": "same mug, shattered -> refund or replacement" },
+  { "file": "../../demo-photos/6-tee-small-tear.jpg", "sku": "TEE-ORGANIC", "expect": "same tee, tear -> mending kit" },
+  { "file": "../../demo-photos/7-tee-stained.jpg", "sku": "TEE-ORGANIC", "expect": "same tee, stain -> stain remover kit" },
+  { "file": "../../demo-photos/8-headphones-cushion-torn.jpg", "sku": "HEADPHONES-OVER", "expect": "same headphones, cushion -> new cushions" },
+  { "file": "../../demo-photos/9-headphones-scuffed.jpg", "sku": "HEADPHONES-OVER", "expect": "same headphones, scuffs -> keep with case" },
+  { "file": "../../demo-photos/10-headphones-headband-snapped.jpg", "sku": "HEADPHONES-OVER", "expect": "same headphones, snapped -> replacement" },
+  { "file": "../cases/broken-rocket-mug.jpg", "sku": "MUG-CLASSIC", "expect": "different mug -> held" },
+  { "file": "../cases/chipped-closeup.jpg", "sku": "MUG-CLASSIC", "expect": "different (painted) cup -> held" }
+]

@@ -1,11 +1,12 @@
 // Resolution offers: instead of picking the refund alone, the merchant approves a short list of
-// options (full refund, or keep the item with a repair kit and a smaller refund) and the buyer
+// options (the full refund, or remedies from their library that Jev judged to fit) and the buyer
 // picks one. Every amount on the list is approved by the merchant when the offer is sent, so the
 // buyer's pick only selects among approved refunds; it can never raise one.
 import { randomUUID } from "node:crypto";
 import { audit, now, tx } from "./db.js";
 import { GateError, reserve } from "./refunds/execute.js";
 import { toDecimal } from "./money.js";
+import { offerOptions } from "./suggest/suggestions.js";
 
 const json = (s) => (s ? JSON.parse(s) : null);
 
@@ -19,8 +20,8 @@ export function sendOffer(db, { claimId, claimVersion, proposalId, reason, actor
     if (!proposal || proposal.claim_version !== claim.version) {
       throw new GateError("STALE_CASE", "The proposal is out of date. Reload and review again.");
     }
-    const options = json(proposal.calc_json).options ?? [];
-    if (options.length < 2) throw new GateError("NO_OPTIONS", "This damage has no repair option; approve a refund instead.");
+    const options = offerOptions(db, proposal);
+    if (options.length < 2) throw new GateError("NO_OPTIONS", "No remedy in your library fits this damage; approve a refund instead.");
     // Same rule as a direct approval: a case the policy did not propose needs the merchant's reason.
     const why = (reason || "").trim();
     if (proposal.route !== "propose" && why.length < 3) {
@@ -38,7 +39,8 @@ export function sendOffer(db, { claimId, claimVersion, proposalId, reason, actor
   });
 }
 
-// The buyer's pick. Returns { op, option, duplicate }; the caller submits op to PayPal.
+// The buyer's pick. Returns { op, option, duplicate }; the caller submits op to PayPal. op is null
+// when the pick refunds nothing (a replacement).
 export function acceptOffer(db, { claimId, offerId, optionId }) {
   return tx(db, () => {
     const claim = db.prepare("SELECT * FROM claims WHERE id = ?").get(claimId);
@@ -47,7 +49,8 @@ export function acceptOffer(db, { claimId, offerId, optionId }) {
     const options = json(offer.options_json);
     // A second tap (or a retry after a dropped connection) gets the first pick's refund back.
     if (offer.status === "accepted") {
-      return { op: db.prepare("SELECT * FROM refund_ops WHERE id = ?").get(offer.op_id), option: options.find((o) => o.id === offer.chosen_option), duplicate: true };
+      const op = offer.op_id ? db.prepare("SELECT * FROM refund_ops WHERE id = ?").get(offer.op_id) : null;
+      return { op, option: options.find((o) => o.id === offer.chosen_option), duplicate: true };
     }
     if (claim.status !== "offer_sent" || claim.version !== offer.claim_version) {
       throw new GateError("STALE_CASE", "This offer is no longer open.");
@@ -56,18 +59,24 @@ export function acceptOffer(db, { claimId, offerId, optionId }) {
     if (!option) throw new GateError("INVALID_OPTION", "Pick one of the options offered.");
 
     const proposal = db.prepare("SELECT * FROM proposals WHERE id = ?").get(offer.proposal_id);
-    const note = option.kind === "repair"
-      ? `Refund for request ${claim.ref}: you kept the item; your ${option.kit} ships separately.`
-      : `Refund for request ${claim.ref}, reviewed by the merchant.`;
+    const sends = option.kind === "refund" ? null : option.item;
     // Logged before the reservation so the timeline reads: the pick, then the money.
     audit(db, { claimId, actor: "buyer", type: "offer.accepted",
-      payload: { option: option.id, refund: toDecimal(option.refundCents), kit: option.kit ?? null } });
-    const op = reserve(db, {
-      claim, proposal, amountCents: option.refundCents, actor: "buyer",
-      overrideReason: `Buyer chose "${option.id}" from options the ${offer.actor} approved`, note,
-    });
+      payload: { option: option.id, title: option.title, refund: toDecimal(option.refundCents), kit: sends } });
+    let op = null;
+    if (option.refundCents > 0) {
+      op = reserve(db, {
+        claim, proposal, amountCents: option.refundCents, actor: "buyer",
+        overrideReason: `Buyer chose "${option.title}" from options the ${offer.actor} approved`,
+        note: sends ? `Refund for request ${claim.ref}: you kept the item; ${sends} ships separately.` : undefined,
+      });
+    } else {
+      // Nothing to refund (a replacement): the case is settled without a PayPal call.
+      db.prepare("UPDATE claims SET status = 'resolved', version = version + 1, updated_at = ? WHERE id = ?").run(now(), claimId);
+      audit(db, { claimId, actor: "system", type: "claim.resolved", payload: { sends } });
+    }
     db.prepare("UPDATE offers SET status = 'accepted', chosen_option = ?, op_id = ?, decided_at = ? WHERE id = ?")
-      .run(option.id, op.id, now(), offer.id);
+      .run(option.id, op?.id ?? null, now(), offer.id);
     return { op, option, duplicate: false };
   });
 }
