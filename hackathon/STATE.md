@@ -126,6 +126,17 @@ reused-photo flag fired. Rule reader, five sample texts (`probe/rules-live.js`):
 in 1.3-2.8 s; "just handle the small stuff" was refused for having no amount. Screenshots
 `screenshots/20-*.png` to `27-*.png`.
 
+## Agent-to-agent: MCP servers for both sides' assistants (2026-10-27)
+
+`mcp/buyer.js` (a shopper's assistant files, follows and settles a claim; the claim link is its only
+permission) and `mcp/merchant.js` (the merchant's assistant reads requests, agent decisions and
+rules, and checks them with the PayPal Agent Toolkit's read-only tools; no money-moving tool is
+registered). `scripts/agent-to-agent.js` (`npm run demo:agents`) drives both with a model in a tool
+loop. Live run 2026-10-27: the buyer's assistant used get_order, report_damage and check_request
+(wait 60 s); the refund agent refunded `1W017904CP577140R` $20.00 COMPLETED; the merchant's assistant
+used list_requests, get_request, then the toolkit's get_refund and get_order, and confirmed it.
+Transcript: `AGENT_TO_AGENT_RUN.md`. 91 tests pass (3 new in `tests/mcp.test.js`).
+
 ## Unresolved
 
 - No hosted demo yet; Render is the candidate (it has a sponsor prize). The upload folder and SQLite file need a persistent disk. `render.yaml` turns on `PUBLIC_DEMO`, so set `DEMO_BUYER_EMAIL` / `DEMO_BUYER_PASSWORD` to a sandbox Personal account when deploying.

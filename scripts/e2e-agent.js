@@ -5,6 +5,7 @@
 // in .env. Usage: node --env-file=.env scripts/e2e-agent.js
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
+import { sandboxBuy } from "./lib/sandbox-buy.js";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:8888";
 const shots = process.env.SHOTS_DIR || "hackathon/screenshots";
@@ -39,29 +40,9 @@ await shot("22-agent-on");
 
 // 2. A buyer pays through the PayPal sandbox and reports damage with a photo.
 async function buyAndReport(items, photo, statement) {
-  const order = await (await fetch(`${BASE}/api/demo/orders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items }) })).json();
-  await page.goto(order.approveUrl);
-  // PayPal remembers the sandbox buyer after the first purchase and skips the sign-in.
-  if (await page.waitForSelector("#email", { timeout: 15_000 }).catch(() => null)) {
-    await page.fill("#email", process.env.SANDBOX_BUYER_EMAIL);
-    await page.click("#btnNext");
-    await page.fill("#password", process.env.SANDBOX_BUYER_PASSWORD);
-    await page.click("#btnLogin");
-  }
-  const pay = page.locator('[data-testid="submit-button-initial"], #payment-submit-btn, button:has-text("Complete Purchase"), button:has-text("Continue")').first();
-  await pay.waitFor({ timeout: 60_000 });
-  await pay.click();
-  await page.waitForURL((u) => !u.hostname.includes("paypal.com"), { timeout: 60_000 }).catch(() => {});
-  let cap;
-  for (let i = 0; i < 10; i++) {
-    const r = await fetch(`${BASE}/api/demo/orders/${order.paypalOrderId}/capture`, { method: "POST" });
-    cap = await r.json();
-    if (r.ok) break;
-    await new Promise((r) => setTimeout(r, 2000));
-  }
-  if (!cap.claimUrl) throw new Error("capture failed: " + JSON.stringify(cap));
-  log("paid", order.paypalOrderId, "capture", cap.captureId);
-  await page.goto(BASE + cap.claimUrl);
+  const { paypalOrderId, captureId, claimUrl } = await sandboxBuy(page, BASE, items);
+  log("paid", paypalOrderId, "capture", captureId);
+  await page.goto(BASE + claimUrl);
   await page.waitForSelector("#form:not(.hidden)");
   await page.fill("#statement", statement);
   await page.setInputFiles("#photos", photo);

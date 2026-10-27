@@ -23,7 +23,7 @@ export async function setup({ pp = fakePayPal(), assess = fakeAssess(), suggest 
     return out;
   };
   const merchant = (method, path, body) => call(method, `/api/merchant${path}`, { body, headers: { "X-Refund-Relay": "1" } });
-  return { db, pp, queue, call, merchant, close: () => server.close(), login: () => call("POST", "/api/merchant/login", { body: { password: "test-password" } }) };
+  return { db, pp, queue, base, call, merchant, close: () => server.close(), login: () => call("POST", "/api/merchant/login", { body: { password: "test-password" } }) };
 }
 
 export async function purchase(t) {
