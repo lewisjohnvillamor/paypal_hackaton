@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f5f7">
+  <title>Refund agent · Refund Relay</title>
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/merchant"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span>Refund Relay <span class="ctx">Merchant</span></a>
+    <nav><a href="/merchant">Requests</a><a href="/merchant/agent" aria-current="page">Refund agent</a><a href="/merchant/remedies">Remedies</a></nav>
+  </header>
+  <main>
+    <section id="page" class="hidden">
+      <p class="eyebrow">Juniper Market</p>
+      <h1>Refund agent</h1>
+      <p class="lede">Tell your agent, in your own words, which damage reports it may settle without you. It reads every report after the photo check, refunds through PayPal when a report fits your rules, and leaves everything else for you with a note on why.</p>
+      <div id="notice" class="notice hidden" role="status"></div>
+
+      <div id="on" class="card agent-on hidden"></div>
+
+      <form id="write" class="card">
+        <div class="card-head"><h2 style="margin:0" id="write-title">Your rules</h2></div>
+        <label for="text" class="sr-only">Your rules, in plain English</label>
+        <textarea id="text" maxlength="1000" required placeholder="Refund chipped mugs under $25 on your own. Ask me about anything above that."></textarea>
+        <div class="row agent-examples" aria-label="Examples">
+          <span class="small muted">Try:</span>
+          <button type="button" class="chip" data-ex="Refund chipped mugs under $25 on your own. Ask me about anything above that.">Chipped mugs under $25</button>
+          <button type="button" class="chip" data-ex="Refund any broken mug or vase up to $50. For stained or torn T-shirts up to $25, offer the buyer my remedies. Never more than $150 a day.">Mugs, vases and tees</button>
+          <button type="button" class="chip" data-ex="Headphones with torn ear cushions: refund up to $40. Everything else comes to me.">Headphone cushions</button>
+        </div>
+        <button class="primary lg" type="submit" id="read">Read it back to me</button>
+        <p class="footnote" style="margin:10px 0 0">Nothing turns on until you check the read-back. The agent only ever follows the read-back, not your original words.</p>
+      </form>
+
+      <section id="preview" class="card hidden" aria-live="polite"></section>
+
+      <section id="activity" class="card hidden"></section>
+    </section>
+    <div id="signin" class="card hidden center" style="max-width:400px;margin:40px auto 0;padding:32px">
+      <p style="margin:0">Sign in on the <a href="/merchant">requests page</a> first.</p>
+    </div>
+  </main>
+  <script type="module">
+    import { api, usd, esc, pill, when, busy, settle } from "/app.js";
+    const $ = (id) => document.getElementById(id);
+    let state = null, draft = null;
+
+    function say(text, tone = "") {
+      $("notice").textContent = text;
+      $("notice").className = text ? `notice ${tone}` : "notice hidden";
+    }
+
+    const readback = (lines) => `<ol class="agent-rules">${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ol>`;
+
+    function drawOn() {
+      const m = state.mandate;
+      $("on").classList.toggle("hidden", !m);
+      $("write-title").textContent = m ? "Change your rules" : "Your rules";
+      if (!m) return;
+      const share = Math.min(100, Math.round((state.spentCents / m.dailyLimitCents) * 100));
+      $("on").innerHTML = `
+        <div class="card-head"><h2 style="margin:0">Your agent is on</h2><span class="pill ok">On</span></div>
+        <p class="small muted" style="margin:0 0 6px">You wrote: “${esc(m.text)}”</p>
+        ${readback(m.readback)}
+        <div class="agent-budget"><div class="row spread small"><span>Sent in the last 24 hours</span><b class="amount">${usd(state.spentCents)} of ${usd(m.dailyLimitCents)}</b></div>
+          <span class="meter wide" aria-hidden="true"><i style="width:${share}%"></i></span></div>
+        <button type="button" class="danger" id="off" style="margin-top:14px">Turn the agent off</button>`;
+      $("off").onclick = async (e) => {
+        busy(e.target, true, "Turning off");
+        try { await api("/api/merchant/agent", { method: "DELETE", merchant: true }); say("Your agent is off. Every report waits for you again.", "ok"); await load(); }
+        catch (err) { say(err.message, "bad"); busy(e.target, false); }
+      };
+    }
+
+    function drawActivity() {
+      const r = state.recent;
+      $("activity").classList.toggle("hidden", !r.length);
+      $("activity").innerHTML = `<h2>What your agent did lately</h2><ul class="list agent-log">${r.map((x) => `
+        <li><a href="/merchant/case?id=${encodeURIComponent(x.claimId)}">
+          <span class="pill ${x.acted ? "ok" : "warn"}">${x.acted ? (x.act === "offer" ? "Offered choices" : "Refunded") : "Left for you"}</span>
+          <span><b>${esc(x.ref)}</b> · ${esc(x.title)}<span class="small muted" style="display:block">${esc(x.why)}</span></span>
+          <span class="small muted">${when(x.at)}</span></a></li>`).join("")}</ul>`;
+    }
+
+    function drawPreview() {
+      $("preview").classList.toggle("hidden", !draft);
+      if (!draft) return;
+      const acted = draft.replay.filter((x) => x.act).length;
+      $("preview").innerHTML = `
+        <h2>Here's what your agent will do</h2>
+        ${readback(draft.readback)}
+        ${draft.notUnderstood ? `<div class="notice warn">Not turned into a rule: ${esc(draft.notUnderstood)}</div>` : ""}
+        ${draft.replay.length ? `<h3 style="margin:18px 0 6px">On your latest ${draft.replay.length} requests, it would have settled ${acted}</h3>
+          <ul class="list agent-log">${draft.replay.map((x) => `<li><span class="pill ${x.act ? "ok" : ""}">${x.act ? (x.act === "offer" ? "Offer choices" : `Refund ${usd(x.amountCents)}`) : "Leave for you"}</span>
+            <span><b>${esc(x.ref)}</b> · ${esc(x.title)}<span class="small muted" style="display:block">${esc(x.why)}</span></span></li>`).join("")}</ul>` : ""}
+        <div class="row" style="margin-top:18px"><button class="approve" type="button" id="turn-on" style="flex:1">Turn on these rules</button>
+          <button type="button" id="edit">Edit</button></div>`;
+      $("turn-on").onclick = async (e) => {
+        busy(e.target, true, "Turning on");
+        try {
+          await api("/api/merchant/agent", { method: "POST", merchant: true, body: { text: draft.text, rules: { rules: draft.rules, dailyLimitCents: draft.dailyLimitCents }, model: draft.model } });
+          draft = null; drawPreview();
+          say("Your agent is on. New reports that fit your rules are settled without you.", "ok");
+          await load();
+        } catch (err) { say(err.message, "bad"); busy(e.target, false); }
+      };
+      $("edit").onclick = () => { draft = null; drawPreview(); $("text").focus(); };
+    }
+
+    document.querySelectorAll("[data-ex]").forEach((b) => (b.onclick = () => { $("text").value = b.dataset.ex; $("text").focus(); }));
+    $("write").onsubmit = async (e) => {
+      e.preventDefault();
+      say("");
+      busy($("read"), true, "Reading your rules");
+      try {
+        draft = await api("/api/merchant/agent/preview", { method: "POST", merchant: true, body: { text: $("text").value } });
+        drawPreview();
+        $("preview").scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (err) { draft = null; drawPreview(); say(err.message, "bad"); }
+      busy($("read"), false);
+    };
+
+    async function load() {
+      try {
+        state = await api("/api/merchant/agent");
+        $("page").classList.remove("hidden");
+        if (!state.canWrite) say("Writing rules in plain English needs the AI, which is off on this server.", "warn");
+        if (state.mandate && !$("text").value) $("text").value = state.mandate.text;
+        drawOn(); drawActivity(); settle();
+      } catch (e) {
+        if (e.status === 401) $("signin").classList.remove("hidden");
+        else say(e.message, "bad");
+      }
+    }
+    load();
+    setInterval(() => !$("page").classList.contains("hidden") && api("/api/merchant/agent").then((s) => { state = s; drawOn(); drawActivity(); }).catch(() => {}), 10000);
+  </script>
+</body>
+</html>

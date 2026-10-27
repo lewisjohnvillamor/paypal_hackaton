@@ -16,14 +16,20 @@
     "probe:stability": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning probe/stability.js",
     "cleanup": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning src/cleanup.js",
     "backup": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning src/backup.js",
-    "bench": "node --disable-warning=ExperimentalWarning bench/run.js"
+    "bench": "node --disable-warning=ExperimentalWarning bench/run.js",
+    "mcp:buyer": "node mcp/buyer.js",
+    "mcp:merchant": "node --env-file-if-exists=.env mcp/merchant.js",
+    "demo:agents": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/agent-to-agent.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.1.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@paypal/agent-toolkit": "^1.11.0",
     "@typesafe-ai/sdk": "^0.7.0",
     "express": "^4.22.3",
     "multer": "^2.4.0",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "playwright": "^1.56.1"

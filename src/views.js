@@ -22,12 +22,13 @@ export function inbox(db, { limit = 100, before = null } = {}) {
       (SELECT chosen_option FROM offers f WHERE f.claim_id = c.id ORDER BY f.created_at DESC LIMIT 1) AS chosen_option,
       (SELECT options_json FROM offers f WHERE f.claim_id = c.id ORDER BY f.created_at DESC LIMIT 1) AS offer_options,
       (SELECT COUNT(*) FROM suggestions s WHERE s.proposal_id = p.id AND (s.status = 'approved' OR (s.status = 'pending' AND c.status = 'ready'))) AS ai_suggestions,
-      (SELECT COALESCE(SUM(amount_cents), 0) FROM refund_ops r WHERE r.claim_id = c.id AND r.status = 'COMPLETED') AS refunded_cents
+      (SELECT COALESCE(SUM(amount_cents), 0) FROM refund_ops r WHERE r.claim_id = c.id AND r.status = 'COMPLETED') AS refunded_cents,
+      (SELECT type || ' ' || payload FROM audit d WHERE d.claim_id = c.id AND d.type IN ('agent.acted', 'agent.left_for_merchant') ORDER BY d.id DESC LIMIT 1) AS agent_note
     FROM claims c JOIN order_lines l ON l.id = c.line_id JOIN orders o ON o.id = c.order_id
     LEFT JOIN proposals p ON p.id = (SELECT id FROM proposals x WHERE x.claim_id = c.id ORDER BY x.created_at DESC LIMIT 1)
     LEFT JOIN assessments a ON a.id = p.assessment_id
     WHERE (? IS NULL OR c.created_at < ?)
-    ORDER BY c.created_at DESC LIMIT ?`).all(before, before, n).map(({ calc_json, findings_json, photo_ids_json, offer_options, ...r }) => {
+    ORDER BY c.created_at DESC LIMIT ?`).all(before, before, n).map(({ calc_json, findings_json, photo_ids_json, offer_options, agent_note, ...r }) => {
     const f = json(findings_json);
     const calc = json(calc_json);
     const sent = json(photo_ids_json) ?? [];
@@ -39,6 +40,9 @@ export function inbox(db, { limit = 100, before = null } = {}) {
       concerns: calc?.reasons?.length ?? null,
       remedies: (calc?.options ?? []).filter((o) => o.kind !== "refund").length,
       chosen_title: (json(offer_options) ?? []).find((o) => o.id === r.chosen_option)?.title ?? null,
+      // What the refund agent did on its last look: "acted" or "left", and its one-line why.
+      agent: agent_note ? (agent_note.startsWith("agent.acted") ? "acted" : "left") : null,
+      agent_why: agent_note ? json(agent_note.slice(agent_note.indexOf(" ") + 1))?.why ?? null : null,
       thumb: i >= 0 ? { id: sent[i], box: f.locations[i].box } : r.first_photo ? { id: r.first_photo, box: null } : null,
     };
   });

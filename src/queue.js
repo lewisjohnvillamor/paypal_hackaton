@@ -4,7 +4,7 @@
 // has no current proposal), so after a restart `resume()` picks up whatever was waiting.
 import { assessClaim } from "./claims.js";
 
-export function assessmentQueue(db, assess, { concurrency = Number(process.env.JEV_CONCURRENCY || 4), suggest = null, match = null } = {}) {
+export function assessmentQueue(db, assess, { concurrency = Number(process.env.JEV_CONCURRENCY || 4), suggest = null, match = null, after = null } = {}) {
   const waiting = [];
   const active = new Set();
   const again = new Set(); // evidence arrived while this claim was being assessed
@@ -22,6 +22,8 @@ export function assessmentQueue(db, assess, { concurrency = Number(process.env.J
     try {
       await assessClaim(db, claimId, assess, "system", suggest, match);
       counts.completed++;
+      // The refund agent reads the fresh proposal against the merchant's rules.
+      if (after) await after(claimId).catch((err) => console.error("agent", claimId, err.message));
     } catch (err) {
       // STALE_CASE: new photos landed mid-assessment; they enqueue the claim again.
       if (err.code === "STALE_CASE") again.add(claimId);

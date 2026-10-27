@@ -4,9 +4,9 @@ import { fakeAssess, fakePayPal, testPhoto } from "./helpers.js";
 import { createApp } from "../src/server.js";
 import { openDb } from "../src/db.js";
 
-export async function setup({ pp = fakePayPal(), assess = fakeAssess(), suggest = null, match = null } = {}) {
+export async function setup({ pp = fakePayPal(), assess = fakeAssess(), suggest = null, match = null, parseRules = null } = {}) {
   const db = openDb(":memory:");
-  const { app, queue } = createApp({ db, pp, assess, suggest, match });
+  const { app, queue } = createApp({ db, pp, assess, suggest, match, parseRules });
   const server = app.listen(0);
   const base = `http://127.0.0.1:${server.address().port}`;
   let cookie = "";
@@ -23,7 +23,7 @@ export async function setup({ pp = fakePayPal(), assess = fakeAssess(), suggest 
     return out;
   };
   const merchant = (method, path, body) => call(method, `/api/merchant${path}`, { body, headers: { "X-Refund-Relay": "1" } });
-  return { db, pp, queue, call, merchant, close: () => server.close(), login: () => call("POST", "/api/merchant/login", { body: { password: "test-password" } }) };
+  return { db, pp, queue, base, call, merchant, close: () => server.close(), login: () => call("POST", "/api/merchant/login", { body: { password: "test-password" } }) };
 }
 
 export async function purchase(t) {

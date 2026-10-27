@@ -10,33 +10,35 @@ import { offerOptions } from "./suggest/suggestions.js";
 
 const json = (s) => (s ? JSON.parse(s) : null);
 
-export function sendOffer(db, { claimId, claimVersion, proposalId, reason, actor }) {
-  return tx(db, () => {
-    const claim = db.prepare("SELECT * FROM claims WHERE id = ?").get(claimId);
-    if (!claim) throw new GateError("NOT_FOUND", "No such refund request.");
-    if (claim.version !== claimVersion) throw new GateError("STALE_CASE", "This request changed since you opened it. Reload and review again.");
-    if (claim.status !== "ready") throw new GateError("NOT_READY", `Request is ${claim.status}; an offer cannot be sent now.`);
-    const proposal = db.prepare("SELECT * FROM proposals WHERE id = ? AND claim_id = ?").get(proposalId, claimId);
-    if (!proposal || proposal.claim_version !== claim.version) {
-      throw new GateError("STALE_CASE", "The proposal is out of date. Reload and review again.");
-    }
-    const options = offerOptions(db, proposal);
-    if (options.length < 2) throw new GateError("NO_OPTIONS", "No remedy in your library fits this damage; approve a refund instead.");
-    // Same rule as a direct approval: a case the policy did not propose needs the merchant's reason.
-    const why = (reason || "").trim();
-    if (proposal.route !== "propose" && why.length < 3) {
-      throw new GateError("REASON_REQUIRED", "Give a reason when sending options for a case the policy did not propose.");
-    }
+export const sendOffer = (db, args) => tx(db, () => openOffer(db, args));
 
-    const ts = now();
-    const version = claim.version + 1;
-    db.prepare("UPDATE claims SET status = 'offer_sent', version = ?, updated_at = ? WHERE id = ?").run(version, ts, claimId);
-    const id = randomUUID();
-    db.prepare(`INSERT INTO offers (id, claim_id, claim_version, proposal_id, options_json, actor, reason, status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?)`).run(id, claimId, version, proposal.id, JSON.stringify(options), actor, why || null, ts);
-    audit(db, { claimId, actor, type: "offer.sent", payload: { options: options.map((o) => ({ id: o.id, refundCents: o.refundCents })) } });
-    return db.prepare("SELECT * FROM offers WHERE id = ?").get(id);
-  });
+// Inside the caller's transaction. Shared by the merchant's "let the buyer choose" and the refund
+// agent acting on one of the merchant's rules.
+export function openOffer(db, { claimId, claimVersion, proposalId, reason, actor }) {
+  const claim = db.prepare("SELECT * FROM claims WHERE id = ?").get(claimId);
+  if (!claim) throw new GateError("NOT_FOUND", "No such refund request.");
+  if (claim.version !== claimVersion) throw new GateError("STALE_CASE", "This request changed since you opened it. Reload and review again.");
+  if (claim.status !== "ready") throw new GateError("NOT_READY", `Request is ${claim.status}; an offer cannot be sent now.`);
+  const proposal = db.prepare("SELECT * FROM proposals WHERE id = ? AND claim_id = ?").get(proposalId, claimId);
+  if (!proposal || proposal.claim_version !== claim.version) {
+    throw new GateError("STALE_CASE", "The proposal is out of date. Reload and review again.");
+  }
+  const options = offerOptions(db, proposal);
+  if (options.length < 2) throw new GateError("NO_OPTIONS", "No remedy in your library fits this damage; approve a refund instead.");
+  // Same rule as a direct approval: a case the policy did not propose needs the merchant's reason.
+  const why = (reason || "").trim();
+  if (proposal.route !== "propose" && why.length < 3) {
+    throw new GateError("REASON_REQUIRED", "Give a reason when sending options for a case the policy did not propose.");
+  }
+
+  const ts = now();
+  const version = claim.version + 1;
+  db.prepare("UPDATE claims SET status = 'offer_sent', version = ?, updated_at = ? WHERE id = ?").run(version, ts, claimId);
+  const id = randomUUID();
+  db.prepare(`INSERT INTO offers (id, claim_id, claim_version, proposal_id, options_json, actor, reason, status, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?)`).run(id, claimId, version, proposal.id, JSON.stringify(options), actor, why || null, ts);
+  audit(db, { claimId, actor, type: "offer.sent", payload: { options: options.map((o) => ({ id: o.id, refundCents: o.refundCents })) } });
+  return db.prepare("SELECT * FROM offers WHERE id = ?").get(id);
 }
 
 // The buyer's pick. Returns { op, option, duplicate }; the caller submits op to PayPal. op is null

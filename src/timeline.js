@@ -71,7 +71,7 @@ export function agentTimeline(db, claimId) {
   const steps = [];
   for (const h of history) {
     const x = json(h.payload) ?? {};
-    const who = h.actor === "buyer" ? "buyer" : h.actor === "system" ? "system" : "merchant";
+    const who = ["buyer", "system", "agent"].includes(h.actor) ? h.actor : "merchant";
     const add = (s) => steps.push({ at: h.at, actor: who, ...s });
     switch (h.type) {
       case "claim.submitted": add({ title: `Buyer reported ${x.quantity > 1 ? `${x.quantity} damaged items` : "a damaged item"}` }); break;
@@ -80,7 +80,11 @@ export function agentTimeline(db, claimId) {
       case "assessment.failed": steps.push(...reviewSteps(db, claimId, h, photoNumber)); break;
       case "claim.info_requested": add({ title: "You asked for more photos", detail: x.message }); break;
       case "claim.closed": add({ title: "You closed it without a refund", detail: x.reason }); break;
-      case "offer.sent": add({ title: "You let the buyer choose", detail: "This approved every amount on the list." }); break;
+      case "offer.sent":
+        if (who !== "agent") add({ title: "You let the buyer choose", detail: "This approved every amount on the list." });
+        break;
+      case "agent.acted": add({ title: x.act === "offer" ? "Your refund agent let the buyer choose, on its own" : "Your refund agent approved the refund, on its own", detail: x.why }); break;
+      case "agent.left_for_merchant": add({ title: "Your refund agent left this one for you", detail: x.why }); break;
       case "offer.accepted": add({ title: `Buyer chose: ${x.title ?? x.option}`, detail: `${x.refund === "0.00" ? "No refund" : `$${x.refund} back`}${x.kit ? `; send ${x.kit}` : ""}.` }); break;
       case "suggestion.created":
         steps.push({ at: h.at, actor: "claude", title: x.titles.length
@@ -96,7 +100,8 @@ export function agentTimeline(db, claimId) {
       case "claim.resolved": add({ title: "Sorted without a refund", detail: x.sends ? `Send ${x.sends}.` : undefined }); break;
       case "refund.approved":
         // A buyer's pick already has its own step; the reservation behind it adds nothing new.
-        if (who !== "buyer") add({ title: `You approved ${usd(x.amountCents)}`, detail: x.overrideReason });
+        // So does an agent's approval: its own step says which rule it acted on.
+        if (who === "merchant") add({ title: `You approved ${usd(x.amountCents)}`, detail: x.overrideReason });
         break;
       case "refund.completed": steps.push({ at: h.at, actor: "paypal", title: "PayPal completed the refund", meta: x.refundId }); break;
       case "refund.pending": steps.push({ at: h.at, actor: "paypal", title: "PayPal is still processing the refund", meta: x.refundId }); break;

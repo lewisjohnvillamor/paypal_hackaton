@@ -118,3 +118,74 @@ export async function checkItemMatch(input) {
 }
 
 export const defaultMatcher = () => (process.env.ANTHROPIC_API_KEY ? checkItemMatch : null);
+
+// The refund agent's rules, from the merchant's own words. The answer is only a draft: the server
+// checks it (src/agent/rules.js) and the merchant reads it back, in words the server writes from
+// the structure, before anything is turned on. Only the merchant's text and the store's product
+// list go in.
+export function buildRulesRequest({ text, products, damage }) {
+  const content = [
+    "Products this store sells (id: name, price):",
+    ...products.map((p) => `- ${p.sku}: ${p.title}, ${usd(p.unitCents)}`),
+    "",
+    "Kinds of damage (id: meaning, products it applies to):",
+    ...damage.map((d) => `- ${d.key}: ${d.label} (${d.skus.join(", ")})`),
+    "",
+    "The shop owner's instructions for their refund agent:",
+    "<owner_rules>",
+    text,
+    "</owner_rules>",
+    "",
+    "Turn the instructions into rules the agent may act on alone. Each rule:",
+    "products: the product ids it covers, or an empty list when the owner did not limit it to certain products.",
+    "damage: the damage ids it covers, or an empty list when the owner did not limit it to certain damage. \"Chipped\" or \"cracked\" means crack_or_chip; \"broken\" or \"smashed\" means shattered; a snapped handle is handle_off.",
+    "max_refund_cents: the most the agent may refund on one request under this rule, in cents. \"Under $25\", \"below $25\" and \"up to $25\" all mean 2500.",
+    "action: \"refund\" to send the refund; \"offer\" when the owner wants the buyer offered repair kits, replacements or other remedies to choose from.",
+    "daily_limit_cents: the most the agent may send in a day, in cents, or 0 when the owner did not say.",
+    "Anything the owner wants to decide themselves (\"ask me\", \"send me the rest\") needs no rule: whatever no rule covers always goes to the owner.",
+    "Make a rule only for what the owner actually said; never add products, damage or amounts of your own. Every rule needs an amount; if the owner gave none for something, leave it out and say so.",
+    "not_understood: one short sentence naming a part of the instructions you could not turn into a rule. Leave it empty when every part became a rule or only says what the owner decides themselves; do not explain rules you made.",
+  ].join("\n");
+  const schema = {
+    type: "object", additionalProperties: false, required: ["rules", "daily_limit_cents", "not_understood"],
+    properties: {
+      rules: {
+        type: "array",
+        items: {
+          type: "object", additionalProperties: false, required: ["products", "damage", "max_refund_cents", "action"],
+          properties: {
+            products: { type: "array", items: { type: "string", enum: products.map((p) => p.sku) } },
+            damage: { type: "array", items: { type: "string", enum: damage.map((d) => d.key) } },
+            max_refund_cents: { type: "integer" },
+            action: { type: "string", enum: ["refund", "offer"] },
+          },
+        },
+      },
+      daily_limit_cents: { type: "integer" },
+      not_understood: { type: "string" },
+    },
+  };
+  return {
+    model: HAIKU_MODEL,
+    max_tokens: 2000,
+    system: "You turn a small online shop owner's refund instructions into structured rules for their refund agent. The owner reviews the rules before they take effect.",
+    messages: [{ role: "user", content: [{ type: "text", text: content }] }],
+    output_config: { effort: "low", format: { type: "json_schema", schema } },
+  };
+}
+
+export async function parseRules(input) {
+  const t = Date.now();
+  const res = await anthropic().messages.create(buildRulesRequest(input));
+  if (res.stop_reason === "refusal") throw new Error(`Haiku declined (${res.stop_details?.category ?? "no category"})`);
+  if (res.stop_reason === "max_tokens") throw new Error("Haiku ran out of room before answering");
+  const parsed = JSON.parse(res.content.find((b) => b.type === "text")?.text ?? "{}");
+  return {
+    rules: (parsed.rules ?? []).map((r) => ({ skus: r.products ?? [], damage: r.damage ?? [], maxRefundCents: r.max_refund_cents, action: r.action })),
+    dailyLimitCents: parsed.daily_limit_cents > 0 ? parsed.daily_limit_cents : null,
+    notUnderstood: String(parsed.not_understood ?? "").slice(0, 300),
+    model: res.model, latencyMs: Date.now() - t,
+  };
+}
+
+export const defaultRuleParser = () => (process.env.ANTHROPIC_API_KEY ? parseRules : null);

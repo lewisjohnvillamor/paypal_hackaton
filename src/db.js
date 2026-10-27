@@ -184,6 +184,18 @@ CREATE TABLE IF NOT EXISTS suggestions (
   UNIQUE (proposal_id, listing_id)
 );
 
+-- The merchant's standing rules for the refund agent: their own words, and the checked structure
+-- that is the only thing enforced. One row is on at a time (ended_at IS NULL); old ones stay.
+CREATE TABLE IF NOT EXISTS mandates (
+  id TEXT PRIMARY KEY,
+  text TEXT NOT NULL,
+  rules_json TEXT NOT NULL,
+  model TEXT,
+  actor TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  ended_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS audit (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   claim_id TEXT,
@@ -223,6 +235,8 @@ CREATE INDEX IF NOT EXISTS refund_ops_by_claim ON refund_ops(claim_id, created_a
 CREATE INDEX IF NOT EXISTS refund_ops_open ON refund_ops(status) WHERE status IN ('SUBMITTING','PENDING','UNKNOWN');
 CREATE INDEX IF NOT EXISTS audit_by_claim ON audit(claim_id, type);
 CREATE INDEX IF NOT EXISTS audit_by_op ON audit(op_id);
+CREATE INDEX IF NOT EXISTS offers_by_actor ON offers(actor, status, created_at);
+CREATE INDEX IF NOT EXISTS refund_ops_by_created ON refund_ops(created_at);
 `;
 
 export function openDb(path = process.env.DATABASE_PATH || "data/refund-relay.db") {

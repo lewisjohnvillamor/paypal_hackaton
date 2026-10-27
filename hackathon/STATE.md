@@ -98,6 +98,45 @@ screenshots `screenshots/17-*.png` to `19-*.png` use the test double.
 - Gate 3 (vertical slice): done. The three must-haves, immutable approvals, reservations, idempotency and reconciliation are all in place.
 - Gate 4 (verify and polish): started. `npm test` passes 20 tests (invariants, using a fake PayPal and a fake Jev).
 
+## Refund agent: the merchant's rules in plain English (2026-10-26)
+
+The merchant writes standing rules on `/merchant/agent` ("Refund chipped mugs under $25 on your
+own. Ask me about anything above that."). Claude Haiku turns the words into `{ rules: [{ skus,
+damage, maxRefundCents, action }], dailyLimitCents }` (`parseRules` in `src/ai/haiku.js`); the server
+checks it (`checkRules`: known products, damage that product can have, a limit on every rule, $200
+ceiling, daily limit at least the largest rule, $100 default) and writes the read-back itself
+(`describeRules`), with a replay of what the rules would have done on the latest 12 requests. Only
+the checked structure is stored and enforced (`mandates` table), never the words.
+
+After each queued review the agent (`runAgent`, `src/agent/autopilot.js`) runs `decide()`: only a
+`propose` route (clear evidence, no policy concerns), a rule covering the product and the damage
+type (photo check at least 0.5 sure of it), the amount within the rule, and the last 24 hours of
+agent refunds plus this one within the daily limit. Then the PayPal ledger check, and inside one
+transaction it decides again and calls the same `reserve` as a merchant approval (actor `agent`),
+then `submit`. An `offer` rule sends the remedy list instead (`openOffer`). Anything else is left
+for the merchant with one sentence on the timeline, the inbox Outcome column and the agent page.
+The merchant's manual re-review does not trigger the agent.
+
+Live (2026-10-26, `scripts/e2e-agent.js`, real PayPal sandbox, photo check and rule reader): the
+rule above read back as "Refund any classic white ceramic mug with a crack or chip, up to $25.00 a
+request"; a chipped mug was refunded by the agent with no click, refund `0CB61482WR802293Y` for
+$20.00 COMPLETED (an earlier run: `2L621395024542343`); a cracked vase was left: "None of your rules
+covers the clear glass bud vase." A repeat run with the same mug photo was left too, because the
+reused-photo flag fired. Rule reader, five sample texts (`probe/rules-live.js`): all read correctly
+in 1.3-2.8 s; "just handle the small stuff" was refused for having no amount. Screenshots
+`screenshots/20-*.png` to `27-*.png`.
+
+## Agent-to-agent: MCP servers for both sides' assistants (2026-10-27)
+
+`mcp/buyer.js` (a shopper's assistant files, follows and settles a claim; the claim link is its only
+permission) and `mcp/merchant.js` (the merchant's assistant reads requests, agent decisions and
+rules, and checks them with the PayPal Agent Toolkit's read-only tools; no money-moving tool is
+registered). `scripts/agent-to-agent.js` (`npm run demo:agents`) drives both with a model in a tool
+loop. Live run 2026-10-27: the buyer's assistant used get_order, report_damage and check_request
+(wait 60 s); the refund agent refunded `1W017904CP577140R` $20.00 COMPLETED; the merchant's assistant
+used list_requests, get_request, then the toolkit's get_refund and get_order, and confirmed it.
+Transcript: `AGENT_TO_AGENT_RUN.md`. 91 tests pass (3 new in `tests/mcp.test.js`).
+
 ## Unresolved
 
 - No hosted demo yet; Render is the candidate (it has a sponsor prize). The upload folder and SQLite file need a persistent disk. `render.yaml` turns on `PUBLIC_DEMO`, so set `DEMO_BUYER_EMAIL` / `DEMO_BUYER_PASSWORD` to a sandbox Personal account when deploying.
