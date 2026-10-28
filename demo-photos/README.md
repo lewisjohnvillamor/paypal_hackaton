@@ -14,7 +14,7 @@ Synthetic product-damage examples generated with the built-in image-generation t
 | `9-headphones-scuffed.jpg` | `catalog/catalog-headphones.jpg` | Cosmetic scuffs; structure intact | Keep with case and partial refund |
 | `10-headphones-headband-snapped.jpg` | `catalog/catalog-headphones.jpg` | Headband broken through | Replacement or refund |
 
-Each generated JPG is 1536 x 1024. Catalog references are copied unchanged from `public/assets/`; their existing repository source/licence information still applies. The mug's silhouette and the vase's cylindrical shape are based on those references. Backgrounds were simplified; the vase's flowers and water were removed to expose the damage. Full generation prompts are in `prompts.json`.
+Each generated JPG is 1536 x 1024. Catalog references are copied unchanged from `public/assets/`; their existing repository source/licence information still applies. The mug's silhouette and the vase's cylindrical shape are based on those references. Backgrounds were simplified. `2-vase-cracked.jpg` is not generated: it is the catalog photo itself with a crack drawn on the glass and a closer, tilted framing (`scripts/photos/crack-vase.py`), because a generated empty glass did not read as the same product. Full generation prompts are in `prompts.json`.
 
 For the marketing recorder on the working branch, set `DEMO_PHOTOS=demo-photos`. The four original filenames match its lookup keys. It can derive the blurred 4a example from 4b. The additional T-shirt and headphone photos can be uploaded manually to claims for the corresponding products; they do not add recorder scenes automatically.
 

@@ -2,7 +2,7 @@
 
 Last updated 2026-10-23 (product-match layer added).
 
-The store now sells four very different products: a ceramic mug ($20), a clear glass bud vase
+The store now sells four very different products: a ceramic mug ($20), a clear glass cylinder vase
 ($45), an organic cotton T-shirt ($25) and wireless over-ear headphones ($120). The buyer fills a
 bag, pays once with PayPal, and can report a problem with any item on the order.
 

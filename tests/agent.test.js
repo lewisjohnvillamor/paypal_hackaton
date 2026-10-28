@@ -55,7 +55,7 @@ test("the agent acts only on a clear proposal inside a rule, the limit and the d
   assert.match(left({ route: "manual_review", reasons: ["REPEAT_CLAIMANT"] }, "POLICY_FLAGGED"), /concern, so you decide. This buyer filed/);
   left({ route: "request_info" }, "ASKING_FOR_PHOTOS");
   assert.match(left({ amountCents: 4000 }, "OVER_LIMIT"), /\$40.00 is above your \$25.00 limit/);
-  assert.match(left({ sku: "VASE-GLASS" }, "NO_RULE"), /clear glass bud vase/);
+  assert.match(left({ sku: "VASE-GLASS" }, "NO_RULE"), /clear glass cylinder vase/);
   assert.match(left({ findings: { ...chipped, damage_kind: "shattered", signals: { damage_kind: { confidence: 0.9 } } } }, "NO_RULE"), /don't cover broken into pieces/);
   assert.match(left({ findings: { ...chipped, signals: { damage_kind: { confidence: 0.3 } } } }, "NO_RULE"), /wasn't sure/);
   assert.match(left({ spentCents: 9000 }, "DAILY_LIMIT"), /\$100.00 daily limit/);
