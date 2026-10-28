@@ -166,3 +166,13 @@ Numbers in `bench/RESULTS.md`; review and roadmap in `PRODUCTION.md`.
 ## Next executable task
 
 Deploy to Render with a persistent disk, then record the 3-minute demo following spec section 15.
+
+## Hackathon video (2026-10-27)
+
+2:49, voiced and scored: the owner sets the refund agent's rules in plain English, a shopper pays with PayPal and is refunded by the agent with no click, a second shopper's own assistant files through the buyer MCP server and is refunded the same way, a cracked vase goes to the owner (remedies + in-stock suggestion), a different product is held for a label photo. Live PayPal sandbox, live photo check and live assistants.
+
+- Voice: `python3 scripts/voice/tts.py scripts/voice/agent-video-lines.json data/voice <kokoro-model-dir>` (Kokoro, offline, voice af_heart). Captions are the voiceover lines.
+- Record: app on a fresh database with REPEAT_CLAIM_LIMIT=0, then `CHROMIUM_PATH=/opt/pw-browsers/chromium node --env-file=.env scripts/record-agent-video.js data/agent-video`. It stops if the agent did not pay the assistant's request.
+- Stitch: `node scripts/stitch-agent-video.js data/agent-video <music.mp3>`. Playwright's video drifts from the wall clock (up to 10 s on a long take), so the recorder flips a corner square at every cut and line and the stitcher maps times through those flips.
+- Music: "Inspired", Kevin MacLeod (incompetech.com), CC BY 4.0; the credit goes in the YouTube description.
+- The generated `demo-photos/5-mug-in-pieces.jpg` is now flagged as a likely stock photo by the live check (4 of 4 runs), so the agent rightly holds it; the video uses the snapped-handle photo for the assistant scene.
