@@ -50,6 +50,13 @@
     .bag .kv-row > :first-child { flex: 1; min-width: 0; }
     .bag .kv-row > :last-child { flex: none; }
     .bag .total { font-size: 22px; font-weight: 700; letter-spacing: -0.03em; }
+    .bag-bar { position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 12px 12px 12px 20px; border-radius: 999px; background: var(--nav-bg); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
+      box-shadow: 0 8px 30px rgb(0 0 0 / 0.18); color: var(--text); font-weight: 600; font-size: 15px; animation: bar-in 0.3s var(--ease) both; }
+    @keyframes bar-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+    .bag-bar:hover { text-decoration: none; }
+    .bag-bar .go { background: var(--blue); color: #fff; border-radius: 999px; padding: 8px 16px; }
+    @media (min-width: 900px) { .bag-bar { display: none; } }
     .order-lines li { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 0.5px solid var(--separator); }
     .order-lines li:last-child { border-bottom: 0; }
     .order-lines img { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; flex: none; }
@@ -70,7 +77,7 @@
 
       <div class="shop">
         <div class="products" id="products" aria-live="polite"></div>
-        <aside class="card bag" aria-labelledby="bag-title">
+        <aside class="card bag" id="bag" aria-labelledby="bag-title">
           <div class="card-head" style="margin-bottom:8px"><h2 id="bag-title">Your bag</h2><span id="bag-count" class="small muted"></span></div>
           <p id="bag-empty" class="small muted" style="margin:0 0 8px">Add something to get started.</p>
           <div id="bag-lines"></div>
@@ -87,6 +94,9 @@
         </aside>
       </div>
     </section>
+
+    <!-- Phones: the bag sits below every product, so a bar keeps it one tap away. -->
+    <a href="#bag" id="bag-bar" class="bag-bar hidden"><span id="bag-bar-text"></span><span class="go">Check out</span></a>
 
     <section id="done" class="hidden">
       <div class="card hero" style="max-width:600px;margin:0 auto">
@@ -106,7 +116,7 @@
       <div class="card" id="mine-list"></div>
     </section>
   </main>
-  <footer class="foot demo-note">Hackathon prototype · PayPal sandbox only · Product photos under Creative Commons licences; authors and licences in probe/cases.json and probe/products/sources.json.</footer>
+  <footer class="foot demo-note">Hackathon prototype · PayPal sandbox only · Product photos under Creative Commons licences; authors and licences are listed in the project's repository.</footer>
 
   <script type="module">
     import { api, usd, esc, ICON, checkBadge, myOrders, rememberOrder } from "/app.js";
@@ -187,7 +197,15 @@
       const count = lines.reduce((s, l) => s + l.quantity, 0);
       $("bag-count").textContent = count ? `${count} item${count > 1 ? "s" : ""}` : "";
       $("checkout").classList.toggle("locked", !lines.length);
+      $("bag-bar-text").textContent = count ? `${count} item${count > 1 ? "s" : ""} · ${usd(total)}` : "";
+      barState();
     }
+
+    // The bar shows only while there is something in the bag and the bag itself is off screen.
+    let bagVisible = false;
+    const barState = () => $("bag-bar").classList.toggle("hidden", !cart().length || bagVisible || $("shop-view").classList.contains("hidden"));
+    new IntersectionObserver(([e]) => { bagVisible = e.isIntersecting; barState(); }).observe($("bag"));
+    $("bag-bar").onclick = (e) => { e.preventDefault(); $("bag").scrollIntoView({ behavior: "smooth", block: "start" }); };
 
     // The total counts to its new value instead of snapping.
     let shown = 0, frame = 0;
@@ -230,7 +248,7 @@
         </li>`).join("");
       $("receipt").innerHTML = `
         <div class="kv-row"><span>PayPal order</span><span class="mono">${esc(orderID)}</span></div>`;
-      $("shop-view").classList.add("hidden");
+      $("shop-view").classList.add("hidden"); barState();
       $("mine").classList.add("hidden");
       $("done").classList.remove("hidden");
       window.scrollTo({ top: 0 });

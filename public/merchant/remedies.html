@@ -14,9 +14,9 @@
   <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/ag-grid-community.min.js" defer></script>
 </head>
 <body>
-  <header class="top">
-    <a class="brand" href="/merchant"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span>Refund Relay <span class="ctx">Merchant</span></a>
-    <nav><a href="/merchant">Requests</a><a href="/merchant/agent">Refund agent</a><a href="/merchant/remedies" aria-current="page">Remedies</a></nav>
+  <header class="top app">
+    <a class="brand" href="/merchant" aria-label="Refund Relay merchant home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span><span class="brand-name">Refund Relay</span> <span class="ctx">Merchant</span></a>
+    <nav aria-label="Merchant"><a href="/merchant">Requests</a><a href="/merchant/agent">Refund agent</a><a href="/merchant/remedies" aria-current="page">Remedies</a><a href="/" class="wide-only">Store</a><a href="#" id="logout" data-logout>Sign out</a></nav>
   </header>
   <main class="wide">
     <section id="library" class="hidden">
@@ -46,14 +46,16 @@
       const dark = matchMedia("(prefers-color-scheme: dark)");
       const theme = () => el.classList.toggle("ag-theme-quartz-dark", dark.matches);
       theme(); dark.addEventListener?.("change", theme);
+      const narrow = matchMedia("(max-width: 619px)").matches;
       const columns = [
-        { headerName: "On", field: "active", width: 72, cellDataType: "boolean", editable: true },
-        { headerName: "Offer to the buyer", field: "title", width: 240, editable: true },
+        { headerName: "On", field: "active", width: narrow ? 56 : 72, cellDataType: "boolean", editable: true },
+        // The offer and its refund come first, so a phone shows them without scrolling sideways.
+        { headerName: "Offer to the buyer", field: "title", width: narrow ? 150 : 240, editable: true, wrapText: true, autoHeight: true },
+        { headerName: "Refund per item", field: "refundUnitCents", width: narrow ? 100 : 140, type: "rightAligned", editable: true,
+          valueFormatter: (x) => usd(x.value), valueParser: (x) => Math.round(Number(String(x.newValue).replace(/[$,]/g, "")) * 100) },
         { headerName: "What you send", field: "item", flex: 1, minWidth: 220, editable: true, wrapText: true, autoHeight: true },
         { headerName: "When it fits (the AI reads this)", field: "fits", flex: 1.4, minWidth: 260, editable: true, wrapText: true, autoHeight: true,
           cellEditor: "agLargeTextCellEditor", cellEditorPopup: true, cellEditorParams: { maxLength: 400, rows: 6, cols: 50 } },
-        { headerName: "Refund per item", field: "refundUnitCents", width: 140, type: "rightAligned", editable: true,
-          valueFormatter: (x) => usd(x.value), valueParser: (x) => Math.round(Number(String(x.newValue).replace(/[$,]/g, "")) * 100) },
         { headerName: "Kind", field: "kind", width: 140, editable: true, cellEditor: "agSelectCellEditor",
           cellEditorParams: { values: Object.keys(KIND) }, valueFormatter: (x) => KIND[x.value] ?? x.value },
       ];

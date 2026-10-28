@@ -83,3 +83,10 @@ export function optionText(o) {
 // The amount column: a remedy that refunds nothing says so instead of "$0.00".
 export const optionAmount = (o) => (o.refundCents > 0 ? usd(o.refundCents) : "No refund");
 export const optionArt = (o) => o.kind === "refund" ? ICON.check : /kintsugi|gold leaf/i.test(`${o.title} ${o.item}`) ? `<img src="/assets/kintsugi.svg" alt="">` : ICON.box;
+
+// "Sign out" in the merchant pages' bar.
+document.querySelectorAll("[data-logout]").forEach((a) => (a.onclick = async (e) => {
+  e.preventDefault();
+  await api("/api/merchant/logout", { method: "POST" }).catch(() => {});
+  location.href = "/merchant/";
+}));

@@ -48,7 +48,7 @@ export function agentSpent(db, at = Date.now()) {
   const refunded = db.prepare(`SELECT COALESCE(SUM(o.amount_cents), 0) n FROM refund_ops o JOIN approvals a ON a.id = o.approval_id
     WHERE o.status != 'FAILED' AND o.created_at >= ?
       AND (a.actor = 'agent' OR o.id IN (SELECT op_id FROM offers WHERE actor = 'agent' AND op_id IS NOT NULL))`).get(since).n;
-  const open = db.prepare("SELECT options_json FROM offers WHERE actor = 'agent' AND status = 'open' AND created_at >= ?").all(since)
+  const open = db.prepare("SELECT options_json FROM offers WHERE actor = 'agent' AND status = 'open' AND decided_at IS NULL AND created_at >= ?").all(since)
     .reduce((s, o) => s + Math.max(0, ...json(o.options_json).map((x) => x.refundCents)), 0);
   return refunded + open;
 }

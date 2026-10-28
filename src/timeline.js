@@ -83,6 +83,7 @@ export function agentTimeline(db, claimId) {
       case "offer.sent":
         if (who !== "agent") add({ title: "You let the buyer choose", detail: "This approved every amount on the list." });
         break;
+      case "offer.withdrawn": add({ title: "You took back the choices", detail: "The buyer can no longer pick; review the case again to decide." }); break;
       case "agent.acted": add({ title: x.act === "offer" ? "Your refund agent let the buyer choose, on its own" : "Your refund agent approved the refund, on its own", detail: x.why }); break;
       case "agent.left_for_merchant": add({ title: "Your refund agent left this one for you", detail: x.why }); break;
       case "offer.accepted": add({ title: `Buyer chose: ${x.title ?? x.option}`, detail: `${x.refund === "0.00" ? "No refund" : `$${x.refund} back`}${x.kit ? `; send ${x.kit}` : ""}.` }); break;

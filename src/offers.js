@@ -83,7 +83,24 @@ export function acceptOffer(db, { claimId, offerId, optionId }) {
   });
 }
 
+// The merchant takes back an offer the buyer has not answered. The case returns to them: the
+// version moves on, so the old proposal and the old offer can no longer be approved or picked, and
+// the merchant reviews it again before deciding.
+export function withdrawOffer(db, { claimId, actor }) {
+  return tx(db, () => {
+    const claim = db.prepare("SELECT * FROM claims WHERE id = ?").get(claimId);
+    if (!claim) throw new GateError("NOT_FOUND", "No such refund request.");
+    const offer = db.prepare("SELECT * FROM offers WHERE claim_id = ? AND status = 'open' AND decided_at IS NULL ORDER BY created_at DESC LIMIT 1").get(claimId);
+    if (claim.status !== "offer_sent" || !offer) throw new GateError("NOT_READY", "There is no open offer on this request.");
+    // The offer row keeps status 'open' (the table only allows open/accepted); decided_at with no
+    // pick marks it withdrawn, and the claim's new version stops any late pick.
+    db.prepare("UPDATE offers SET decided_at = ? WHERE id = ?").run(now(), offer.id);
+    db.prepare("UPDATE claims SET status = 'ready', version = version + 1, updated_at = ? WHERE id = ?").run(now(), claimId);
+    audit(db, { claimId, actor, type: "offer.withdrawn", payload: { offerId: offer.id } });
+  });
+}
+
 export function latestOffer(db, claimId) {
   const o = db.prepare("SELECT * FROM offers WHERE claim_id = ? ORDER BY created_at DESC LIMIT 1").get(claimId);
-  return o && { id: o.id, status: o.status, options: json(o.options_json), chosen: o.chosen_option, sentBy: o.actor, createdAt: o.created_at, decidedAt: o.decided_at };
+  return o && { id: o.id, status: o.status === "open" && o.decided_at ? "withdrawn" : o.status, options: json(o.options_json), chosen: o.chosen_option, sentBy: o.actor, createdAt: o.created_at, decidedAt: o.decided_at };
 }
