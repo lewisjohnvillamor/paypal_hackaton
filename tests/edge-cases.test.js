@@ -35,7 +35,7 @@ test("a different mug from the one sold goes to manual review and needs a writte
 
 test("an unsure design match alone does not block the one-click proposal", async () => {
   const { t, d } = await caseWith({ design_match: "uncertain" });
-  try { assert.equal(d.proposal.route, "propose"); } finally { t.close(); }
+  try { assert.equal(d.proposal.route, "auto_refund"); } finally { t.close(); }
 });
 
 test("stock-looking photos and written instructions inside a photo go to manual review", async () => {
@@ -288,6 +288,6 @@ test("REPEAT_CLAIM_LIMIT=0 turns the repeat-claimant flag off for a shared demo 
     await purchaseAndClaim(t);
     const second = await purchaseAndClaim(t);
     await t.login();
-    assert.equal((await detail(t, second.claimId)).proposal.route, "propose");
+    assert.equal((await detail(t, second.claimId)).proposal.route, "auto_refund");
   } finally { t.close(); delete process.env.REPEAT_CLAIM_LIMIT; }
 });

@@ -28,20 +28,22 @@ const base = {
 
 test("clear damage drafts one unit refund", () => {
   const p = draftProposal(base);
-  assert.equal(p.route, "propose");
+  assert.equal(p.route, "auto_refund");
   assert.equal(p.amountCents, 2000);
   assert.deepEqual(p.reasons, []);
 });
 
-test("negative AI finding never auto-denies; it routes to a person", () => {
-  const p = draftProposal({ ...base, findings: { ...clearFindings, visible_breakage: "no" } });
-  assert.equal(p.route, "manual_review");
-  assert.ok(p.reasons.includes("NO_BREAKAGE_SEEN"));
+test("a confident no-damage finding on clear photos drafts a decline the merchant confirms", () => {
+  const p = draftProposal({ ...base, findings: { ...clearFindings, visible_breakage: "no", signals: { ...clearFindings.signals, visible_breakage: 0.05 } } });
+  assert.equal(p.route, "reject");
+  assert.equal(p.decidedBy, "NO_DAMAGE_SEEN");
+  assert.equal(p.hardReject, false); // the agent never closes on the AI's word alone
 });
 
-test("unusable photos ask for more information with no amount", () => {
+test("unusable photos draft no refund and ask the buyer for clearer ones", () => {
   const p = draftProposal({ ...base, findings: { ...clearFindings, evidence_usable: "no" } });
-  assert.equal(p.route, "request_info");
+  assert.equal(p.route, "reject");
+  assert.equal(p.askForPhotos, true);
   assert.equal(p.amountCents, 0);
 });
 

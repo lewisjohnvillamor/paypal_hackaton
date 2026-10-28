@@ -23,7 +23,7 @@ test("a claim with 100 photos is stored in full and the model sees the best 8", 
     assert.equal(seen, AI_MAX_PHOTOS);
     assert.equal(d.assessment.photosSent, AI_MAX_PHOTOS);
     assert.equal(d.evidence.filter((e) => e.sentToAi).length, AI_MAX_PHOTOS);
-    assert.equal(d.proposal.route, "propose");
+    assert.equal(d.proposal.route, "auto_refund");
   } finally { t.close(); }
 });
 
@@ -39,7 +39,7 @@ test("damage boxes land on the photos Jev saw, in the order it saw them", async 
     await t.login();
     const d = await detail(t, c.claimId);
     assert.deepEqual(d.evidence.map((e) => e.damageBox), [null, box, null]);
-    assert.equal(d.proposal.route, "propose"); // display only: policy is unchanged
+    assert.equal(d.proposal.route, "auto_refund"); // display only: policy is unchanged
   } finally { t.close(); }
 });
 

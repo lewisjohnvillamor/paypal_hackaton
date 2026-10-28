@@ -7,6 +7,7 @@ import { audit, now, tx } from "./db.js";
 import { GateError, reserve } from "./refunds/execute.js";
 import { toDecimal } from "./money.js";
 import { offerOptions } from "./suggest/suggestions.js";
+import { isAutoRoute } from "./policy/refundPolicy.js";
 
 const json = (s) => (s ? JSON.parse(s) : null);
 
@@ -27,7 +28,7 @@ export function openOffer(db, { claimId, claimVersion, proposalId, reason, actor
   if (options.length < 2) throw new GateError("NO_OPTIONS", "No remedy in your library fits this damage; approve a refund instead.");
   // Same rule as a direct approval: a case the policy did not propose needs the merchant's reason.
   const why = (reason || "").trim();
-  if (proposal.route !== "propose" && why.length < 3) {
+  if (!isAutoRoute(proposal.route) && why.length < 3) {
     throw new GateError("REASON_REQUIRED", "Give a reason when sending options for a case the policy did not propose.");
   }
 

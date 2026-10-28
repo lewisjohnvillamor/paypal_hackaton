@@ -1,7 +1,7 @@
 // Read models for the UI. Buyer views expose only that buyer's safe status.
 import { refundableBalance } from "./policy/refundPolicy.js";
 import { offerOptions, proposalSuggestions } from "./suggest/suggestions.js";
-import { REASON_TEXT } from "./reasons.js";
+import { BUYER_DECLINE, REASON_TEXT } from "./reasons.js";
 import { latestOffer } from "./offers.js";
 import { agentTimeline } from "./timeline.js";
 
@@ -89,6 +89,9 @@ export function caseDetail(db, claimId) {
       id: proposal.id, route: proposal.route, amountCents: proposal.amount_cents, currency: proposal.currency,
       policyVersion: proposal.policy_version, current: proposal.claim_version === claim.version, ...json(proposal.calc_json),
       reasonText: Object.fromEntries((json(proposal.calc_json).reasons ?? []).map((r) => [r, REASON_TEXT[r] ?? r])),
+      // The one rule that settled the outcome, in words, for the top of the case.
+      decidedByText: REASON_TEXT[json(proposal.calc_json).decidedBy] ?? null,
+      declineText: proposal.route === "reject" ? BUYER_DECLINE[json(proposal.calc_json).decidedBy] ?? BUYER_DECLINE.DEFAULT : null,
       // The list the merchant would send: library remedies plus the suggestions they approved.
       options: offerOptions(db, proposal),
       suggestions: proposalSuggestions(db, proposal.id),

@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { audit, now, tx } from "../db.js";
 import { toDecimal, toCents } from "../money.js";
-import { refundableBalance } from "../policy/refundPolicy.js";
+import { isAutoRoute, refundableBalance } from "../policy/refundPolicy.js";
 
 export class GateError extends Error {
   constructor(code, message, extra = {}) {
@@ -82,7 +82,7 @@ export function approveAndReserve(db, { claimId, claimVersion, proposalId, amoun
     if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
       throw new GateError("INVALID_AMOUNT", "Refund amount must be a positive number of cents.");
     }
-    const overridden = amountCents !== proposal.amount_cents || proposal.route !== "propose";
+    const overridden = amountCents !== proposal.amount_cents || !isAutoRoute(proposal.route);
     const why = (reason || "").trim();
     if (overridden && why.length < 3) {
       throw new GateError("REASON_REQUIRED", "Give a reason when approving an amount or case the policy did not propose.");

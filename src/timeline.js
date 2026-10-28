@@ -8,7 +8,11 @@ import { DAMAGE_LABELS as DAMAGE } from "./kinds.js";
 const json = (s) => (s ? JSON.parse(s) : null);
 const usd = (cents) => `$${toDecimal(cents)}`;
 const pct = (p) => (typeof p === "number" ? ` (${Math.round(p * 100)}%)` : "");
-const ROUTE = { propose: "suggests a one-click refund", manual_review: "needs your judgment", request_info: "asks the buyer for clearer photos" };
+const ROUTE = {
+  auto_refund: "marked it safe to refund automatically", propose: "suggests a one-click refund", manual_review: "needs your judgment",
+  reject: "advises no refund", request_info: "asks the buyer for clearer photos",
+};
+const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 const WORD = { yes: "yes", no: "no", uncertain: "unsure", consistent: "yes", inconsistent: "no" };
 
 
@@ -47,10 +51,14 @@ function reviewSteps(db, claimId, h, photoNumber) {
   if (p) {
     const calc = json(p.calc_json);
     const reasons = calc.reasons ?? [];
+    const c = calc.calculation ?? {};
+    const priced = c.percent != null && p.route !== "reject"
+      ? ` ${cap(DAMAGE[c.damageKind] ?? c.damageKind)} pays ${c.percent}% of ${usd(c.grossCents)} under your severity table.` : "";
     steps.push({
       at: p.created_at, actor: "policy",
-      title: p.route === "request_info" ? `Policy ${ROUTE[p.route]}` : `Policy drafted ${usd(p.amount_cents)} and ${ROUTE[p.route]}`,
-      detail: reasons.length ? reasons.map((r) => REASON_TEXT[r] ?? r).join(" ") : "Clear evidence, inside the 14-day window, within the refundable balance.",
+      title: p.route === "request_info" || calc.askForPhotos ? "Policy asks the buyer for clearer photos"
+        : p.route === "reject" ? `Policy ${ROUTE[p.route]}` : `Policy drafted ${usd(p.amount_cents)} and ${ROUTE[p.route]}`,
+      detail: `${reasons.length ? reasons.map((r) => REASON_TEXT[r] ?? r).join(" ") : REASON_TEXT.ALL_CHECKS_PASSED}${priced}`,
       meta: p.policy_version,
     });
     if ((calc.options ?? []).length > 1) {
@@ -79,12 +87,15 @@ export function agentTimeline(db, claimId) {
       case "assessment.completed":
       case "assessment.failed": steps.push(...reviewSteps(db, claimId, h, photoNumber)); break;
       case "claim.info_requested": add({ title: "You asked for more photos", detail: x.message }); break;
-      case "claim.closed": add({ title: "You closed it without a refund", detail: x.reason }); break;
+      case "claim.closed":
+        if (who !== "agent") add({ title: "You closed it without a refund", detail: x.reason });
+        else add({ title: "The buyer was told", detail: x.reason });
+        break;
       case "offer.sent":
         if (who !== "agent") add({ title: "You let the buyer choose", detail: "This approved every amount on the list." });
         break;
       case "offer.withdrawn": add({ title: "You took back the choices", detail: "The buyer can no longer pick; review the case again to decide." }); break;
-      case "agent.acted": add({ title: x.act === "offer" ? "Your refund agent let the buyer choose, on its own" : "Your refund agent approved the refund, on its own", detail: x.why }); break;
+      case "agent.acted": add({ title: x.act === "offer" ? "Your refund agent let the buyer choose, on its own" : x.act === "decline" ? "Your refund agent closed it without a refund, under your policy" : "Your refund agent approved the refund, on its own", detail: x.why }); break;
       case "agent.left_for_merchant": add({ title: "Your refund agent left this one for you", detail: x.why }); break;
       case "offer.accepted": add({ title: `Buyer chose: ${x.title ?? x.option}`, detail: `${x.refund === "0.00" ? "No refund" : `$${x.refund} back`}${x.kit ? `; send ${x.kit}` : ""}.` }); break;
       case "suggestion.created":

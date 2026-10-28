@@ -11,7 +11,7 @@ test("happy path: $80 purchase, one broken mug, $20 approved refund reaches PayP
     const { claimId } = await purchaseAndClaim(t);
     await t.login();
     const d = (await t.merchant("GET", `/claims/${claimId}`)).body;
-    assert.equal(d.proposal.route, "propose");
+    assert.equal(d.proposal.route, "auto_refund");
     assert.equal(d.proposal.amountCents, 2000);
     const r = await approve(t, d);
     assert.equal(r.status, 200, JSON.stringify(r.body));

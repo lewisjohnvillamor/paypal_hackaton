@@ -18,7 +18,7 @@ const fakeParser = (answer) => {
   fn.calls = [];
   return fn;
 };
-const ctx = (o = {}) => ({ route: "propose", reasons: [], amountCents: 2000, sku: "MUG-CLASSIC", findings: chipped, options: 1, spentCents: 0, ...o });
+const ctx = (o = {}) => ({ route: "auto_refund", reasons: [], amountCents: 2000, sku: "MUG-CLASSIC", findings: chipped, options: 1, spentCents: 0, ...o });
 
 test("rules are checked: known products and damage, a limit on every rule, a ceiling, a daily limit", () => {
   const ok = checkRules(chippedMugs());

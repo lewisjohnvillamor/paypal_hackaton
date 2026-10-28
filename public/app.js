@@ -75,7 +75,7 @@ export function rememberOrder(orderId, fields) {
 // Wording for a resolution option, shared by the buyer's choice and the merchant's case page.
 // Remedy titles and items are the merchant's own words from their remedy library.
 export function optionText(o) {
-  if (o.kind === "refund") return { title: "Full refund", detail: `${usd(o.refundCents)} back to your PayPal account. No need to send anything back.` };
+  if (o.kind === "refund") return { title: o.title ?? "Full refund", detail: `${usd(o.refundCents)} back to your PayPal account. No need to send anything back.` };
   const item = o.item ? o.item.charAt(0).toUpperCase() + o.item.slice(1) : "";
   return { title: o.title, detail: o.refundCents > 0 ? `${usd(o.refundCents)} back, plus ${o.item}.` : `${item}.` };
 }

@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { audit, now, tx } from "./db.js";
 import { hashToken, newToken } from "./auth.js";
 import { draftProposal, itemConfirmed, refundableBalance, resolutionOptions } from "./policy/refundPolicy.js";
+import { currentPolicy } from "./policy/settings.js";
+import { agentSpent } from "./agent/spend.js";
 import { TEMPLATE_VERSION } from "./ai/jev.js";
 import { IMAGE_CONCURRENCY, MAX_PHOTOS, SIMILAR_PHOTO_BITS, aiCopy, differenceHash, hashDistance, mapLimit } from "./images.js";
 import { anyNearOtherClaim } from "./photoIndex.js";
@@ -182,25 +184,30 @@ export async function assessClaim(db, claimId, assess, actor = "system", suggest
 
     const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(claim.order_id);
     const ops = db.prepare("SELECT * FROM refund_ops WHERE capture_id = ?").all(order.capture_id);
-    const draft = draftProposal({
-      line, quantity: claim.quantity, findings: result?.findings ?? null,
-      deliveredAt: order.delivered_at, claimedAt: claim.created_at,
-      refundableCents: refundableBalance(order.amount_cents, ops), flags,
-    });
-    const options = draft.route === "request_info" ? [] : resolutionOptions({
+    // The decision is drafted under the settings in force now, and records which version that was
+    // and every input it used, so it can be replayed to the same answer.
+    const settings = currentPolicy(db);
+    const inputs = {
+      quantity: claim.quantity, deliveredAt: order.delivered_at, claimedAt: claim.created_at,
+      refundableCents: refundableBalance(order.amount_cents, ops), flags, agentSpentCents: agentSpent(db),
+    };
+    const draft = draftProposal({ line, findings: result?.findings ?? null, settings, ...inputs });
+    const options = draft.route === "reject" ? [] : resolutionOptions({
       remedies, quantity: draft.calculation.quantity, findings: result?.findings ?? null, amountCents: draft.amountCents,
+      fullRefund: draft.amountCents >= draft.calculation.grossCents,
     });
     const proposalId = randomUUID();
     db.prepare(`INSERT INTO proposals (id, claim_id, claim_version, assessment_id, policy_version, route, amount_cents,
       currency, calc_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(proposalId, claimId, claim.version, assessmentId, draft.policyVersion, draft.route, draft.amountCents,
-        draft.currency, JSON.stringify({ reasons: draft.reasons, calculation: draft.calculation, options }), ts);
+        draft.currency, JSON.stringify({ reasons: draft.reasons, decidedBy: draft.decidedBy, askForPhotos: draft.askForPhotos, hardReject: draft.hardReject,
+          calculation: draft.calculation, options, policyId: settings.id, inputs }), ts);
 
     db.prepare("UPDATE claims SET status = 'ready', updated_at = ? WHERE id = ?").run(ts, claimId);
     audit(db, { claimId, actor, type: error ? "assessment.failed" : "assessment.completed",
       payload: { route: draft.route, amountCents: draft.amountCents, error } });
     if (matched?.error) audit(db, { claimId, actor: "system", type: "match.failed", payload: { error: matched.error } });
-    if (suggested && draft.route !== "request_info" && draft.amountCents > 0 && itemConfirmed(result?.findings)) {
+    if (suggested && draft.route !== "reject" && draft.amountCents > 0 && itemConfirmed(result?.findings)) {
       if (suggested.error) audit(db, { claimId, actor: "system", type: "suggestion.failed", payload: { error: suggested.error } });
       else {
         storeSuggestions(db, { claimId, proposalId, model: suggested.model, suggestions: suggested.suggestions });
@@ -246,18 +253,20 @@ export function requestInfo(db, claimId, message, actor) {
   return transition(db, claimId, ["new", "ready"], "needs_info", actor, "claim.info_requested", { message: msg });
 }
 
-export function closeClaim(db, claimId, reason, actor) {
+export function closeClaim(db, claimId, reason, actor, inTx = false) {
   const why = String(reason || "").trim();
   if (why.length < 3) throw new ClaimError("INVALID", "Give a reason for closing without a refund.");
-  return transition(db, claimId, ["new", "ready", "needs_info"], "closed", actor, "claim.closed", { reason: why });
+  return transition(db, claimId, ["new", "ready", "needs_info"], "closed", actor, "claim.closed", { reason: why }, inTx);
 }
 
-function transition(db, claimId, from, to, actor, type, payload) {
-  return tx(db, () => {
+// inTx: the caller already holds a transaction (the refund agent closing a case it decided on).
+function transition(db, claimId, from, to, actor, type, payload, inTx = false) {
+  const step = () => {
     const c = db.prepare("SELECT * FROM claims WHERE id = ?").get(claimId);
     if (!c) throw new ClaimError("NOT_FOUND", "No such request.", 404);
     if (!from.includes(c.status)) throw new ClaimError("INVALID_STATE", `Request is ${c.status}.`, 409);
     db.prepare("UPDATE claims SET status = ?, version = version + 1, updated_at = ? WHERE id = ?").run(to, now(), claimId);
     audit(db, { claimId, actor, type, payload });
-  });
+  };
+  return inTx ? step() : tx(db, step);
 }

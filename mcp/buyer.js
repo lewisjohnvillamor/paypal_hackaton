@@ -54,7 +54,7 @@ function statusText(s, statusLink) {
   if (s.closeReason) lines.push(`The shop's reason: ${s.closeReason}`);
   if (s.offer?.open) {
     lines.push("The shop offers these choices (pick one with choose_option, after asking the buyer):");
-    for (const o of s.offer.options) lines.push(`- ${o.id}: ${o.kind === "refund" ? `Full refund, ${usd(o.refundCents)} back` : `${o.title}: ${o.refundCents ? `${usd(o.refundCents)} back, plus ` : ""}${o.item ?? ""}`}`);
+    for (const o of s.offer.options) lines.push(`- ${o.id}: ${o.kind === "refund" ? `${o.title ?? "Full refund"}, ${usd(o.refundCents)} back` : `${o.title}: ${o.refundCents ? `${usd(o.refundCents)} back, plus ` : ""}${o.item ?? ""}`}`);
   } else if (s.offer?.chosen) lines.push(`Chosen: ${s.offer.options.find((o) => o.id === s.offer.chosen)?.title ?? s.offer.chosen}.`);
   if (statusLink) lines.push(`Status link: ${statusLink}`);
   return lines.join("\n");

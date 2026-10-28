@@ -13,10 +13,12 @@ import { PRODUCTS } from "../catalog.js";
 import { kindOf } from "../kinds.js";
 import { formatUsd as usd } from "../money.js";
 import { REASON_TEXT } from "../reasons.js";
+import { isAutoRoute } from "../policy/refundPolicy.js";
+import { AUTO_CEILING_CENTS, DEFAULT_POLICY } from "../policy/settings.js";
 
 export const MAX_RULES = 8;
 // No rule may let the agent send more than this on one request, whatever the words said.
-export const AGENT_CEILING_CENTS = Number(process.env.AGENT_CEILING_CENTS || 20000);
+export const AGENT_CEILING_CENTS = AUTO_CEILING_CENTS;
 export const DEFAULT_DAILY_CENTS = 10000;
 // The AI must be at least this sure of the damage type before a rule that names one applies.
 export const DAMAGE_SURE = 0.5;
@@ -87,19 +89,31 @@ export function describeRules({ rules, dailyLimitCents }) {
   return [
     ...lines,
     `Never more than ${usd(dailyLimitCents)} in a day without you.`,
-    "Only when the photo check is clear and nothing looks off; anything else waits for you.",
+    "Only when your refund policy marks a request safe to refund automatically; anything else waits for you.",
   ];
 }
 
 // The agent's judgment on one reviewed request. Returns { act, rule, code, why }: act is "refund",
-// "offer" or null (leave it for the merchant), why is one sentence for the merchant.
-// ctx: { route, reasons, amountCents, sku, findings, options, spentCents }
+// "offer", "decline" or null (leave it for the merchant), why is one sentence for the merchant.
+// The refund policy's outcome comes first: the agent only refunds what the policy marked
+// "auto_refund", and only declines what the shop's own records rule out.
+// ctx: { route, reasons, decidedBy, hardReject, askForPhotos, amountCents, sku, findings, options,
+//        spentCents, policy }
 export function decide(mandate, ctx) {
   const leave = (code, why) => ({ act: null, rule: null, code, why });
-  if (ctx.route === "request_info") return leave("ASKING_FOR_PHOTOS", "The photos aren't usable yet, so the buyer is asked for clearer ones first.");
-  if (ctx.route !== "propose") {
-    const first = REASON_TEXT[ctx.reasons?.[0]];
-    return leave("POLICY_FLAGGED", `The refund policy raised a concern, so you decide.${first ? ` ${first}` : ""}`);
+  const policy = ctx.policy ?? DEFAULT_POLICY;
+  const said = REASON_TEXT[ctx.decidedBy ?? ctx.reasons?.[0]];
+  if (ctx.route === "request_info" || ctx.askForPhotos) return leave("ASKING_FOR_PHOTOS", "The photos aren't usable yet, so the buyer is asked for clearer ones first.");
+  if (ctx.route === "reject") {
+    if (ctx.hardReject && policy.agentDeclines) return { act: "decline", rule: null, code: "POLICY_DECLINED", why: said ?? "The shop's records rule this request out." };
+    return leave("POLICY_REJECTED", `The refund policy recommends no refund, and a person confirms that.${said ? ` ${said}` : ""}`);
+  }
+  if (!isAutoRoute(ctx.route)) {
+    return leave("POLICY_FLAGGED", `The refund policy raised a concern, so you decide.${said ? ` ${said}` : ""}`);
+  }
+  // The policy's limits as they stand now; they may have been tightened since the case was drafted.
+  if (ctx.amountCents > policy.autoRefundMaxCents) {
+    return leave("OVER_LIMIT", `${usd(ctx.amountCents)} is above your ${usd(policy.autoRefundMaxCents)} automatic refund limit.`);
   }
   const f = ctx.findings ?? {};
   const labels = damageChoices();
@@ -118,8 +132,9 @@ export function decide(mandate, ctx) {
     const limit = Math.max(...covering.map((r) => r.maxRefundCents));
     return leave("OVER_LIMIT", `${usd(ctx.amountCents)} is above your ${usd(limit)} limit for this.`);
   }
-  if (ctx.spentCents + ctx.amountCents > mandate.dailyLimitCents) {
-    return leave("DAILY_LIMIT", `This would take the agent past your ${usd(mandate.dailyLimitCents)} daily limit (${usd(ctx.spentCents)} sent in the last 24 hours).`);
+  const daily = Math.min(mandate.dailyLimitCents, policy.dailyAutoRefundCents);
+  if (ctx.spentCents + ctx.amountCents > daily) {
+    return leave("DAILY_LIMIT", `This would take the agent past your ${usd(daily)} daily limit (${usd(ctx.spentCents)} sent in the last 24 hours).`);
   }
   // A rule that offers remedies only applies when there is something to offer besides the refund.
   const rule = within.find((r) => r.action === "refund" || (ctx.options ?? 0) >= 2);

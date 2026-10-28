@@ -15,9 +15,11 @@ export function fakePayPal({ refundBehavior, ledger, payerEmail = () => "buyer@e
   const calls = { refunds: [], orders: 0 };
   const refunds = new Map(); // requestId -> refund (PayPal idempotency)
   let seq = 0;
+  const totals = new Map(); // orderId -> total, so a capture matches what was ordered
   const pp = {
     calls,
     async createOrder({ totalValue }) {
+      totals.set(`ORDER-${seq + 1}`, totalValue);
       return { status: 201, body: { id: `ORDER-${++seq}`, status: "CREATED", links: [{ rel: "approve", href: "https://example/approve" }], total: totalValue } };
     },
     async captureOrder(orderId) {
@@ -25,7 +27,7 @@ export function fakePayPal({ refundBehavior, ledger, payerEmail = () => "buyer@e
         status: 201,
         body: {
           id: orderId, status: "COMPLETED", payer: { email_address: payerEmail(orderId) },
-          purchase_units: [{ payee: { merchant_id: "MERCHANT123" }, payments: { captures: [{ id: `CAP-${orderId}`, status: "COMPLETED", amount: { currency_code: "USD", value: "80.00" } }] } }],
+          purchase_units: [{ payee: { merchant_id: "MERCHANT123" }, payments: { captures: [{ id: `CAP-${orderId}`, status: "COMPLETED", amount: { currency_code: "USD", value: totals.get(orderId) ?? "80.00" } }] } }],
         },
       };
     },
@@ -66,6 +68,7 @@ export function fakePayPal({ refundBehavior, ledger, payerEmail = () => "buyer@e
 export const clearFindings = {
   evidence_usable: "yes", visible_breakage: "yes", product_consistency: "consistent", damage_kind: "shattered",
   design_match: "match", stock_photo_suspected: false, instructions_in_photo: false,
+  signals: { evidence_usable: 0.95, visible_breakage: 0.95, damage_kind: { choice: "shattered", confidence: 0.9 } },
 };
 
 export const fakeAssess = (findings = clearFindings) => async () => ({
