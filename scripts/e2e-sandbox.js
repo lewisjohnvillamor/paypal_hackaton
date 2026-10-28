@@ -12,7 +12,7 @@ const shots = process.env.SHOTS_DIR || "hackathon/screenshots";
 mkdirSync(shots, { recursive: true });
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 const shot = async (name) => { await page.waitForTimeout(800); return page.screenshot({ path: `${shots}/${name}.png`, fullPage: true }); };
 
@@ -65,10 +65,11 @@ await page.waitForSelector("#login:not(.hidden)");
 await shot("1c-merchant-login");
 await page.fill("#password", process.env.MERCHANT_PASSWORD);
 await page.click("#login button[type=submit]");
-await page.waitForSelector("#inbox:not(.hidden) a.inbox-row");
+await page.waitForSelector("#inbox:not(.hidden)");
+await page.waitForTimeout(2500); // the AG Grid inbox loads from a CDN
 await shot("2-merchant-inbox");
-await page.click("a.inbox-row");
-await page.waitForSelector("#approve");
+await page.goto(`${BASE}/merchant/case?id=${new URL(BASE + statusUrl).searchParams.get("claim")}`);
+await page.waitForSelector("#approve", { state: "attached", timeout: 60_000 });
 await shot("3-merchant-case");
 if (process.env.E2E_OFFER) {
   if (!(await page.$("#send-offer"))) throw new Error("No repair offer for this photo; try probe/cases/chipped-closeup.jpg");
@@ -80,6 +81,7 @@ if (process.env.E2E_OFFER) {
   await page.waitForSelector("[data-option]");
   await shot("7-buyer-choose");
   await page.click('[data-option="kintsugi_gold"]');
+  await page.click("#confirm");
   await page.waitForSelector(".option.chosen", { timeout: 60_000 });
   await shot("8-buyer-chose-kit");
   const cookies = await page.context().cookies();

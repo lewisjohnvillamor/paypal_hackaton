@@ -318,7 +318,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const { app, db, queue } = createApp();
   // Resume reconciliation of refunds that were in flight when the server last stopped, and any
   // claims that were waiting for assessment.
-  reconcileOpen(db, paypal).then((n) => n && console.log(`Reconciled ${n} open refund operation(s)`));
+  reconcileOpen(db, paypal, { atStartup: true }).then((n) => n && console.log(`Reconciled ${n} open refund operation(s)`));
   const waiting = queue.resume();
   if (waiting) console.log(`Resumed assessment of ${waiting} claim(s)`);
   setInterval(() => reconcileOpen(db, paypal).catch(() => {}), 60_000).unref();

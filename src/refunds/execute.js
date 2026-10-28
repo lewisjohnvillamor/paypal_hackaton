@@ -49,7 +49,8 @@ export async function checkPayPalLedger(db, paypal, claimId) {
     audit(db, { claimId, actor: "system", type: "paypal.capture_not_refundable", payload: { captureStatus: cap.status } });
     throw new GateError("CAPTURE_NOT_REFUNDABLE", `PayPal reports this payment as ${cap.status}; it cannot be refunded here.`);
   }
-  const ours = new Set(ops.map((o) => o.provider_refund_id).filter(Boolean));
+  // A refund PayPal lists under the ID of one of our failed operations is not accounted for either.
+  const ours = new Set(ops.filter((o) => o.status !== "FAILED").map((o) => o.provider_refund_id).filter(Boolean));
   const external = (payments.refunds ?? []).filter((r) => !ours.has(r.id) && !["FAILED", "CANCELLED"].includes(r.status));
   if (external.length) {
     audit(db, { claimId, actor: "system", type: "paypal.external_refund_detected",
@@ -149,7 +150,17 @@ function applyProviderResult(db, op, { status, body, debugId }, actor) {
     error = body?.details?.[0]?.issue || body?.name || `PayPal ${status}`;
   }
 
-  tx(db, () => {
+  const settled = tx(db, () => {
+    // A late answer (a replay racing the original call) never reopens or fails a settled refund.
+    // The one exception is PayPal saying a refund we marked failed did happen: money moved, so the
+    // record follows PayPal.
+    const current = db.prepare("SELECT status FROM refund_ops WHERE id = ?").get(op.id);
+    const lateSuccess = current.status === "FAILED" && status >= 200 && status < 300;
+    if (!OPEN.includes(current.status) && !lateSuccess) {
+      audit(db, { claimId: op.claim_id, opId: op.id, actor, type: "refund.late_answer_ignored",
+        payload: { kept: current.status, answer: next, providerStatus, debugId, error } });
+      return true;
+    }
     db.prepare(`UPDATE refund_ops SET status = ?, provider_refund_id = COALESCE(?, provider_refund_id), provider_status = ?,
       debug_id = COALESCE(?, debug_id), error = ?, updated_at = ? WHERE id = ?`)
       .run(next, body?.id ?? null, providerStatus, debugId ?? null, error, ts, op.id);
@@ -157,7 +168,9 @@ function applyProviderResult(db, op, { status, body, debugId }, actor) {
     db.prepare("UPDATE claims SET status = ?, version = version + 1, updated_at = ? WHERE id = ?").run(claimStatus, ts, op.claim_id);
     audit(db, { claimId: op.claim_id, opId: op.id, actor, type: `refund.${next.toLowerCase()}`,
       payload: { providerStatus, refundId: body?.id ?? null, debugId, error } });
+    return false;
   });
+  if (settled) return db.prepare("SELECT * FROM refund_ops WHERE id = ?").get(op.id);
   return db.prepare("SELECT * FROM refund_ops WHERE id = ?").get(op.id);
 }
 
@@ -193,8 +206,14 @@ export async function reconcile(db, paypal, opId, actor = "system") {
   return submit(db, paypal, op, actor);
 }
 
-export async function reconcileOpen(db, paypal) {
-  const open = db.prepare("SELECT id FROM refund_ops WHERE status IN ('SUBMITTING','PENDING','UNKNOWN')").all();
+// A SUBMITTING operation younger than the PayPal timeout may still be in flight from a click or
+// the agent; the periodic sweep leaves it to that call rather than racing it with a replay.
+const IN_FLIGHT_MS = 60_000;
+
+export async function reconcileOpen(db, paypal, { atStartup = false, at = Date.now() } = {}) {
+  const recent = atStartup ? now() : new Date(at - IN_FLIGHT_MS).toISOString();
+  const open = db.prepare(`SELECT id FROM refund_ops WHERE status IN ('PENDING','UNKNOWN')
+    OR (status = 'SUBMITTING' AND updated_at < ?)`).all(recent);
   for (const { id } of open) await reconcile(db, paypal, id).catch(() => {});
   return open.length;
 }

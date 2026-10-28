@@ -176,3 +176,16 @@ Deploy to Render with a persistent disk, then record the 3-minute demo following
 - Stitch: `node scripts/stitch-agent-video.js data/agent-video <music.mp3>`. Playwright's video drifts from the wall clock (up to 10 s on a long take), so the recorder flips a corner square at every cut and line and the stitcher maps times through those flips.
 - Music: "Inspired", Kevin MacLeod (incompetech.com), CC BY 4.0; the credit goes in the YouTube description.
 - The generated `demo-photos/5-mug-in-pieces.jpg` is now flagged as a likely stock photo by the live check (4 of 4 runs), so the agent rightly holds it; the video uses the snapped-handle photo for the assistant scene.
+
+## Correctness audit (2026-10-28)
+
+Live on the PayPal sandbox with the real photo checks: merchant approval ($20 COMPLETED, a second
+click refused with 409), buyer's pick of the gold-leaf kit ($3 COMPLETED), the refund agent ($20
+COMPLETED with no click; the vase left for the merchant) and the agent-to-agent demo ($20 COMPLETED,
+confirmed by the merchant's assistant against PayPal). One money bug found and fixed: a replay of a
+refund request (the 60 s reconcile sweep, or the merchant's reconcile button) could answer after the
+original call and mark a completed refund FAILED, which released its funds and allowed a second real
+refund for the same item. A settled refund now ignores late answers (except PayPal confirming a
+refund we had marked failed), the sweep skips calls still in flight, and a refund PayPal lists under
+a failed operation's ID blocks new refunds. `scripts/e2e-sandbox.js` was updated for the AG Grid
+inbox and the pick-then-confirm buyer step. 95 tests pass.

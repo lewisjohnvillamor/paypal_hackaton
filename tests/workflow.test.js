@@ -109,10 +109,109 @@ test("open operations survive a restart and reconcile without a new logical refu
     const d = (await t.merchant("GET", `/claims/${claimId}`)).body;
     await approve(t, d);
     fail = false;
-    assert.equal(await reconcileOpen(t.db, pp), 1); // what the server runs at startup
+    assert.equal(await reconcileOpen(t.db, pp, { atStartup: true }), 1); // what the server runs at startup
     const op = t.db.prepare("SELECT * FROM refund_ops").all();
     assert.equal(op.length, 1);
     assert.equal(op[0].status, "COMPLETED");
+  } finally { t.close(); }
+});
+
+// A replay with the same PayPal-Request-Id can race the original call (the periodic sweep, or a
+// merchant pressing reconcile while a click is still in flight) and answer after it.
+const raceInProgress = { status: 422, body: { name: "UNPROCESSABLE_ENTITY", details: [{ issue: "PREVIOUS_REQUEST_IN_PROGRESS" }] } };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+test("a late rejection from a racing replay cannot undo a completed refund or free its funds", async () => {
+  let n = 0, release;
+  const gate = new Promise((r) => (release = r));
+  const pp = fakePayPal({ refundBehavior: async () => {
+    n++;
+    if (n === 1) { await gate; return null; } // the click's call: slow, then COMPLETED
+    if (n === 2) { await sleep(100); return raceInProgress; } // the replay answers after it
+    return null;
+  } });
+  const t = await setup({ pp });
+  try {
+    const { claimId } = await purchaseAndClaim(t);
+    await t.login();
+    const d = (await t.merchant("GET", `/claims/${claimId}`)).body;
+    const click = approve(t, d);
+    await sleep(50);
+    const [op] = t.db.prepare("SELECT id FROM refund_ops").all();
+    const replay = t.merchant("POST", `/refunds/${op.id}/reconcile`);
+    await sleep(20);
+    release();
+    await Promise.all([click, replay]);
+    const after = (await t.merchant("GET", `/claims/${claimId}`)).body;
+    assert.equal(after.refunds[0].status, "COMPLETED");
+    assert.equal(after.claim.status, "refunded");
+    assert.equal(after.payment.refundableCents, 6000, "the completed refund still counts against the payment");
+    assert.ok(t.db.prepare("SELECT 1 FROM audit WHERE type = 'refund.late_answer_ignored'").get());
+  } finally { t.close(); }
+});
+
+test("a refund marked failed that PayPal later shows as made is adopted, and blocks a second refund", async () => {
+  let n = 0, release;
+  const gate = new Promise((r) => (release = r));
+  const pp = fakePayPal({ refundBehavior: async () => {
+    n++;
+    if (n === 1) { await gate; return null; } // the click's call: slow, then COMPLETED
+    if (n === 2) return raceInProgress; // the replay is rejected first
+    return null;
+  } });
+  const t = await setup({ pp });
+  try {
+    const { claimId } = await purchaseAndClaim(t);
+    await t.login();
+    const d = (await t.merchant("GET", `/claims/${claimId}`)).body;
+    const click = approve(t, d);
+    await sleep(50);
+    const [op] = t.db.prepare("SELECT id FROM refund_ops").all();
+    await t.merchant("POST", `/refunds/${op.id}/reconcile`);
+    assert.equal(t.db.prepare("SELECT status FROM refund_ops").get().status, "FAILED");
+    release();
+    await click;
+    const after = (await t.merchant("GET", `/claims/${claimId}`)).body;
+    assert.equal(after.refunds[0].status, "COMPLETED");
+    assert.equal(after.claim.status, "refunded");
+    assert.equal(new Set(pp.calls.refunds.map((c) => c.requestId)).size, 1, "one logical refund");
+  } finally { t.close(); }
+});
+
+test("a failed operation whose refund PayPal lists anyway blocks new refunds as unaccounted", async () => {
+  const pp = fakePayPal();
+  const t = await setup({ pp });
+  try {
+    const { claimId } = await purchaseAndClaim(t);
+    await t.login();
+    const d = (await t.merchant("GET", `/claims/${claimId}`)).body;
+    await approve(t, d);
+    // Our record says failed, PayPal says the refund went through.
+    t.db.prepare("UPDATE refund_ops SET status = 'FAILED'").run();
+    t.db.prepare("UPDATE claims SET status = 'ready'").run();
+    await t.merchant("POST", `/claims/${claimId}/assess`);
+    const d2 = (await t.merchant("GET", `/claims/${claimId}`)).body;
+    const r = await approve(t, d2, { reason: "trying again" });
+    assert.equal(r.body.error, "EXTERNAL_REFUND_DETECTED");
+    assert.equal(pp.calls.refunds.length, 1);
+  } finally { t.close(); }
+});
+
+test("the periodic sweep leaves a refund call that is still in flight alone", { timeout: 10_000 }, async () => {
+  let release;
+  const gate = new Promise((r) => (release = r));
+  const pp = fakePayPal({ refundBehavior: async () => { await gate; return null; } });
+  const t = await setup({ pp });
+  try {
+    const { claimId } = await purchaseAndClaim(t);
+    await t.login();
+    const d = (await t.merchant("GET", `/claims/${claimId}`)).body;
+    const click = approve(t, d);
+    await sleep(50);
+    assert.equal(await reconcileOpen(t.db, pp), 0);
+    assert.equal(pp.calls.refunds.length, 1);
+    release();
+    assert.equal((await click).body.claim.status, "refunded");
   } finally { t.close(); }
 });
 
