@@ -120,8 +120,10 @@
         if (document.readyState === "complete") draw(); else window.addEventListener("load", draw, { once: true });
         settle();
       } catch (e) {
-        if (e.status === 401) $("signin").classList.remove("hidden");
-        else say(e.message, "bad");
+        // Signed out, or a connected store (the agent and remedies are the demo store's so far):
+        // the page itself stays hidden, so the reason shows in the card instead.
+        if (e.status !== 401) $("signin").firstElementChild.textContent = e.message;
+        $("signin").classList.remove("hidden");
       }
     }
     load();

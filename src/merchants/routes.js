@@ -36,7 +36,7 @@ export function platformRoutes(app, { db, clientFor, paypalFor, fetchImage, limi
       merchant: getMerchant(db, id), demo: id === DEMO, baseUrl: baseUrl(req), categories: CATEGORIES, claimLinkDays: CLAIM_LINK_DAYS,
       connection, keys, counts: { orders, requests },
       checklist: [
-        { id: "paypal", title: "Connect your PayPal account", done: !!connection },
+        { id: "paypal", title: "Connect your PayPal account", done: !!connection && !connection.needsReconnect },
         { id: "key", title: "Create a secret key for your server", done: keys.some((k) => !k.revokedAt) },
         { id: "order", title: "Send your first order to Refund Relay", done: orders > 0 },
         { id: "button", title: "Show buyers the Report a problem button", done: requests > 0 },

@@ -62,7 +62,7 @@
             <div><label for="daily">Most in any 24 hours <span class="hint" id="spent">Across every automatic refund.</span></label><input id="daily" type="number" min="0.01" step="0.01" inputmode="decimal" required></div>
             <div><label for="window">Reporting window, days <span class="hint">Later reports are declined.</span></label><input id="window" type="number" min="1" max="90" step="1" inputmode="numeric" required></div>
           </div>
-          <div class="optin"><input type="checkbox" id="declines"><label for="declines">Let the refund agent close requests your own records rule out <span class="hint">Late reports, more items than were bought, a payment already refunded, or your own catalog photo sent back. A decline based on the photos always waits for you.</span></label></div>
+          <div class="optin" data-demo-only><input type="checkbox" id="declines"><label for="declines">Let the refund agent close requests your own records rule out <span class="hint">Late reports, more items than were bought, a payment already refunded, or your own catalog photo sent back. A decline based on the photos always waits for you.</span></label></div>
         </section>
 
         <section class="card" aria-labelledby="h-sure">
@@ -95,7 +95,7 @@
 
     function drawOutcomes(p) {
       $("outcomes").innerHTML = [
-        ["ok", "Refund", `Every check passes: clear photos of your product, damage the photo check is at least ${Math.round(p.minDamageSeen * 100)}% sure of, its kind at least ${Math.round(p.minDamageTypeSure * 100)}% sure, no risk flags, and the amount from the table below is at most ${usd(p.autoRefundMaxCents)} and keeps the day under ${usd(p.dailyAutoRefundCents)}. Your refund agent sends it, or you approve it in one click.`],
+        ["ok", "Refund", `Every check passes: clear photos of your product, damage the photo check is at least ${Math.round(p.minDamageSeen * 100)}% sure of, its kind at least ${Math.round(p.minDamageTypeSure * 100)}% sure, no risk flags, and the amount from the table below is at most ${usd(p.autoRefundMaxCents)} and keeps the day under ${usd(p.dailyAutoRefundCents)}. You approve it in one click, or your refund agent sends it when its rules are on.`],
         ["warn", "You review", "Anything doubtful, risky or over a limit: borderline photos, an unsure damage type, a possibly different product, a reused or stock-looking photo, a repeat claimant, more than one item, or an amount above your limits. You see the drafted amount and the reason."],
         ["bad", "No refund", `Ruled out by your records (reported more than ${p.claimWindowDays} days after delivery, more items than bought, nothing left to refund, your own catalog photo), or by clear photos: no damage seen, two checks agreeing it is a different product, or damage your table pays 0% for. Unusable photos ask the buyer for clearer ones.`],
       ].map(([tone, label, text]) => `<li><span class="pill ${tone}">${label}</span><p>${esc(text)}</p></li>`).join("");

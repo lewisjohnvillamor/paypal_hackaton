@@ -27,8 +27,8 @@ function merchantPayPal(orders) {
           purchase_units: [{
             payee: { merchant_id: o.payee ?? "SHOPPAYEE1" },
             payments: {
-              captures: o.uncaptured ? [] : [{ id: `CAP-${id}`, status: own.length ? "PARTIALLY_REFUNDED" : "COMPLETED", amount: { currency_code: o.currency ?? "USD", value: o.total }, create_time: "2026-10-28T10:00:00Z" }],
-              refunds: own,
+              captures: o.uncaptured ? [] : [{ id: `CAP-${id}`, status: own.length || o.refunds ? "PARTIALLY_REFUNDED" : "COMPLETED", amount: { currency_code: o.currency ?? "USD", value: o.total }, create_time: o.captured ?? "2026-10-28T10:00:00Z" }],
+              refunds: [...(o.refunds ?? []), ...own],
             },
           }],
         },
@@ -273,7 +273,102 @@ test("each store keeps its own refund policy; the agent and remedy library stay 
 });
 
 test("catalog photos are only fetched from public https hosts", async () => {
-  for (const url of ["https://127.0.0.1/a.jpg", "https://10.0.0.5/a.jpg", "https://[::1]/a.jpg", "https://169.254.169.254/latest/meta-data"]) {
+  for (const url of ["https://127.0.0.1/a.jpg", "https://10.0.0.5/a.jpg", "https://[::1]/a.jpg", "https://169.254.169.254/latest/meta-data",
+    "https://[::]/a.jpg", "https://[::ffff:127.0.0.1]/a.jpg", "https://[::127.0.0.1]/a.jpg", "https://0x7f.1/a.jpg", "https://localhost/a.jpg",
+    "https://100.100.100.200/a.jpg", "https://[fd00::1]/a.jpg", "https://[fe80::1]/a.jpg", "http://cdn.example.com/a.jpg"]) {
     await assert.rejects(fetchCatalogImage(url), /host not allowed/, url);
   }
+});
+
+test("a retried POST /v1/orders that races the first one stores the order once", async () => {
+  const p = await platform({ "5O190127TN364715T": { total: "37.00" } });
+  try {
+    const { key } = await connectedShop(p);
+    const both = await Promise.all([p.api(key, "POST", "/v1/orders", ORDER()), p.api(key, "POST", "/v1/orders", ORDER())]);
+    assert.deepEqual(both.map((r) => r.status).sort(), [200, 201], JSON.stringify(both.map((r) => r.body)));
+    assert.equal(both[0].body.id, both[1].body.id);
+    assert.equal(p.db.prepare("SELECT COUNT(*) n FROM orders").get().n, 1);
+    assert.equal(p.db.prepare("SELECT COUNT(*) n FROM order_lines").get().n, 1);
+  } finally { p.close(); }
+});
+
+test("an order already partly refunded in PayPal is refused, since every later refund would be blocked", async () => {
+  const p = await platform({ "5O190127TN364715T": { total: "37.00", refunds: [{ id: "DASHREF1", status: "COMPLETED", amount: { currency_code: "USD", value: "5.00" } }] } });
+  try {
+    const { key } = await connectedShop(p);
+    const r = await p.api(key, "POST", "/v1/orders", ORDER());
+    assert.equal(r.status, 422);
+    assert.match(r.body.message, /already partly refunded/);
+    assert.equal(p.db.prepare("SELECT COUNT(*) n FROM orders").get().n, 0);
+  } finally { p.close(); }
+});
+
+test("a stored PayPal secret that can no longer be read asks the store to reconnect instead of failing", async () => {
+  const p = await platform({ "5O190127TN364715T": { total: "37.00" } });
+  const before = process.env.CREDENTIALS_KEY;
+  try {
+    const { key } = await connectedShop(p);
+    process.env.CREDENTIALS_KEY = "a-different-credentials-key-0123456789";
+    const o = (await p.call("GET", "/api/dashboard")).body;
+    assert.equal(o.connection.needsReconnect, true);
+    assert.equal(o.checklist.find((x) => x.id === "paypal").done, false);
+    const r = await p.api(key, "POST", "/v1/orders", ORDER());
+    assert.equal(r.status, 409, JSON.stringify(r.body));
+    assert.equal(r.body.error, "PAYPAL_NOT_CONNECTED");
+    // Pasting the credentials again under the new key fixes it.
+    assert.equal((await p.call("PUT", "/api/dashboard/paypal", { body: { clientId: CLIENT_ID, clientSecret: SECRET } })).body.connection.needsReconnect, false);
+    assert.equal((await p.api(key, "POST", "/v1/orders", ORDER())).status, 201);
+  } finally {
+    if (before === undefined) delete process.env.CREDENTIALS_KEY; else process.env.CREDENTIALS_KEY = before;
+    p.close();
+  }
+});
+
+test("pasting the same PayPal app again keeps the payee its orders were paid to; another app starts over", async () => {
+  const p = await platform({ "5O190127TN364715T": { total: "37.00" } });
+  try {
+    const { key } = await connectedShop(p);
+    assert.equal((await p.api(key, "POST", "/v1/orders", ORDER())).status, 201);
+    const payee = () => p.db.prepare("SELECT payee_merchant_id p FROM paypal_connections").get().p;
+    assert.equal(payee(), "SHOPPAYEE1");
+    await p.call("PUT", "/api/dashboard/paypal", { body: { clientId: CLIENT_ID, clientSecret: SECRET } });
+    assert.equal(payee(), "SHOPPAYEE1", "a rotated secret does not drop the payee check");
+    await p.call("PUT", "/api/dashboard/paypal", { body: { clientId: "AnotherSandboxApp_0123456789", clientSecret: SECRET } });
+    assert.equal(payee(), null);
+  } finally { p.close(); }
+});
+
+test("the repeat-claimant flag only counts requests at the same store", async () => {
+  const p = await platform({ "5O190127TN364715T": { total: "37.00" }, "6SECONDORDER0001X": { total: "37.00" } });
+  const claimOn = async (reg) => {
+    const token = reg.claim_url.split("#t=")[1];
+    const link = await p.call("GET", `/api/claim-link/${reg.id}`, { headers: { "X-Claim-Token": token }, as: "buyer" });
+    const form = new FormData();
+    form.set("orderId", reg.id);
+    form.set("lineId", link.body.lines[0].id);
+    form.set("quantity", "1");
+    form.set("statement", "The mug arrived in pieces.");
+    form.append("photos", new Blob([await testPhoto(Math.floor(Math.random() * 1000))], { type: "image/jpeg" }), "p.jpg");
+    const c = await p.call("POST", "/api/claims", { form, headers: { "X-Claim-Token": token }, as: "buyer" });
+    assert.equal(c.status, 201, JSON.stringify(c.body));
+    return (await p.call("GET", `/api/merchant/claims/${c.body.claimId}`)).body.proposal.reasons;
+  };
+  try {
+    // The same buyer already has a request at the demo store.
+    const demoOrder = await p.call("POST", "/api/demo/orders", { as: "buyer" });
+    const cap = await p.call("POST", `/api/demo/orders/${demoOrder.body.paypalOrderId}/capture`, { as: "buyer" });
+    const form = new FormData();
+    form.set("orderId", cap.body.orderId);
+    form.set("lineId", cap.body.lines[0].id);
+    form.set("quantity", "1");
+    form.set("statement", "One mug arrived shattered.");
+    form.append("photos", new Blob([await testPhoto(3)], { type: "image/jpeg" }), "p.jpg");
+    assert.equal((await p.call("POST", "/api/claims", { form, headers: { "X-Claim-Token": cap.body.claimUrl.split("#t=")[1] }, as: "buyer" })).status, 201);
+
+    const { key } = await connectedShop(p);
+    const first = (await p.api(key, "POST", "/v1/orders", ORDER("5O190127TN364715T", { buyer_email: "buyer@example.com" }))).body;
+    assert.ok(!(await claimOn(first)).includes("REPEAT_CLAIMANT"), "a request at another store does not count");
+    const second = (await p.api(key, "POST", "/v1/orders", ORDER("6SECONDORDER0001X", { buyer_email: "buyer@example.com" }))).body;
+    assert.ok((await claimOn(second)).includes("REPEAT_CLAIMANT"), "an earlier request at the same store does");
+  } finally { p.close(); }
 });

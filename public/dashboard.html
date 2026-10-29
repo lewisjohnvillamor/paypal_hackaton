@@ -249,7 +249,8 @@ claim_url = res.json()["claim_url"]       # show it with relay.js or email it`,
       show("pp-connected", !!c);
       show("pp-form", !c && !s.demo);
       if (c) {
-        $("pp-connected").innerHTML = `<div class="kv-row"><span>App</span><span class="mono">${esc(c.clientId)}</span></div>
+        $("pp-connected").innerHTML = `${c.needsReconnect ? `<div class="notice warn" style="margin:0 0 12px">${ICON.info}<span>Refund Relay can no longer read your saved secret, so it cannot check orders or refund. Choose Replace and paste your Client ID and Secret again.</span></div>` : ""}
+          <div class="kv-row"><span>App</span><span class="mono">${esc(c.clientId)}</span></div>
           <div class="kv-row"><span>Paid to</span><span class="mono">${esc(c.payeeMerchantId || "Learned from your first order")}</span></div>
           <div class="kv-row"><span>Checked with PayPal</span><span>${c.source === "server" ? "Set on the server" : esc(when(c.verifiedAt))}</span></div>
           ${s.demo ? `<p class="small muted" style="margin:12px 0 0">The demo store's PayPal app is set on the server.</p>`
