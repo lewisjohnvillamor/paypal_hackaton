@@ -89,21 +89,25 @@ export function describeRules({ rules, dailyLimitCents }) {
   return [
     ...lines,
     `Never more than ${usd(dailyLimitCents)} in a day without you.`,
+    "When the photos can't be used, ask the buyer for clearer ones.",
     "Only when your refund policy marks a request safe to refund automatically; anything else waits for you.",
   ];
 }
 
 // The agent's judgment on one reviewed request. Returns { act, rule, code, why }: act is "refund",
-// "offer", "decline" or null (leave it for the merchant), why is one sentence for the merchant.
-// The refund policy's outcome comes first: the agent only refunds what the policy marked
-// "auto_refund", and only declines what the shop's own records rule out.
+// "offer", "decline", "ask" (ask the buyer for clearer photos) or null (leave it for the merchant),
+// why is one sentence for the merchant. The refund policy's outcome comes first: the agent only
+// refunds what the policy marked "auto_refund", and only declines what the shop's own records rule
+// out. Asking for photos moves no money, so the agent does it whenever the policy says to.
 // ctx: { route, reasons, decidedBy, hardReject, askForPhotos, amountCents, sku, findings, options,
 //        spentCents, policy }
 export function decide(mandate, ctx) {
   const leave = (code, why) => ({ act: null, rule: null, code, why });
   const policy = ctx.policy ?? DEFAULT_POLICY;
   const said = REASON_TEXT[ctx.decidedBy ?? ctx.reasons?.[0]];
-  if (ctx.route === "request_info" || ctx.askForPhotos) return leave("ASKING_FOR_PHOTOS", "The photos aren't usable yet, so the buyer is asked for clearer ones first.");
+  if (ctx.route === "request_info" || ctx.askForPhotos) {
+    return { act: "ask", rule: null, code: "ASKING_FOR_PHOTOS", why: "The photos aren't usable, so the buyer was asked for clearer ones." };
+  }
   if (ctx.route === "reject") {
     if (ctx.hardReject && policy.agentDeclines) return { act: "decline", rule: null, code: "POLICY_DECLINED", why: said ?? "The shop's records rule this request out." };
     return leave("POLICY_REJECTED", `The refund policy recommends no refund, and a person confirms that.${said ? ` ${said}` : ""}`);

@@ -35,6 +35,12 @@ services:
         sync: false
       - key: TYPESAFE_API_KEY
         sync: false
+      # Claude Haiku: plain-English rules for the refund agent, remedy suggestions and the second
+      # product check. Without it the agent page cannot read new rules.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_WORKSPACE_ID
+        sync: false
       - key: MERCHANT_PASSWORD
         sync: false
       - key: SESSION_SECRET

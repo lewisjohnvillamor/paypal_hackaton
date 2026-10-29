@@ -5,18 +5,20 @@
 // one open refund per payment, the refundable balance, idempotent retries.
 import { randomUUID } from "node:crypto";
 import { audit, now, tx } from "../db.js";
-import { checkPayPalLedger, reserve, submit } from "../refunds/execute.js";
+import { checkPayPalLedger, latestProposal, reserve, submit } from "../refunds/execute.js";
 import { openOffer } from "../offers.js";
 import { offerOptions } from "../suggest/suggestions.js";
 import { checkRules, decide, describeRules } from "./rules.js";
 import { agentSpent } from "./spend.js";
-import { closeClaim } from "../claims.js";
+import { closeClaim, requestInfo } from "../claims.js";
 import { currentPolicy } from "../policy/settings.js";
 import { BUYER_DECLINE } from "../reasons.js";
 
 export { agentSpent };
 
 const json = (s) => (s ? JSON.parse(s) : null);
+// What the buyer reads when the agent asks for clearer photos (the merchant's case page suggests the same).
+export const ASK_FOR_PHOTOS = "Please send a clear, well-lit photo that shows the damage and the whole item.";
 
 const view = (m) => !m ? null : {
   id: m.id, text: m.text, ...json(m.rules_json), model: m.model, createdAt: m.created_at,
@@ -56,7 +58,7 @@ function caseFacts(db, claimId) {
   if (!claim || claim.status !== "ready") return null;
   // The agent works for the demo store only, so far; a connected store's cases wait for a person.
   if (db.prepare("SELECT merchant_id FROM orders WHERE id = ?").get(claim.order_id)?.merchant_id !== "demo") return null;
-  const proposal = db.prepare("SELECT * FROM proposals WHERE claim_id = ? ORDER BY created_at DESC LIMIT 1").get(claimId);
+  const proposal = latestProposal(db, claimId);
   if (!proposal || proposal.claim_version !== claim.version) return null;
   const assessment = db.prepare("SELECT findings_json FROM assessments WHERE id = ?").get(proposal.assessment_id);
   const line = db.prepare("SELECT sku FROM order_lines WHERE id = ?").get(claim.line_id);
@@ -103,6 +105,10 @@ export async function runAgent(db, paypal, claimId) {
       const again = decide(current, facts.ctx);
       if (again.act !== d.act) throw Object.assign(new Error(again.why), { code: again.code });
       audit(db, { claimId, actor: "agent", type: "agent.acted", payload: { mandateId: mandate.id, act: d.act, rule: d.rule, why: d.why } });
+      if (d.act === "ask") {
+        requestInfo(db, claimId, ASK_FOR_PHOTOS, "agent", true);
+        return null;
+      }
       if (d.act === "decline") {
         closeClaim(db, claimId, BUYER_DECLINE[facts.ctx.decidedBy] ?? BUYER_DECLINE.DEFAULT, "agent", true);
         return null;

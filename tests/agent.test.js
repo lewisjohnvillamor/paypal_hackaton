@@ -3,7 +3,7 @@
 // PayPal, Jev and the rule-reading AI are test doubles.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clearFindings, fakeAssess, fakePayPal } from "./helpers.js";
+import { clearFindings, fakeAssess, fakePayPal, testPhoto } from "./helpers.js";
 import { purchaseAndClaim, setup } from "./harness.js";
 import { AGENT_CEILING_CENTS, checkRules, decide, describeRules } from "../src/agent/rules.js";
 
@@ -53,7 +53,9 @@ test("the agent acts only on a clear proposal inside a rule, the limit and the d
   assert.equal(decide(m, ctx()).rule, 0);
   const left = (o, code) => { const d = decide(m, ctx(o)); assert.equal(d.act, null); assert.equal(d.code, code, d.why); return d.why; };
   assert.match(left({ route: "manual_review", reasons: ["REPEAT_CLAIMANT"] }, "POLICY_FLAGGED"), /concern, so you decide. This buyer filed/);
-  left({ route: "request_info" }, "ASKING_FOR_PHOTOS");
+  // Unusable photos: the agent asks the buyer for clearer ones (no money moves), on any rules.
+  assert.equal(decide(m, ctx({ route: "request_info" })).act, "ask");
+  assert.equal(decide(m, ctx({ route: "reject", askForPhotos: true, sku: "VASE-GLASS" })).code, "ASKING_FOR_PHOTOS");
   assert.match(left({ amountCents: 4000 }, "OVER_LIMIT"), /\$40.00 is above your \$25.00 limit/);
   assert.match(left({ sku: "VASE-GLASS" }, "NO_RULE"), /clear glass cylinder vase/);
   assert.match(left({ findings: { ...chipped, damage_kind: "shattered", signals: { damage_kind: { confidence: 0.9 } } } }, "NO_RULE"), /don't cover broken into pieces/);
@@ -236,5 +238,37 @@ test("preview replays the rules over recent requests without acting on them", as
     const d = (await t.merchant("GET", `/claims/${c.claimId}`)).body;
     assert.equal(d.claim.status, "ready");
     assert.equal(t.pp.calls.refunds.length, 0);
+  } finally { t.close(); }
+});
+
+test("unusable photos: with rules on, the agent asks the buyer for clearer ones and the new photo is reviewed", async () => {
+  const blurry = { ...chipped, evidence_usable: "no" };
+  let findings = blurry;
+  const t = await setup({ pp: uniqueEmails(), assess: async () => ({ model: "fake-jev (test double)", findings, answers: {}, usage: {}, latencyMs: 1 }), parseRules: fakeParser(chippedMugs()) });
+  try {
+    // No rules on: the case waits for the merchant, and the buyer is not told anything yet.
+    const before = await purchaseAndClaim(t);
+    await t.login();
+    assert.equal((await t.merchant("GET", `/claims/${before.claimId}`)).body.claim.status, "ready");
+
+    await withRules(t);
+    const c = await purchaseAndClaim(t);
+    const d = (await t.merchant("GET", `/claims/${c.claimId}`)).body;
+    assert.equal(d.claim.status, "needs_info");
+    assert.equal(t.pp.calls.refunds.length, 0);
+    assert.ok(d.timeline.some((s) => s.actor === "agent" && /asked the buyer for clearer photos/.test(s.title)), JSON.stringify(d.timeline));
+    const headers = { "X-Claim-Token": c.statusToken };
+    const status = (await t.call("GET", `/api/claims/${c.claimId}/status`, { headers })).body;
+    assert.equal(status.status, "needs_info");
+    assert.match(status.infoRequest, /clear, well-lit photo/);
+
+    // The buyer (or their assistant) sends a clear photo; the agent refunds it under the rule.
+    findings = chipped;
+    const form = new FormData();
+    form.append("photos", new Blob([await testPhoto()], { type: "image/jpeg" }), "p.jpg");
+    const more = await t.call("POST", `/api/claims/${c.claimId}/evidence`, { form, headers });
+    assert.equal(more.status, 200, JSON.stringify(more.body));
+    assert.equal((await t.merchant("GET", `/claims/${c.claimId}`)).body.claim.status, "refunded");
+    assert.equal(t.pp.calls.refunds.length, 1);
   } finally { t.close(); }
 });

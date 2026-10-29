@@ -4,7 +4,7 @@
 // buyer's pick only selects among approved refunds; it can never raise one.
 import { randomUUID } from "node:crypto";
 import { audit, now, tx } from "./db.js";
-import { GateError, reserve } from "./refunds/execute.js";
+import { GateError, latestProposal, reserve } from "./refunds/execute.js";
 import { toDecimal } from "./money.js";
 import { offerOptions } from "./suggest/suggestions.js";
 import { isAutoRoute } from "./policy/refundPolicy.js";
@@ -20,8 +20,8 @@ export function openOffer(db, { claimId, claimVersion, proposalId, reason, actor
   if (!claim) throw new GateError("NOT_FOUND", "No such refund request.");
   if (claim.version !== claimVersion) throw new GateError("STALE_CASE", "This request changed since you opened it. Reload and review again.");
   if (claim.status !== "ready") throw new GateError("NOT_READY", `Request is ${claim.status}; an offer cannot be sent now.`);
-  const proposal = db.prepare("SELECT * FROM proposals WHERE id = ? AND claim_id = ?").get(proposalId, claimId);
-  if (!proposal || proposal.claim_version !== claim.version) {
+  const proposal = latestProposal(db, claimId);
+  if (!proposal || proposal.id !== proposalId || proposal.claim_version !== claim.version) {
     throw new GateError("STALE_CASE", "The proposal is out of date. Reload and review again.");
   }
   const options = offerOptions(db, proposal);

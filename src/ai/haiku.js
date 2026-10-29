@@ -15,7 +15,14 @@ const usd = (cents) => `$${(cents / 100).toFixed(2)}`;
 let client;
 // Keys not scoped to a workspace must name one on every request.
 const workspace = process.env.ANTHROPIC_WORKSPACE_ID;
-const anthropic = () => (client ??= new Anthropic(workspace ? { defaultHeaders: { "anthropic-workspace-id": workspace } } : {}));
+// The SDK's own default waits up to 10 minutes and retries twice. Every call here sits in a review
+// (holding a slot in the assessment queue) or in a merchant's request, and each one has a fallback,
+// so a slow answer fails fast instead: one retry, 30 seconds each.
+export const HAIKU_TIMEOUT_MS = Number(process.env.HAIKU_TIMEOUT_MS || 30_000);
+const anthropic = () => (client ??= new Anthropic({
+  timeout: HAIKU_TIMEOUT_MS, maxRetries: 1,
+  ...(workspace ? { defaultHeaders: { "anthropic-workspace-id": workspace } } : {}),
+}));
 
 const jpeg = (buf) => ({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: buf.toString("base64") } });
 
