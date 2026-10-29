@@ -4,10 +4,10 @@ What Refund Relay does when things go wrong or someone tries to game it. Each ro
 
 Two rules hold throughout:
 
-1. **The model and the shop's own records only route cases.** A doubtful finding or a risk flag sends the case to the merchant with a plain-language reason. Nothing automatically denies a claim, and nothing pays one without the merchant clicking approve.
+1. **The model only routes cases.** A doubtful finding or a risk flag sends the case to the merchant with a plain-language reason. Nothing is paid without the merchant's click, or the refund agent acting inside rules the merchant turned on and the refund policy marked safe. Only the shop's own records (too late, too many units, nothing left to refund, the shop's own catalog photo) close a request with no person involved.
 2. **When in doubt about money, block and reconcile.** If the app cannot be sure what PayPal did, it keeps the funds reserved and refuses new refunds on that payment until the record is clear.
 
-Tests are in `tests/edge-cases.test.js` (E), `tests/workflow.test.js` (W) and `tests/unit.test.js` (U). They use a fake PayPal and a fake Jev. Rows marked **live** were also checked against the real PayPal sandbox or the real Jev model on 2026-10-22.
+Tests are in `tests/edge-cases.test.js` (E), `tests/workflow.test.js` (W), `tests/unit.test.js` (U) and `tests/agent.test.js` (A). They use a fake PayPal and a fake Jev. Rows marked **live** were also checked against the real PayPal sandbox or the real Jev model on 2026-10-22.
 
 ## Photos and evidence
 
@@ -17,7 +17,7 @@ Tests are in `tests/edge-cases.test.js` (E), `tests/workflow.test.js` (W) and `t
 | Photo of the right mug that Jev can't confirm | Design match "unsure" does not flag anything. Jev is good at spotting a different mug and weak at confirming the right one, so only a clear mismatch counts. | `normalize()` | E: an unsure design match alone… |
 | Not a mug at all (plate, shard, other object) | The item check marks it as a different kind of product, and it goes to manual review. | `product_consistency` | U; **live**: broken plate caught |
 | Photo doesn't clearly show damage | "No breakage seen" or "unsure" goes to manual review. It is never an automatic denial. | policy `NO_BREAKAGE_SEEN`, `BREAKAGE_UNCERTAIN` | U |
-| Blurry, dark, or too-far-away photo | Unusable photos lead to "ask the buyer for clearer photos" with no amount offered. Borderline ones go to manual review. | policy `EVIDENCE_NOT_USABLE` | U; **live**: all blurred and dark photos caught |
+| Blurry, dark, or too-far-away photo | Unusable photos lead to "ask the buyer for clearer photos" with no amount offered. With the refund agent on, it asks the buyer itself (no money moves), so a buyer's assistant waiting on the request hears back; the new photo is reviewed again. Borderline ones go to manual review. | policy `EVIDENCE_NOT_USABLE`; agent `ask` | U; A: unusable photos… |
 | Same photo reused on a different claim, even resized or recompressed | A 64-bit image fingerprint matches within 8 bits, so the case is flagged "A photo closely matches one sent with a different refund request". | `src/images.js` `differenceHash`; `riskFlags()` | E: the same photo reused… |
 | Buyer uploads the shop's own catalog photo | Fingerprint match against the catalog photo flags it. | `PHOTO_MATCHES_CATALOG` | E |
 | Stock or professional photo from the internet | Jev flags images that look like studio or stock shots. | `looks_like_stock_photo` | E; **live**: no false alarms on 19 real snapshots (no true stock photo tested yet) |
@@ -40,7 +40,7 @@ Tests are in `tests/edge-cases.test.js` (E), `tests/workflow.test.js` (W) and `t
 | Second request on the same order while one is open | Rejected by a database constraint. | `one_active_claim_per_order` | W |
 | New request after the first was refunded or closed | Allowed, but flagged "This order already had an earlier refund request". | `PRIOR_CLAIM_ON_ORDER` | E (two tests) |
 | Same buyer files requests on several orders | Flagged as a repeat claimant (other orders, last 90 days). `REPEAT_CLAIM_LIMIT` sets the threshold; 0 turns it off for a shared demo buyer account. | `REPEAT_CLAIMANT` | E (two tests) |
-| Claim reported more than 14 days after delivery | Manual review. | `OUTSIDE_CLAIM_WINDOW` | U |
+| Claim reported after the store's reporting window (14 days unless the merchant changes it, 1 to 90) | No refund, from the shop's own records; the refund agent closes it with a reason the buyer reads. The claim link stays open for the whole window, even when that is longer than the link's own 14 days. | `OUTSIDE_CLAIM_WINDOW`; `orderForClaimToken()` | U; E: the claim link stays open… |
 | Someone guesses or reuses a claim link for another order | Rejected. Links are random, stored only as hashes, and tied to one order. | `orderForClaimToken()` | W; E |
 | Buyer adds photos after a refund or closure | Rejected. More photos are accepted only when the merchant asked for them. | evidence route | E |
 | New photos after the merchant started reviewing | Case version goes up and any earlier approval is stale. | `STALE_CASE` | W |
@@ -56,6 +56,8 @@ Tests are in `tests/edge-cases.test.js` (E), `tests/workflow.test.js` (W) and `t
 | Cross-site form post to the refund endpoint | Blocked by a SameSite=Strict cookie plus a required custom header. | `requireMerchant()` | W |
 | Model or network failure during review | The case still opens for manual review with "AI assessment unavailable". Findings are never invented. | `assessClaim()` | W |
 | Model returns malformed answers or takes over 20 s | Treated as an AI failure, as above. | `normalize()`; `AbortSignal.timeout` | E; U |
+| Claude Haiku slow or down (suggestions, second product check, rule writing) | Each call gives up after 30 s with one retry (`HAIKU_TIMEOUT_MS`), instead of the SDK's 10 minutes and two retries, so a stuck call cannot hold an assessment-queue slot. A failure is recorded and the review goes on without it. | `src/ai/haiku.js` | — |
+| Merchant runs the review again on the same photos, then approves from the old draft | Refused as stale: only the newest proposal can be approved or offered, even though the case version did not change. | `latestProposal()` | E: a review run again… |
 
 ## PayPal side
 

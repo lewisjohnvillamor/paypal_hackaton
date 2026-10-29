@@ -291,3 +291,51 @@ test("REPEAT_CLAIM_LIMIT=0 turns the repeat-claimant flag off for a shared demo 
     assert.equal((await detail(t, second.claimId)).proposal.route, "auto_refund");
   } finally { t.close(); delete process.env.REPEAT_CLAIM_LIMIT; }
 });
+
+// ---- Second bug hunt (2026-10-29) -----------------------------------------------------------
+
+test("a review run again drafts a new proposal; the earlier one can no longer be approved or offered", async () => {
+  let findings = clearFindings; // shattered: $20 under the default table
+  const t = await setup({ pp: uniqueEmails(), assess: async () => ({ model: "fake-jev (test double)", findings, answers: {}, usage: {}, latencyMs: 1 }) });
+  try {
+    const c = await purchaseAndClaim(t);
+    await t.login();
+    const first = await detail(t, c.claimId);
+    assert.equal(first.proposal.amountCents, 2000);
+    // Same photos, reviewed again: the photo check now sees only scratches (20%, $4).
+    findings = { ...clearFindings, damage_kind: "cosmetic", signals: { ...clearFindings.signals, damage_kind: { choice: "cosmetic", confidence: 0.9 } } };
+    const again = (await t.merchant("POST", `/claims/${c.claimId}/assess`)).body;
+    assert.equal(again.claim.version, first.claim.version); // no new photos, so no new version
+    assert.equal(again.proposal.amountCents, 400);
+    const stale = await approve(t, first);
+    assert.equal(stale.status, 409);
+    assert.equal(stale.body.error, "STALE_CASE");
+    const offer = await t.merchant("POST", `/claims/${c.claimId}/send-offer`, { claimVersion: first.claim.version, proposalId: first.proposal.id });
+    assert.equal(offer.status, 409);
+    assert.equal(t.pp.calls.refunds.length, 0);
+    const ok = await approve(t, again);
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    assert.equal(t.pp.calls.refunds[0].body.amount.value, "4.00");
+  } finally { t.close(); }
+});
+
+test("the claim link stays open for the store's whole reporting window, even past its own 14 days", async () => {
+  const t = await setup({ pp: uniqueEmails() });
+  try {
+    const o = await purchase(t);
+    const daysAgo = (d) => new Date(Date.now() - d * 86400e3).toISOString();
+    // Delivered 20 days ago; the link's own 14 days ran out 6 days ago.
+    t.db.prepare("UPDATE orders SET delivered_at = ? WHERE id = ?").run(daysAgo(20), o.orderId);
+    t.db.prepare("UPDATE claim_links SET expires_at = ? WHERE order_id = ?").run(daysAgo(6), o.orderId);
+    const open = () => t.call("GET", `/api/claim-link/${o.orderId}`, { headers: { "X-Claim-Token": o.token } });
+    assert.equal((await open()).status, 403); // default 14-day window: closed
+    await t.login();
+    const p = await t.merchant("PUT", "/policy", { claimWindowDays: 30 });
+    assert.equal(p.status, 200, JSON.stringify(p.body));
+    assert.equal((await open()).status, 200); // 30-day window: still open
+    // A wrong token is still refused, window or not.
+    assert.equal((await t.call("GET", `/api/claim-link/${o.orderId}`, { headers: { "X-Claim-Token": "nope" } })).status, 403);
+    const filed = await fileClaim(t, o);
+    assert.equal(filed.status, 201, JSON.stringify(filed.body));
+  } finally { t.close(); }
+});

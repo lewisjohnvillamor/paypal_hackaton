@@ -122,7 +122,8 @@ export function merchantServer({ base, password, paypal }) {
     const a = await get("/agent");
     return text({
       on: !!a.mandate, owner_wrote: a.mandate?.text ?? null, rules: a.mandate?.readback ?? [],
-      sent_last_24h: usd(a.spentCents), daily_limit: a.mandate ? usd(a.mandate.dailyLimitCents) : null,
+      // The agent stops at the lower of its rules' daily limit and the refund policy's.
+      sent_last_24h: usd(a.spentCents), daily_limit: a.mandate ? usd(Math.min(a.mandate.dailyLimitCents, a.policyDailyCents ?? Infinity)) : null,
       latest: a.recent.slice(0, 10).map((x) => `${x.ref} ${x.title}: ${x.acted ? x.act : "left for owner"} (${x.why})`),
     });
   });

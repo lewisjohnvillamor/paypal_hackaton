@@ -261,10 +261,10 @@ async function matchFor({ match, product, findings, photos, reference }) {
   }
 }
 
-export function requestInfo(db, claimId, message, actor) {
+export function requestInfo(db, claimId, message, actor, inTx = false) {
   const msg = String(message || "").trim();
   if (msg.length < 3) throw new ClaimError("INVALID", "Tell the buyer what you need.");
-  return transition(db, claimId, ["new", "ready"], "needs_info", actor, "claim.info_requested", { message: msg });
+  return transition(db, claimId, ["new", "ready"], "needs_info", actor, "claim.info_requested", { message: msg }, inTx);
 }
 
 export function closeClaim(db, claimId, reason, actor, inTx = false) {
@@ -273,7 +273,7 @@ export function closeClaim(db, claimId, reason, actor, inTx = false) {
   return transition(db, claimId, ["new", "ready", "needs_info"], "closed", actor, "claim.closed", { reason: why }, inTx);
 }
 
-// inTx: the caller already holds a transaction (the refund agent closing a case it decided on).
+// inTx: the caller already holds a transaction (the refund agent closing a case, or asking for photos).
 function transition(db, claimId, from, to, actor, type, payload, inTx = false) {
   const step = () => {
     const c = db.prepare("SELECT * FROM claims WHERE id = ?").get(claimId);

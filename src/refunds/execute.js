@@ -23,6 +23,11 @@ export function mapProviderStatus(s) {
 
 const OPEN = ["SUBMITTING", "PENDING", "UNKNOWN"];
 
+// A review run again on the same photos drafts a new proposal without changing the case version,
+// so "current" means the newest proposal, not merely one drafted for this version.
+export const latestProposal = (db, claimId) =>
+  db.prepare("SELECT * FROM proposals WHERE claim_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1").get(claimId);
+
 // Step 0 (network, before any reservation): compare PayPal's own record of the capture with ours.
 // Refunds issued from the PayPal dashboard, a reversed (charged-back) capture, or a capture PayPal
 // no longer considers refundable all block the app until a person reconciles them.
@@ -75,8 +80,8 @@ export function approveAndReserve(db, { claimId, claimVersion, proposalId, amoun
     if (claim.version !== claimVersion) throw new GateError("STALE_CASE", "This request changed since you opened it. Reload and review again.");
     if (claim.status !== "ready") throw new GateError("NOT_READY", `Request is ${claim.status}; it cannot be approved now.`);
 
-    const proposal = db.prepare("SELECT * FROM proposals WHERE id = ? AND claim_id = ?").get(proposalId, claimId);
-    if (!proposal || proposal.claim_version !== claim.version) {
+    const proposal = latestProposal(db, claimId);
+    if (!proposal || proposal.id !== proposalId || proposal.claim_version !== claim.version) {
       throw new GateError("STALE_CASE", "The proposal is out of date. Reload and review again.");
     }
     if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
