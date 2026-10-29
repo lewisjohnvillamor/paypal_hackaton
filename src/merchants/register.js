@@ -52,8 +52,15 @@ export function checkOrderBody(body) {
     if (!url || url.protocol !== "https:") throw new RegisterError("INVALID", `${at}.image_url must be an https link to the product's catalog photo.`);
     return { sku, title, quantity: it.quantity, unitCents, category: it.category, imageUrl: url.href };
   });
+  // Shipping and tax the checkout charged on top of the items: part of what PayPal captured, so part
+  // of what can be refunded, but never part of an item's worth under the refund policy.
+  const extra = (field) => {
+    if (body?.[field] == null || body[field] === "") return 0;
+    try { return toCents(body[field]); } catch { throw new RegisterError("INVALID", `${field} must be a USD amount such as "4.95", or left out.`); }
+  };
+  const shippingCents = extra("shipping"), taxCents = extra("tax");
   const buyerEmail = body?.buyer_email ? String(body.buyer_email).trim().toLowerCase().slice(0, 254) : null;
-  return { paypalOrderId, lines, buyerEmail };
+  return { paypalOrderId, lines, shippingCents, taxCents, buyerEmail };
 }
 
 // Private, loopback, link-local and other non-public addresses are never fetched (the URL comes
@@ -123,7 +130,7 @@ export const catalogPhotoPath = (file) => join(uploadDir(), "catalog", file);
 
 // client: the merchant's own PayPal client. Returns { order, claimToken, alreadyRegistered }.
 export async function registerOrder(db, { merchantId, client, body, fetchImage = fetchCatalogImage }) {
-  const { paypalOrderId, lines, buyerEmail } = checkOrderBody(body);
+  const { paypalOrderId, lines, shippingCents, taxCents, buyerEmail } = checkOrderBody(body);
   if (!client) throw new RegisterError("PAYPAL_NOT_CONNECTED", "Connect your PayPal account on the dashboard first.", 409);
 
   const existing = db.prepare("SELECT * FROM orders WHERE paypal_order_id = ?").get(paypalOrderId);
@@ -140,7 +147,8 @@ export async function registerOrder(db, { merchantId, client, body, fetchImage =
 
   const unit = res.body.purchase_units?.[0] ?? {};
   const cap = unit.payments?.captures?.[0];
-  const totalCents = lines.reduce((s, l) => s + l.unitCents * l.quantity, 0);
+  const itemsCents = lines.reduce((s, l) => s + l.unitCents * l.quantity, 0);
+  const totalCents = itemsCents + shippingCents + taxCents;
   const problems = [];
   if (res.body.purchase_units?.length !== 1) problems.push("the order must have exactly one purchase unit");
   if (!cap) problems.push("the order has no capture yet: capture the payment before registering it");
@@ -151,7 +159,8 @@ export async function registerOrder(db, { merchantId, client, body, fetchImage =
     // check stops at refunds it did not make), so a new order must arrive unrefunded.
     else if (!existing && (cap.status !== "COMPLETED" || refunded)) problems.push("the payment was already partly refunded in PayPal");
     if (cap.amount?.currency_code !== "USD") problems.push(`currency is ${cap.amount?.currency_code}; only USD is supported`);
-    else if (toCents(cap.amount.value) !== totalCents) problems.push(`PayPal captured ${cap.amount.value} USD but the items add up to ${toDecimal(totalCents)}`);
+    else if (toCents(cap.amount.value) !== totalCents) problems.push(`PayPal captured ${cap.amount.value} USD but the items${shippingCents || taxCents
+      ? ` (${toDecimal(itemsCents)}) plus shipping (${toDecimal(shippingCents)}) and tax (${toDecimal(taxCents)})` : ""} add up to ${toDecimal(totalCents)}`);
   }
   const payee = unit.payee?.merchant_id ?? null;
   const expected = expectedPayee(db, merchantId);

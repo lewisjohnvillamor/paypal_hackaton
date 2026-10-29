@@ -372,3 +372,60 @@ test("the repeat-claimant flag only counts requests at the same store", async ()
     assert.ok((await claimOn(second)).includes("REPEAT_CLAIMANT"), "an earlier request at the same store does");
   } finally { p.close(); }
 });
+
+// Files a one-photo request on a registered order; returns the merchant's view of the case.
+async function claimAndOpen(p, reg) {
+  const token = reg.claim_url.split("#t=")[1];
+  const link = await p.call("GET", `/api/claim-link/${reg.id}`, { headers: { "X-Claim-Token": token }, as: "buyer" });
+  const form = new FormData();
+  form.set("orderId", reg.id);
+  form.set("lineId", link.body.lines[0].id);
+  form.set("quantity", "1");
+  form.set("statement", "The mug arrived in pieces.");
+  form.append("photos", new Blob([await testPhoto(11)], { type: "image/jpeg" }), "p.jpg");
+  const c = await p.call("POST", "/api/claims", { form, headers: { "X-Claim-Token": token }, as: "buyer" });
+  assert.equal(c.status, 201, JSON.stringify(c.body));
+  return (await p.call("GET", `/api/merchant/claims/${c.body.claimId}`)).body;
+}
+
+test("orders with shipping and tax are accepted when items + shipping + tax equal the capture", async () => {
+  const p = await platform({ "5O190127TN364715T": { total: "42.95" } });
+  try {
+    const { key } = await connectedShop(p);
+    const short = await p.api(key, "POST", "/v1/orders", ORDER());
+    assert.equal(short.status, 422);
+    assert.match(short.body.message, /captured 42.95 USD but the items add up to 37.00/);
+    assert.equal((await p.api(key, "POST", "/v1/orders", ORDER(undefined, { shipping: "free" }))).status, 400);
+    const wrong = await p.api(key, "POST", "/v1/orders", ORDER(undefined, { shipping: "4.95" }));
+    assert.match(wrong.body.message, /items \(37.00\) plus shipping \(4.95\) and tax \(0.00\) add up to 41.95/);
+
+    const r = await p.api(key, "POST", "/v1/orders", ORDER(undefined, { shipping: "4.95", tax: "1.00" }));
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    assert.equal(r.body.amount.value, "42.95");
+    // The policy prices the broken item, not the shipping; the whole capture stays refundable.
+    const d = await claimAndOpen(p, r.body);
+    assert.equal(d.proposal.amountCents, 1850);
+    assert.equal(d.payment.refundableCents, 4295);
+  } finally { p.close(); }
+});
+
+test("a store that disconnected PayPal is told to reconnect, and nothing reaches PayPal", async () => {
+  const p = await platform({ "5O190127TN364715T": { total: "37.00" } });
+  try {
+    const { key } = await connectedShop(p);
+    const d = await claimAndOpen(p, (await p.api(key, "POST", "/v1/orders", ORDER())).body);
+    await p.call("DELETE", "/api/dashboard/paypal");
+    const approve = () => p.call("POST", `/api/merchant/claims/${d.claim.id}/approve-refund`, { body: { claimVersion: d.claim.version, proposalId: d.proposal.id, amountCents: 1850 } });
+    const r = await approve();
+    assert.equal(r.status, 409);
+    assert.equal(r.body.error, "PAYPAL_NOT_CONNECTED");
+    assert.match(r.body.message, /Reconnect PayPal/);
+    assert.equal(p.shop.calls.refunds.length, 0);
+    assert.equal((await p.call("GET", `/api/merchant/claims/${d.claim.id}`)).body.claim.status, "ready");
+
+    await p.call("PUT", "/api/dashboard/paypal", { body: { clientId: CLIENT_ID, clientSecret: SECRET } });
+    const again = await approve();
+    assert.equal(again.status, 200, JSON.stringify(again.body));
+    assert.equal(again.body.claim.status, "refunded");
+  } finally { p.close(); }
+});
