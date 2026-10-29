@@ -257,7 +257,7 @@ async function openCase(id, settle = ".timeline") {
 }
 
 // 0. Title
-await card("Refund Relay", "Something arrived broken? Snap a photo. The shop's refund agent puts it right through PayPal, in seconds.", "title");
+await card("Refund Relay", "The refund agent for stores that take PayPal. Something arrived broken? Snap a photo, and it's put right in seconds.", "title");
 
 // 1. The owner sets the agent's rules in plain English
 await go(`${BASE}/merchant/agent`);

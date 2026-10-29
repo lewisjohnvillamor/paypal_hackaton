@@ -1,5 +1,5 @@
 {
-  "title": "Ever had something arrive broken? Here's how Juniper Market puts it right, through PayPal, in seconds.",
+  "title": "Ever had something arrive broken? Juniper Market uses Refund Relay, a refund agent that puts it right through PayPal, in seconds.",
   "rule1": "First, a peek behind the counter. The owner tells their refund agent what it may settle on its own, in plain English.",
   "rule2": "The agent reads the rules back, with a daily limit, so there are no surprises.",
   "rule3": "One click, and the agent is on duty.",
@@ -10,7 +10,7 @@
   "chip1": "One mug arrived chipped. I say what happened, and add a photo.",
   "chip2": "And send.",
   "refunded": "A few seconds later, my twenty dollars is back in PayPal. Nobody at the shop lifted a finger.",
-  "case": "On the shop's side, the case shows what happened: my photo was checked, and the agent refunded me under the owner's rule.",
+  "case": "In the shop's Refund Relay console, the case shows what happened: my photo was checked, and the agent refunded me under the owner's rule.",
   "asst0": "Next time, I didn't even open the site. I just asked my own assistant.",
   "asst1": "It reported the broken mug through the shop's own connector, and the refund agent paid me back through PayPal.",
   "asst2": "Agent to agent. No forms, no waiting on hold.",
