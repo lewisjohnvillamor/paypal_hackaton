@@ -189,3 +189,15 @@ refund for the same item. A settled refund now ignores late answers (except PayP
 refund we had marked failed), the sweep skips calls still in flight, and a refund PayPal lists under
 a failed operation's ID blocks new refunds. `scripts/e2e-sandbox.js` was updated for the AG Grid
 inbox and the pick-then-confirm buyer step. 95 tests pass.
+
+## Second audit: UI/UX and logic (2026-10-28)
+
+26 pages for buyer, merchant and agent shot on desktop and phone, light and dark, with axe
+(WCAG 2 A/AA). Fixed: the merchant can take back an unanswered offer (`POST
+/api/merchant/claims/:id/withdraw-offer`; the offer row keeps status `open` with `decided_at` set,
+because the table's CHECK allows only open/accepted); one merchant nav bar with Sign out on every
+page; phones get a card list instead of the inbox grid; a floating bag bar on the store for phones;
+the empty inbox, clipped grid columns, remedies columns on phones, the second-request notice,
+broken-link help, closing-reason punctuation, the inbox link contrast. The buyer's status no longer
+carries AI fit scores, and a $0 replacement pick no longer needs PayPal to answer. Open items are
+in the audit doc.

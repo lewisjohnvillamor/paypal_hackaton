@@ -14,7 +14,7 @@ import { OrderError, captureOrder, startOrder } from "./orders.js";
 import { ClaimError, addEvidence, assessClaim, closeClaim, createClaim, requestInfo, uploadDir } from "./claims.js";
 import { GateError, approveAndReserve, checkPayPalLedger, reconcile, reconcileOpen, submit } from "./refunds/execute.js";
 import { caseDetail, inbox, buyerStatus } from "./views.js";
-import { acceptOffer, sendOffer } from "./offers.js";
+import { acceptOffer, sendOffer, withdrawOffer } from "./offers.js";
 import { createRemedy, remedyLibrary, seedRemedies, updateRemedy } from "./remedies.js";
 import { defaultMatcher, defaultRuleParser, defaultSuggester } from "./ai/haiku.js";
 import { activeMandate, agentSpent, replay, runAgent, saveMandate, stopMandate } from "./agent/autopilot.js";
@@ -168,7 +168,10 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
   // The buyer picks one of the options the merchant approved; the pick is the refund.
   app.post("/api/claims/:id/choose", limit(10, 60e3), wrap(async (req, res) => {
     const claim = claimForStatusToken(req);
-    await checkPayPalLedger(db, pp, claim.id);
+    // PayPal is asked first only when the pick moves money; a replacement settles without it.
+    const open = db.prepare("SELECT options_json FROM offers WHERE id = ? AND claim_id = ? AND status = 'open' AND decided_at IS NULL").get(String(req.body.offerId || ""), claim.id);
+    const picked = open && JSON.parse(open.options_json).find((o) => o.id === String(req.body.optionId || ""));
+    if (!picked || picked.refundCents > 0) await checkPayPalLedger(db, pp, claim.id);
     const { op, duplicate } = acceptOffer(db, { claimId: claim.id, offerId: String(req.body.offerId || ""), optionId: String(req.body.optionId || "") });
     if (op && !duplicate) await submit(db, pp, op, "buyer");
     res.json(buyerStatus(db, db.prepare("SELECT * FROM claims WHERE id = ?").get(claim.id)));
@@ -238,6 +241,10 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
   m.post("/claims/:id/send-offer", wrap(async (req, res) => {
     const { claimVersion, proposalId, reason } = req.body;
     sendOffer(db, { claimId: req.params.id, claimVersion: Number(claimVersion), proposalId, reason, actor: req.actor });
+    res.json(caseDetail(db, req.params.id));
+  }));
+  m.post("/claims/:id/withdraw-offer", wrap(async (req, res) => {
+    withdrawOffer(db, { claimId: req.params.id, actor: req.actor });
     res.json(caseDetail(db, req.params.id));
   }));
   m.get("/remedies", (_req, res) => res.json(remedyLibrary(db)));

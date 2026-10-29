@@ -129,8 +129,9 @@ export function buyerStatus(db, claim) {
       ? { amountCents: op.amount_cents, state: op.status === "COMPLETED" ? "issued" : "processing", refundId: op.provider_refund_id }
       : null,
     // Only what the buyer needs to choose: no model findings, no risk flags.
-    offer: offer && (offer.status === "open" ? claim.status === "offer_sent" : true)
-      ? { id: offer.id, open: offer.status === "open", chosen: offer.chosen, options: offer.options }
+    offer: offer && (offer.status === "open" ? claim.status === "offer_sent" : offer.status === "accepted")
+      ? { id: offer.id, open: offer.status === "open", chosen: offer.chosen,
+          options: offer.options.map(({ id, kind, title, item, refundCents }) => ({ id, kind, title, item, refundCents })) }
       : null,
     createdAt: claim.created_at,
   };

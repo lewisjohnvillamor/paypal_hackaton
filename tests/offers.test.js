@@ -184,3 +184,40 @@ test("the merchant edits the remedy library, and Jev is only asked about active 
     assert.deepEqual(seen.at(-1), ["kintsugi_gold", "replacement", made.body.id]);
   } finally { t.close(); }
 });
+
+test("the merchant can take back unanswered choices; the old offer can no longer be picked", async () => {
+  const t = await setup({ pp: uniqueEmails(), assess: fakeAssess(handleOff) });
+  try {
+    const o = await offered(t);
+    const s = await o.status();
+    const w = await t.merchant("POST", `/claims/${o.claimId}/withdraw-offer`);
+    assert.equal(w.status, 200, JSON.stringify(w.body));
+    assert.equal(w.body.claim.status, "ready");
+    assert.equal(w.body.proposal.current, false, "the merchant reviews again before deciding");
+    assert.ok(w.body.timeline.some((x) => x.title === "You took back the choices"));
+    assert.equal((await o.status()).offer, null, "the buyer no longer sees the choices");
+    const late = await o.choose({ offerId: s.offer.id, optionId: "refund" });
+    assert.equal(late.status, 409);
+    assert.equal(t.pp.calls.refunds.length, 0);
+    assert.equal((await t.merchant("POST", `/claims/${o.claimId}/withdraw-offer`)).status, 409);
+    await t.merchant("POST", `/claims/${o.claimId}/assess`);
+    const d = (await t.merchant("GET", `/claims/${o.claimId}`)).body;
+    assert.equal(d.proposal.current, true);
+    const r = await t.merchant("POST", `/claims/${o.claimId}/approve-refund`, { claimVersion: d.claim.version, proposalId: d.proposal.id, amountCents: d.proposal.amountCents });
+    assert.equal(r.body.claim.status, "refunded");
+  } finally { t.close(); }
+});
+
+test("the buyer's choices carry no AI scores, and a replacement pick needs no PayPal lookup", async () => {
+  const pp = uniqueEmails();
+  const t = await setup({ pp, assess: fakeAssess(handleOff) });
+  try {
+    const o = await offered(t);
+    const s = await o.status();
+    assert.ok(s.offer.options.every((x) => !("fit" in x) && !("source" in x)));
+    pp.getOrder = async () => { throw new Error("PayPal is down"); };
+    const r = await o.choose({ offerId: s.offer.id, optionId: "replacement" });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.status, "resolved");
+  } finally { t.close(); }
+});

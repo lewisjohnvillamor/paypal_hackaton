@@ -64,6 +64,7 @@
       "claim.info_requested": "You asked for more photos",
       "claim.closed": "Closed without a refund",
       "offer.sent": "You let the buyer choose",
+      "offer.withdrawn": "You took back the choices",
       "offer.accepted": "Buyer chose",
       "refund.approved": "You approved the refund",
       "refund.completed": "PayPal completed the refund",
@@ -122,7 +123,11 @@
       const head = `<div class="voice merchant" style="margin-bottom:16px"><span class="avatar">${ICON.check}</span><div><div class="tag">Your decision</div><div class="small muted">${claim.status === "offer_sent" ? "You approved the options below." : claim.status === "needs_info" ? "Waiting for the buyer's photos." : "Nothing moves until you approve."}</div></div></div>`;
       if (claim.status === "offer_sent" && d.offer) {
         return `<div class="card">${head}<p style="margin:0 0 4px"><b>Waiting for the buyer to choose.</b></p>
-          <p class="small muted" style="margin:0">You approved these amounts. Their pick is refunded through PayPal straight away.</p>${optionListHtml(d.offer.options)}</div>`;
+          <p class="small muted" style="margin:0">You approved these amounts. Their pick is refunded through PayPal straight away.</p>${optionListHtml(d.offer.options)}
+          <details class="more"><summary>More options</summary>
+            <p class="small muted" style="margin:0 0 12px">Buyer not answering? Take the choices back and decide yourself. Nothing is refunded until you do.</p>
+            <button id="withdraw-offer" class="danger">Take back the choices</button>
+          </details></div>`;
       }
       if (claim.status === "needs_info") {
         const asked = [...d.history].reverse().find((h) => h.type === "claim.info_requested")?.payload?.message;
@@ -140,9 +145,12 @@
       if (!proposal || !proposal.current) {
         // After PayPal declines a refund the approval is spent, so the case needs a fresh review.
         const declined = d.refunds.at(-1)?.status === "FAILED" && claim.status === "ready";
+        const lastStep = d.history.at(-1)?.type;
+        const withdrawn = lastStep === "offer.withdrawn";
         const why = declined ? `PayPal declined the last refund (${esc(d.refunds.at(-1).error || "no reason given")}). Nothing was refunded. Review the case again to approve a new amount.`
+          : withdrawn ? "You took back the buyer's choices. Review the case again to decide."
           : !proposal ? "This request hasn't been reviewed yet." : "The photos changed since the last review.";
-        return `<div class="card">${head}<p class="muted">${why}</p><button id="assess" class="primary lg">Review ${declined ? "again" : "current photos"}</button></div>`;
+        return `<div class="card">${head}<p class="muted">${why}</p><button id="assess" class="primary lg">Review ${declined || withdrawn ? "again" : "current photos"}</button></div>`;
       }
       const [routeLabel, tone] = ROUTE[proposal.route];
       const c = proposal.calculation;
@@ -322,6 +330,7 @@
           amountCents: Math.round(Number(amount.value) * 100), reason: $("reason")?.value,
         }, approve, "Refunding with PayPal…");
       }
+      $("withdraw-offer") && ($("withdraw-offer").onclick = (e) => act(`/api/merchant/claims/${id}/withdraw-offer`, {}, e.currentTarget, "Taking back…"));
       $("send-offer") && ($("send-offer").onclick = (e) => act(`/api/merchant/claims/${id}/send-offer`, {
         claimVersion: d.claim.version, proposalId: d.proposal.id, reason: $("reason")?.value,
       }, e.currentTarget, "Sending…"));

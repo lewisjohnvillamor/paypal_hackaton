@@ -89,6 +89,11 @@ header.top {
 header.top nav { display: flex; gap: 22px; font-size: 14px; }
 header.top nav a { color: var(--text); opacity: 0.8; }
 header.top nav a:hover { opacity: 1; text-decoration: none; }
+header.top nav a { white-space: nowrap; }
+header.top nav a[aria-current="page"] { opacity: 1; font-weight: 600; }
+.brand { white-space: nowrap; }
+/* Links inside running text are underlined, so they don't rely on colour alone. */
+.lede a { text-decoration: underline; text-underline-offset: 2px; }
 
 /* Layout */
 main { max-width: 1040px; margin: 0 auto; padding: 40px 22px 80px; }
@@ -318,7 +323,7 @@ details.more[open] summary::after { transform: rotate(-135deg) translateY(-2px);
 .inbox-row:last-child { border-bottom: 0; }
 .inbox-row:hover { background: var(--surface-2); text-decoration: none; }
 .inbox-row img { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; background: var(--surface-2); }
-.inbox-row .title { font-weight: 600; }
+.inbox-row .title { font-weight: 600; white-space: nowrap; }
 .inbox-row .amt { font-size: 17px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
 .inbox-row .chev { width: 8px; height: 13px; color: var(--text-2); opacity: 0.6; }
 @media (max-width: 620px) { .inbox-row { grid-template-columns: 48px minmax(0, 1fr) auto; } .inbox-row .chev { display: none; } .inbox-row img { width: 48px; height: 48px; } }
@@ -371,6 +376,8 @@ footer.foot { max-width: 1040px; margin: 0 auto; padding: 0 22px 40px; color: va
   .product img { width: 88px; height: 88px; }
   .hero .big { font-size: 48px; }
   header.top { padding: 0 16px; }
+  header.top.app nav { gap: 14px; font-size: 13px; }
+  header.top.app .brand-name, header.top.app .wide-only { display: none; }
 }
 @media (max-width: 819px) {
   .sticky-col { position: static; order: -1; }

@@ -14,9 +14,9 @@
   <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/ag-grid-community.min.js" defer></script>
 </head>
 <body>
-  <header class="top">
-    <a class="brand" href="/merchant"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span>Refund Relay <span class="ctx">Merchant</span></a>
-    <nav><a href="/merchant/agent">Refund agent</a><a href="/merchant/remedies">Remedies</a><a href="/">Store</a><a href="#" id="logout" class="hidden">Sign out</a></nav>
+  <header class="top app">
+    <a class="brand" href="/merchant" aria-label="Refund Relay merchant home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span><span class="brand-name">Refund Relay</span> <span class="ctx">Merchant</span></a>
+    <nav aria-label="Merchant"><a href="/merchant" aria-current="page">Requests</a><a href="/merchant/agent">Refund agent</a><a href="/merchant/remedies">Remedies</a><a href="/" class="wide-only">Store</a><a href="#" id="logout" data-logout class="hidden">Sign out</a></nav>
   </header>
   <main class="wide">
     <form id="login" class="card hidden center" style="max-width:400px;margin:40px auto 0;padding:40px 32px">
@@ -76,10 +76,10 @@
     const columns = [
       { headerName: "", field: "thumb", cellRenderer: thumbCell, width: 76, sortable: false, filter: false, resizable: false, pinned: "left", getQuickFilterText: () => "" },
       { headerName: "Request", field: "ref", width: 112, pinned: "left", cellClass: "mono-cell" },
-      { headerName: "Status", field: "status", width: 146, cellRenderer: html((r) => pill(r.status)), getQuickFilterText: (p) => STATUS[p.value]?.[0] ?? p.value },
+      { headerName: "Status", field: "status", width: 172, cellRenderer: html((r) => pill(r.status)), getQuickFilterText: (p) => STATUS[p.value]?.[0] ?? p.value },
       { headerName: "Item", field: "title", flex: 1, minWidth: 170, tooltipValueGetter: (p) => p.data.title, valueGetter: (p) => `${p.data.title} × ${p.data.quantity}` },
       { headerName: "AI saw", field: "damage_kind", width: 120, valueFormatter: (p) => DAMAGE[p.value] ?? "—" },
-      { headerName: "Breakage", field: "breakage", width: 112, type: "rightAligned",
+      { headerName: "Breakage", field: "breakage", width: 128, type: "rightAligned",
         cellRenderer: html((r) => r.breakage == null ? "—" : `<span class="meter" style="color:var(--${r.breakage >= 0.8 ? "green-fill" : r.breakage <= 0.2 ? "red" : "orange"})"><i style="width:${Math.round(r.breakage * 100)}%"></i></span> ${Math.round(r.breakage * 100)}%`) },
       { headerName: "Flags", field: "concerns", width: 84, headerTooltip: "Concerns the refund policy raised", type: "rightAligned", valueFormatter: (p) => p.value == null ? "—" : p.value === 0 ? "None" : String(p.value) },
       { headerName: "Remedies", field: "remedies", width: 140, sortable: true, comparator: (a, b, x, y) => (a + x.data.ai_suggestions) - (b + y.data.ai_suggestions),
@@ -90,8 +90,10 @@
       { headerName: "Reported", field: "created_at", width: 132, hide: matchMedia("(max-width: 1400px)").matches, sort: "desc", valueFormatter: (p) => p.value ? new Date(p.value).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "" },
     ];
 
+    // Phones get the card list: a grid this wide only shows two columns there.
+    const narrow = matchMedia("(max-width: 819px)");
     function makeGrid() {
-      if (grid || !window.agGrid) return;
+      if (grid || !window.agGrid || narrow.matches) return;
       const dark = matchMedia("(prefers-color-scheme: dark)");
       const theme = () => $("grid").classList.toggle("ag-theme-quartz-dark", dark.matches);
       theme(); dark.addEventListener?.("change", theme);
@@ -117,23 +119,31 @@
         `<button type="button" data-f="${k}" aria-pressed="${k === filter}">${k === "all" ? "All" : STATUS[k][0]} <span class="count">${k === "all" ? rows.length : counts[k]}</span></button>`).join("");
       $("filters").querySelectorAll("button").forEach((b) => (b.onclick = () => { filter = b.dataset.f; draw(); }));
       makeGrid();
-      if (grid) {
+      // With nothing to show, the empty state reads better than an empty grid and its pager.
+      const empty = !rows.length;
+      $("grid").classList.toggle("hidden", !grid || empty);
+      $("rows").classList.toggle("hidden", !!grid && !empty);
+      if (grid && !empty) {
         grid.setGridOption("rowData", rows);
         grid.onFilterChanged();
         return;
       }
-      // Fallback list when the grid library could not load.
-      const shown = rows.filter((r) => filter === "all" || r.status === filter);
+      // The list: on phones, and when the grid library could not load.
+      const q = $("search").value.trim().toLowerCase();
+      const shown = rows.filter((r) => (filter === "all" || r.status === filter) &&
+        (!q || `${r.ref} ${r.title} ${STATUS[r.status]?.[0] ?? ""} ${OUTCOME(r)}`.toLowerCase().includes(q)));
       $("rows").innerHTML = shown.length ? shown.map((r) => `
         <a class="inbox-row" href="/merchant/case?id=${encodeURIComponent(r.id)}">
-          <img src="/assets/${esc(r.ref_image)}" alt="">
+          <img src="${r.thumb ? `/api/merchant/evidence/${encodeURIComponent(r.thumb.id)}` : `/assets/${esc(r.ref_image)}`}" alt="">
           <div style="min-width:0">
             <div class="row" style="gap:8px"><span class="title">${esc(r.ref)}</span>${pill(r.status)}</div>
             <div class="small muted">${esc(r.title)} × ${r.quantity} · ${when(r.created_at)}</div>
+            ${OUTCOME(r) && OUTCOME(r) !== STATUS[r.status]?.[0] ? `<div class="small">${esc(OUTCOME(r))}</div>` : ""}
           </div>
-          <div><div class="amt">${r.proposed_cents ? usd(r.proposed_cents) : "—"}</div><div class="small muted" style="text-align:right">${esc(r.status === "refunded" ? "Refunded" : r.status === "closed" ? "Closed" : ROUTE[r.route] || "")}</div></div>
+          <div class="amt">${r.refunded_cents ? usd(r.refunded_cents) : r.proposed_cents && !["closed", "resolved"].includes(r.status) ? usd(r.proposed_cents) : "—"}</div>
           ${ICON.chevron}
         </a>`).join("")
+        : rows.length ? `<div class="empty"><h3>Nothing matches</h3><p class="small" style="margin:0">Try another filter or search.</p></div>`
         : `<div class="empty"><h3>No requests yet</h3><p class="small" style="margin:0">They appear here when a buyer reports a problem.</p></div>`;
     }
     async function load() {
@@ -158,9 +168,8 @@
       try { await api("/api/merchant/login", { method: "POST", body: { password: $("password").value } }); load(); }
       catch (err) { $("login-error").textContent = err.status === 401 ? "That password isn't right. Try again." : err.message; $("login-error").classList.remove("hidden"); }
     };
-    $("search").oninput = (e) => grid?.setGridOption("quickFilterText", e.target.value);
+    $("search").oninput = (e) => (grid ? grid.setGridOption("quickFilterText", e.target.value) : draw());
     $("export").onclick = () => grid?.exportDataAsCsv({ fileName: "refund-requests.csv", columnKeys: ["ref", "status", "title", "damage_kind", "breakage", "concerns", "remedies", "proposed_cents", "refunded_cents", "outcome", "created_at"] });
-    $("logout").onclick = async (e) => { e.preventDefault(); await api("/api/merchant/logout", { method: "POST" }); location.reload(); };
     window.addEventListener("load", () => rows.length && draw()); // the grid script is deferred
     load();
     setInterval(() => !$("inbox").classList.contains("hidden") && load(), 10000);
