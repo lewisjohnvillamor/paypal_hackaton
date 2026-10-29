@@ -1,7 +1,7 @@
 {
   "name": "refund-relay",
   "version": "0.1.0",
-  "description": "Turn a damaged-order complaint into a merchant-approved PayPal partial refund, with photo evidence triaged by Jev.",
+  "description": "Refund Relay: the refund agent for stores that take PayPal. Turn a broken order into the next sale.",
   "license": "MIT",
   "private": true,
   "type": "module",

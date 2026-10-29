@@ -41,3 +41,10 @@ Rendered by the PayPal JS SDK with official style options only (`color: gold`, `
 ## Accessibility check
 
 axe-core 4.10 (WCAG 2 A/AA rules), re-run 2026-10-22 on the store, claim form, inbox, remedies, eight case states and eight buyer status states, light, dark and phone: no colour or labelling violations. One remains inside AG Grid itself (`scrollable-region-focusable` on its viewports); the grid cells are keyboard-navigable through AG Grid's own focus handling, and forcing a tabindex on the viewport broke its ARIA roles, so it is left as is. Focus rings on every control, labels on all inputs, `role="alert"` on errors, `aria-live` on the tracker.
+
+## Naming
+
+- **Refund Relay** is the product: the refund agent for stores that take PayPal. Tagline: *Turn a broken order into the next sale.*
+- **Juniper Market** is the demo store, one merchant on Refund Relay. Its storefront shows its own name and a plain monogram, never the Refund Relay mark.
+- Buyer pages (claim, status) are hosted by Refund Relay for whichever store sold the order: the store's name leads the header, and "Returns by Refund Relay" signs it on the right. They never hard-code a store name.
+- Merchant pages (console, dashboard) carry the Refund Relay mark; the signed-in store's name fills the `data-store` eyebrow.
