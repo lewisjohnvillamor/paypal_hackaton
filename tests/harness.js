@@ -4,9 +4,9 @@ import { fakeAssess, fakePayPal, testPhoto } from "./helpers.js";
 import { createApp } from "../src/server.js";
 import { openDb } from "../src/db.js";
 
-export async function setup({ pp = fakePayPal(), assess = fakeAssess(), suggest = null, match = null, parseRules = null } = {}) {
+export async function setup({ pp = fakePayPal(), assess = fakeAssess(), suggest = null, match = null, parseRules = null, retryDelays, paypalFor } = {}) {
   const db = openDb(":memory:");
-  const { app, queue } = createApp({ db, pp, assess, suggest, match, parseRules });
+  const { app, queue } = createApp({ db, pp, assess, suggest, match, parseRules, retryDelays, ...(paypalFor ? { paypalFor } : {}) });
   const server = app.listen(0);
   const base = `http://127.0.0.1:${server.address().port}`;
   let cookie = "";
