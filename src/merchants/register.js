@@ -2,8 +2,9 @@
 // Nothing the store sends about money is trusted on its own: the order is looked up in the
 // merchant's own PayPal account, and the capture, amount, currency and payee must all agree.
 import { randomUUID } from "node:crypto";
-import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
+import { lookup as dnsLookup } from "node:dns";
+import { request as httpsRequest } from "node:https";
+import { BlockList, isIP } from "node:net";
 import { mkdirSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -55,20 +56,55 @@ export function checkOrderBody(body) {
   return { paypalOrderId, lines, buyerEmail };
 }
 
-// Private, loopback and link-local addresses are never fetched (the URL comes from a merchant).
-const PRIVATE = [/^127\./, /^10\./, /^192\.168\./, /^172\.(1[6-9]|2\d|3[01])\./, /^169\.254\./, /^0\./, /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./, /^::1$/, /^f[cd]/i, /^fe80/i, /^::ffff:/i];
+// Private, loopback, link-local and other non-public addresses are never fetched (the URL comes
+// from a merchant). The check runs inside the connection's own DNS lookup, so the address checked
+// is the address connected to: a host cannot pass the check and then resolve somewhere private.
+// Two lists: a BlockList also matches IPv4 addresses against IPv6 rules (as ::a.b.c.d).
+const BLOCKED_V4 = new BlockList(), BLOCKED_V6 = new BlockList();
+for (const [net, bits] of [["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8], ["169.254.0.0", 16], ["172.16.0.0", 12],
+  ["192.0.0.0", 24], ["192.168.0.0", 16], ["198.18.0.0", 15], ["224.0.0.0", 3]]) BLOCKED_V4.addSubnet(net, bits, "ipv4");
+// ::/96 also covers :: and ::1; ::ffff:0:0/96 is IPv4-mapped, 64:ff9b::/96 NAT64.
+for (const [net, bits] of [["::", 96], ["::ffff:0:0", 96], ["64:ff9b::", 96], ["100::", 64], ["fc00::", 7], ["fe80::", 10], ["ff00::", 8]]) {
+  BLOCKED_V6.addSubnet(net, bits, "ipv6");
+}
+export const publicAddress = (address) => {
+  const v = isIP(address);
+  return v === 4 ? !BLOCKED_V4.check(address, "ipv4") : v === 6 && !BLOCKED_V6.check(address, "ipv6");
+};
+const notAllowed = () => Object.assign(new Error("host not allowed"), { code: "EHOSTBLOCKED" });
 
-export async function fetchCatalogImage(href) {
+function publicLookup(hostname, options, callback) {
+  dnsLookup(hostname, { ...options, all: true }, (err, addrs) => {
+    if (err) return callback(err);
+    if (!addrs.length || !addrs.every((a) => publicAddress(a.address))) return callback(notAllowed());
+    if (options.all) return callback(null, addrs);
+    callback(null, addrs[0].address, addrs[0].family);
+  });
+}
+
+export function fetchCatalogImage(href) {
   const url = new URL(href);
   const host = url.hostname.replace(/^\[|\]$/g, "");
-  const addrs = isIP(host) ? [{ address: host }] : await lookup(host, { all: true }).catch(() => []);
-  if (!addrs.length || addrs.some((a) => PRIVATE.some((re) => re.test(a.address)))) throw new Error("host not allowed");
-  const res = await fetch(url, { redirect: "error", signal: AbortSignal.timeout(10_000) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  if (Number(res.headers.get("content-length") || 0) > MAX_IMAGE_BYTES) throw new Error("too large");
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length > MAX_IMAGE_BYTES) throw new Error("too large");
-  return buf;
+  if (url.protocol !== "https:" || (isIP(host) && !publicAddress(host))) return Promise.reject(notAllowed());
+  return new Promise((resolve, reject) => {
+    // Redirects are not followed (any answer but 200 fails), as with fetch's redirect: "error".
+    const req = httpsRequest(url, { lookup: publicLookup, headers: { Accept: "image/*" } }, (res) => {
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error(`HTTP ${res.statusCode}`)); }
+      if (Number(res.headers["content-length"] || 0) > MAX_IMAGE_BYTES) { res.destroy(); return reject(new Error("too large")); }
+      const chunks = [];
+      let size = 0;
+      res.on("data", (c) => {
+        size += c.length;
+        if (size > MAX_IMAGE_BYTES) { res.destroy(); reject(new Error("too large")); } else chunks.push(c);
+      });
+      res.on("end", () => resolve(Buffer.concat(chunks)));
+      res.on("error", reject);
+    });
+    const timer = setTimeout(() => req.destroy(new Error("timed out")), 10_000);
+    req.on("close", () => clearTimeout(timer));
+    req.on("error", reject);
+    req.end();
+  });
 }
 
 // The catalog photo, stored once per distinct image and served at /assets/m/<sha>.jpg like the
@@ -109,7 +145,11 @@ export async function registerOrder(db, { merchantId, client, body, fetchImage =
   if (res.body.purchase_units?.length !== 1) problems.push("the order must have exactly one purchase unit");
   if (!cap) problems.push("the order has no capture yet: capture the payment before registering it");
   else {
+    const refunded = (unit.payments?.refunds ?? []).some((r) => !["FAILED", "CANCELLED"].includes(r.status));
     if (!["COMPLETED", "PARTIALLY_REFUNDED"].includes(cap.status)) problems.push(`the capture is ${cap.status}`);
+    // A refund made before Refund Relay knew the order would block every refund here (the ledger
+    // check stops at refunds it did not make), so a new order must arrive unrefunded.
+    else if (!existing && (cap.status !== "COMPLETED" || refunded)) problems.push("the payment was already partly refunded in PayPal");
     if (cap.amount?.currency_code !== "USD") problems.push(`currency is ${cap.amount?.currency_code}; only USD is supported`);
     else if (toCents(cap.amount.value) !== totalCents) problems.push(`PayPal captured ${cap.amount.value} USD but the items add up to ${toDecimal(totalCents)}`);
   }
@@ -131,9 +171,14 @@ export async function registerOrder(db, { merchantId, client, body, fetchImage =
   }
 
   const token = newToken();
-  const id = existing?.id ?? randomUUID();
-  tx(db, () => {
-    if (!existing) {
+  const { id, again } = tx(db, () => {
+    // Read again inside the transaction: a retry of the same request may have stored the order
+    // while this one waited on PayPal and the photo fetch.
+    const prior = db.prepare("SELECT * FROM orders WHERE paypal_order_id = ?").get(paypalOrderId);
+    if (prior && prior.merchant_id !== merchantId) throw new RegisterError("ORDER_TAKEN", "Another store already registered this PayPal order.", 409);
+    if (prior && prior.capture_id !== cap.id) throw new RegisterError("ORDER_TAKEN", "This PayPal order was registered with a different capture.", 409);
+    const id = prior?.id ?? randomUUID();
+    if (!prior) {
       db.prepare(`INSERT INTO orders (id, merchant_id, paypal_order_id, capture_id, amount_cents, currency, payee_merchant_id, capture_status,
         buyer_email, delivered_at, delivery_source, created_at) VALUES (?, ?, ?, ?, ?, 'USD', ?, 'COMPLETED', ?, ?, ?, ?)`)
         .run(id, merchantId, paypalOrderId, cap.id, totalCents, payee, buyerEmail ?? res.body.payer?.email_address ?? null,
@@ -144,7 +189,8 @@ export async function registerOrder(db, { merchantId, client, body, fetchImage =
     }
     db.prepare("INSERT OR REPLACE INTO claim_links (order_id, token_hash, expires_at) VALUES (?, ?, ?)")
       .run(id, hashToken(token), new Date(Date.now() + CLAIM_LINK_DAYS * 86400e3).toISOString());
-    audit(db, { actor: merchantId, type: existing ? "order.link_reissued" : "order.registered", payload: { orderId: id, paypalOrderId, captureId: cap.id } });
+    audit(db, { actor: merchantId, type: prior ? "order.link_reissued" : "order.registered", payload: { orderId: id, paypalOrderId, captureId: cap.id } });
+    return { id, again: !!prior };
   });
-  return { order: db.prepare("SELECT * FROM orders WHERE id = ?").get(id), claimToken: token, alreadyRegistered: !!existing };
+  return { order: db.prepare("SELECT * FROM orders WHERE id = ?").get(id), claimToken: token, alreadyRegistered: again };
 }

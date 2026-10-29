@@ -91,7 +91,14 @@ export function connectionView(db, merchantId) {
     return id ? { source: "server", clientId: mask(id), payeeMerchantId: process.env.PAYPAL_MERCHANT_ID || null, verifiedAt: null } : null;
   }
   const c = db.prepare("SELECT * FROM paypal_connections WHERE merchant_id = ?").get(merchantId);
-  return c ? { source: "merchant", clientId: mask(c.client_id), payeeMerchantId: c.payee_merchant_id, verifiedAt: c.verified_at } : null;
+  return c ? { source: "merchant", clientId: mask(c.client_id), payeeMerchantId: c.payee_merchant_id, verifiedAt: c.verified_at,
+    needsReconnect: !readSecret(c.secret_enc) } : null;
+}
+
+// The stored secret, or null when it can no longer be read (CREDENTIALS_KEY or SESSION_SECRET
+// changed): the store then has to paste its credentials again.
+function readSecret(sealed) {
+  try { return decrypt(sealed); } catch { return null; }
 }
 
 const CRED = /^[A-Za-z0-9_-]{20,128}$/;
@@ -111,9 +118,12 @@ export async function saveConnection(db, merchantId, { clientId, clientSecret, p
       : "Could not reach PayPal to check those credentials. Try again.", err.status === 401 ? 400 : 503);
   }
   const ts = now();
+  // Pasting the same app again (a rotated secret) keeps the payee its orders were paid to; a
+  // different app starts over and learns its payee from its next order.
   db.prepare(`INSERT INTO paypal_connections (merchant_id, client_id, secret_enc, payee_merchant_id, verified_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(merchant_id) DO UPDATE SET client_id = excluded.client_id, secret_enc = excluded.secret_enc,
-    payee_merchant_id = excluded.payee_merchant_id, verified_at = excluded.verified_at, updated_at = excluded.updated_at`)
+    payee_merchant_id = COALESCE(excluded.payee_merchant_id,
+      CASE WHEN paypal_connections.client_id = excluded.client_id THEN paypal_connections.payee_merchant_id END), verified_at = excluded.verified_at, updated_at = excluded.updated_at`)
     .run(merchantId, id, encrypt(secret), payee, ts, ts);
   audit(db, { actor: merchantId, type: "paypal.connected", payload: { clientId: mask(id), payee } });
   return connectionView(db, merchantId);
@@ -138,7 +148,8 @@ export const expectedPayee = (db, merchantId) => merchantId === DEMO
   : db.prepare("SELECT payee_merchant_id p FROM paypal_connections WHERE merchant_id = ?").get(merchantId)?.p ?? null;
 
 // A PayPal client per merchant: the demo store's own, or one built from the merchant's stored
-// credentials (rebuilt when they reconnect). null when the merchant has not connected PayPal.
+// credentials (rebuilt when they reconnect). null when the merchant has not connected PayPal, or
+// its stored secret can no longer be read.
 export function merchantClients(db, demoClient, paypalFor) {
   const cache = new Map();
   return (merchantId) => {
@@ -147,7 +158,9 @@ export function merchantClients(db, demoClient, paypalFor) {
     if (!c) return null;
     const hit = cache.get(merchantId);
     if (hit?.at === c.updated_at) return hit.client;
-    const client = paypalFor({ clientId: c.client_id, clientSecret: decrypt(c.secret_enc) });
+    const secret = readSecret(c.secret_enc);
+    if (!secret) return null;
+    const client = paypalFor({ clientId: c.client_id, clientSecret: secret });
     cache.set(merchantId, { at: c.updated_at, client });
     return client;
   };

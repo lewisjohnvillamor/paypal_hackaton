@@ -103,13 +103,14 @@ export function riskFlags(db, claim, evidence, catalogHash) {
   if (db.prepare("SELECT 1 FROM claims WHERE order_id = ? AND id != ? AND created_at <= ?").get(claim.order_id, claim.id, claim.created_at)) {
     flags.push("PRIOR_CLAIM_ON_ORDER");
   }
-  // Prior requests on other orders that mark a buyer as a repeat claimant. A shared demo buyer
+  // Prior requests on the same store's other orders that mark a buyer as a repeat claimant (another
+  // store's requests are that store's business). A shared demo buyer
   // account trips this on every run, so a hosted demo can set REPEAT_CLAIM_LIMIT=0 to turn it off.
   const repeatLimit = Number(process.env.REPEAT_CLAIM_LIMIT ?? 1);
   if (order.buyer_email && repeatLimit > 0) {
     const since = new Date(Date.now() - REPEAT_WINDOW_DAYS * 86400e3).toISOString();
     const n = db.prepare(`SELECT COUNT(*) n FROM claims c JOIN orders o ON o.id = c.order_id
-      WHERE o.buyer_email = ? AND c.order_id != ? AND c.created_at >= ?`).get(order.buyer_email, order.id, since).n;
+      WHERE o.buyer_email = ? AND o.merchant_id = ? AND c.order_id != ? AND c.created_at >= ?`).get(order.buyer_email, order.merchant_id, order.id, since).n;
     if (n >= repeatLimit) flags.push("REPEAT_CLAIMANT");
   }
   if (claim.quantity > 1) flags.push("MULTI_UNIT_CLAIM"); // the merchant confirms how many broke
