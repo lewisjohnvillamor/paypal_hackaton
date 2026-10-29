@@ -12,11 +12,12 @@
 </head>
 <body>
   <header class="top">
-    <a class="brand" href="/"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span>Refund Relay</a>
+    <a class="brand store-brand" id="store-home"><span class="store-mark" aria-hidden="true" id="store-mark"></span><span id="store-brand"></span></a>
+    <span class="powered">Returns by <span class="mark sm" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span><b>Refund Relay</b></span>
   </header>
   <main class="narrow">
     <div id="intro">
-      <p class="eyebrow" id="store">Juniper Market</p>
+      <p class="eyebrow" id="store"></p>
       <h1>Something wrong?<br>Let's fix it.</h1>
       <p class="lede" id="order-summary">Loading your order…</p>
     </div>
@@ -72,7 +73,7 @@
     </div>
   </main>
   <script type="module">
-    import { api, usd, esc, hashToken, ICON, checkBadge, busy, myOrders, rememberOrder } from "/app.js";
+    import { api, usd, esc, hashToken, ICON, checkBadge, busy, myOrders, rememberOrder, showStore } from "/app.js";
     import { shrinkPhotos } from "/photos.js";
     document.querySelectorAll("[data-icon]").forEach((el) => (el.outerHTML = ICON[el.dataset.icon]));
     const orderId = new URLSearchParams(location.search).get("order");
@@ -98,7 +99,8 @@
     try {
       const o = await api(`/api/claim-link/${encodeURIComponent(orderId)}`, { token });
       paidCents = o.amountCents;
-      if (o.store?.name) { $("store").textContent = o.store.name; document.title = `Report a problem · ${o.store.name}`; }
+      if (o.store?.name) { showStore(o.store.name); $("store").textContent = o.store.name; document.title = `Report a problem · ${o.store.name}`; }
+      if (o.store?.demo) $("store-home").href = "/";
       $("order-summary").textContent = `Your ${usd(o.amountCents)} order, paid with PayPal on ${new Date(o.capturedAt).toLocaleDateString(undefined, { dateStyle: "long" })}. Tell the shop what happened and add a photo.`;
       if (o.openClaimRef) {
         // Not an error: the earlier request is still open. Say so calmly and point to it.

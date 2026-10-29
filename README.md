@@ -1,8 +1,10 @@
 # Refund Relay
 
+**The refund agent for stores that take PayPal. Turn a broken order into the next sale.**
+
 A small shop gets a "this arrived damaged" message with photos: a broken mug, a cracked vase, a stained T-shirt, snapped headphones. Refund Relay links that message to the original PayPal payment, has an AI model check the photos, drafts a refund from the shop's policy, and sends the refund through PayPal once the merchant approves it.
 
-Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/). It runs on the PayPal **sandbox** only. This is a prototype, not production software.
+Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/). It runs on the PayPal **sandbox** only. This is a prototype, not production software. Juniper Market, the shop you see in the screenshots and the video, is a demo merchant on Refund Relay, not the product.
 
 ![Merchant case view](hackathon/screenshots/3-merchant-case.png)
 

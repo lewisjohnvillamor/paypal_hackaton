@@ -86,6 +86,13 @@ header.top {
 .brand .mark { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(145deg, #0a84ff, #5e5ce6); display: grid; place-items: center; }
 .brand .mark svg { width: 15px; height: 15px; }
 .brand .ctx { color: var(--text-2); font-weight: 400; }
+/* A merchant's own brand on store and buyer pages: a plain monogram, never the Refund Relay mark. */
+.store-brand .store-mark { width: 26px; height: 26px; border-radius: 50%; background: var(--text); color: var(--bg, #fff); display: grid; place-items: center; font-size: 13px; font-weight: 700; letter-spacing: 0; }
+.store-brand .store-mark:empty { display: none; }
+.powered { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 12px; white-space: nowrap; }
+.powered b { color: var(--text); font-weight: 600; }
+.mark.sm { width: 18px; height: 18px; border-radius: 5px; background: linear-gradient(145deg, #0a84ff, #5e5ce6); display: grid; place-items: center; }
+.mark.sm svg { width: 11px; height: 11px; }
 header.top nav { display: flex; gap: 22px; font-size: 14px; }
 header.top nav a { color: var(--text); opacity: 0.8; }
 header.top nav a:hover { opacity: 1; text-decoration: none; }

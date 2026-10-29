@@ -55,6 +55,12 @@ export function busy(btn, on, label) {
 }
 
 // Cards fade in on first paint only; later re-renders (polling, actions) stay still.
+// Buyer pages: the store's own name leads the header; Refund Relay only signs it ("Returns by").
+export function showStore(name) {
+  const brand = document.getElementById("store-brand"), mark = document.getElementById("store-mark");
+  if (brand) brand.textContent = name;
+  if (mark) mark.textContent = name.trim().charAt(0).toUpperCase();
+}
 export const settle = () => setTimeout(() => document.body.classList.add("settled"), 700);
 
 // Private links (claim and status) kept on this device, so a reload or a closed tab does not lose

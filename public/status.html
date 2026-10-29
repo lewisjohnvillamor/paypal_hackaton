@@ -12,7 +12,8 @@
 </head>
 <body>
   <header class="top">
-    <a class="brand" href="/"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span>Refund Relay</a>
+    <span class="brand store-brand"><span class="store-mark" aria-hidden="true" id="store-mark"></span><span id="store-brand"></span></span>
+    <span class="powered">Returns by <span class="mark sm" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span><b>Refund Relay</b></span>
   </header>
   <main class="narrow">
     <div id="error" class="notice bad hidden" role="alert"></div>
@@ -29,7 +30,7 @@
     </form>
   </main>
   <script type="module">
-    import { api, usd, esc, hashToken, when, checkBadge, ICON, busy, settle, optionText, optionArt, optionAmount } from "/app.js";
+    import { api, usd, esc, hashToken, when, checkBadge, ICON, busy, settle, optionText, optionArt, optionAmount, showStore } from "/app.js";
     import { shrinkPhotos } from "/photos.js";
     const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
     const claimId = new URLSearchParams(location.search).get("claim");
@@ -63,7 +64,7 @@
     function render(s) {
       if (JSON.stringify(s) === last) return;
       last = JSON.stringify(s);
-      if (s.store) document.title = `Your request · ${s.store}`;
+      if (s.store) { showStore(s.store); document.title = `Your request · ${s.store}`; }
       const refunded = s.refund?.state === "issued";
       $("card").innerHTML = `
         <div class="card hero">
