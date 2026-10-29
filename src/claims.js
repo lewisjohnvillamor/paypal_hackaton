@@ -16,6 +16,7 @@ import { PRODUCTS } from "./catalog.js";
 import { activeRemedies } from "./remedies.js";
 import { candidatesFor } from "./suggest/candidates.js";
 import { checkSuggestions, storeSuggestions } from "./suggest/suggestions.js";
+import { DEMO } from "./merchants/accounts.js";
 
 export const uploadDir = () => process.env.UPLOAD_DIR || "data/uploads";
 const STATUS_TOKEN_DAYS = 30;
@@ -115,15 +116,23 @@ export function riskFlags(db, claim, evidence, catalogHash) {
   return flags;
 }
 
-// The catalog photo and its fingerprint, read once per product.
+// The catalog photo and its fingerprint, read once per image. A connected store's photos were
+// stored when it registered the order ("m/<sha>.jpg"); the demo store's ship in public/assets.
 const catalog = new Map();
-function catalogPhoto(sku) {
-  if (!catalog.has(sku)) {
-    const reference = readFileSync(new URL(`../public/assets/${PRODUCTS[sku].refImage}`, import.meta.url));
-    catalog.set(sku, differenceHash(reference).then((hash) => ({ reference, hash })));
+function catalogPhoto(line) {
+  const file = line.ref_image ?? PRODUCTS[line.sku].refImage;
+  if (!catalog.has(file)) {
+    const reference = readFileSync(file.startsWith("m/") ? join(uploadDir(), "catalog", file.slice(2)) : new URL(`../public/assets/${file}`, import.meta.url));
+    catalog.set(file, differenceHash(reference).then((hash) => ({ reference, hash })));
   }
-  return catalog.get(sku);
+  return catalog.get(file);
 }
+
+// What the evidence check and Haiku need to know about the product: the demo catalog entry, or
+// what the store sent when it registered the order.
+const productOf = (line) => PRODUCTS[line.sku] && !line.category
+  ? PRODUCTS[line.sku]
+  : { sku: line.sku, title: line.title, unitCents: line.unit_cents, category: line.category };
 
 // Run Jev on the current evidence and draft a proposal for the current claim version.
 // If Jev fails we record the error and still draft a manual-review proposal; we never invent findings.
@@ -136,11 +145,17 @@ export async function assessClaim(db, claimId, assess, actor = "system", suggest
     throw new ClaimError("NOT_ASSESSABLE", `Request is ${claim.status}.`, 409);
   }
   const line = db.prepare("SELECT * FROM order_lines WHERE id = ?").get(claim.line_id);
+  const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(claim.order_id);
   const evidence = db.prepare("SELECT * FROM evidence WHERE claim_id = ? ORDER BY created_at").all(claimId);
-  const { reference, hash: catalogHash } = await catalogPhoto(line.sku);
+  const { reference, hash: catalogHash } = await catalogPhoto(line);
+  const product = productOf(line);
+  // The remedy library, store listings and refund agent are the demo store's for now; a connected
+  // store gets the photo check, its own refund policy and one-click refunds through its own PayPal.
+  const demoStore = order.merchant_id === DEMO;
+  if (!demoStore) suggest = null;
 
   const flags = riskFlags(db, claim, evidence, catalogHash);
-  const remedies = activeRemedies(db, line.sku);
+  const remedies = demoStore ? activeRemedies(db, line.sku) : [];
 
   let result = null, error = null, sent = pickForModel(evidence), copies = [];
   if (evidence.length === 0) error = "No photos uploaded";
@@ -150,7 +165,7 @@ export async function assessClaim(db, claimId, assess, actor = "system", suggest
       // If the photos still exceed the model's per-call budget, halve the set rather than fail.
       for (let n = copies.length; ; n = Math.ceil(n / 2)) {
         try {
-          result = await assess({ photos: copies.slice(0, n), reference, remedies, category: PRODUCTS[line.sku]?.category });
+          result = await assess({ photos: copies.slice(0, n), reference, remedies, category: product.category });
           sent = sent.slice(0, n);
           break;
         } catch (err) {
@@ -166,7 +181,7 @@ export async function assessClaim(db, claimId, assess, actor = "system", suggest
   const photosSent = copies.slice(0, sent.length);
   const [suggested, matched] = await Promise.all([
     suggestFor({ suggest, sku: line.sku, findings: result?.findings, photos: photosSent, reference }),
-    matchFor({ match, sku: line.sku, findings: result?.findings, photos: photosSent, reference }),
+    matchFor({ match, product, findings: result?.findings, photos: photosSent, reference }),
   ]);
   if (matched?.same) result = { ...result, findings: { ...result.findings, second_check: matched } };
 
@@ -182,14 +197,13 @@ export async function assessClaim(db, claimId, assess, actor = "system", suggest
         result ? JSON.stringify(result.usage) : null, result?.latencyMs ?? null, error,
         evidence.length ? JSON.stringify(sent.map((e) => e.id)) : null, ts);
 
-    const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(claim.order_id);
     const ops = db.prepare("SELECT * FROM refund_ops WHERE capture_id = ?").all(order.capture_id);
     // The decision is drafted under the settings in force now, and records which version that was
     // and every input it used, so it can be replayed to the same answer.
-    const settings = currentPolicy(db);
+    const settings = currentPolicy(db, order.merchant_id);
     const inputs = {
       quantity: claim.quantity, deliveredAt: order.delivered_at, claimedAt: claim.created_at,
-      refundableCents: refundableBalance(order.amount_cents, ops), flags, agentSpentCents: agentSpent(db),
+      refundableCents: refundableBalance(order.amount_cents, ops), flags, agentSpentCents: demoStore ? agentSpent(db) : 0,
     };
     const draft = draftProposal({ line, findings: result?.findings ?? null, settings, ...inputs });
     const options = draft.route === "reject" ? [] : resolutionOptions({
@@ -238,10 +252,10 @@ async function suggestFor({ suggest, sku, findings, photos, reference }) {
 
 // Haiku's second look at whether the photos show the product sold. A failure is recorded and leaves
 // Jev's checks to stand alone; it never blocks the review.
-async function matchFor({ match, sku, findings, photos, reference }) {
+async function matchFor({ match, product, findings, photos, reference }) {
   if (!match || !findings || !photos.length) return null;
   try {
-    return await match({ photos, reference, product: PRODUCTS[sku] });
+    return await match({ photos, reference, product });
   } catch (err) {
     return { error: String(err?.message || err).slice(0, 300) };
   }

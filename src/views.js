@@ -12,7 +12,7 @@ const json = (s) => (s ? JSON.parse(s) : null);
 // Each row also carries what the merchant grid shows at a glance: Jev's headline finding, the
 // photo it outlined, how many concerns the policy raised, how many library remedies fit and how
 // many Claude Haiku suggestions are open or added, and how the case ended.
-export function inbox(db, { limit = 100, before = null } = {}) {
+export function inbox(db, { limit = 100, before = null, merchantId = "demo" } = {}) {
   const n = Math.min(Math.max(Number(limit) || 100, 1), 500);
   return db.prepare(`
     SELECT c.id, c.ref, c.status, c.quantity, c.created_at, c.updated_at, l.title, l.ref_image, o.amount_cents,
@@ -27,8 +27,8 @@ export function inbox(db, { limit = 100, before = null } = {}) {
     FROM claims c JOIN order_lines l ON l.id = c.line_id JOIN orders o ON o.id = c.order_id
     LEFT JOIN proposals p ON p.id = (SELECT id FROM proposals x WHERE x.claim_id = c.id ORDER BY x.created_at DESC LIMIT 1)
     LEFT JOIN assessments a ON a.id = p.assessment_id
-    WHERE (? IS NULL OR c.created_at < ?)
-    ORDER BY c.created_at DESC LIMIT ?`).all(before, before, n).map(({ calc_json, findings_json, photo_ids_json, offer_options, agent_note, ...r }) => {
+    WHERE o.merchant_id = ? AND (? IS NULL OR c.created_at < ?)
+    ORDER BY c.created_at DESC LIMIT ?`).all(merchantId, before, before, n).map(({ calc_json, findings_json, photo_ids_json, offer_options, agent_note, ...r }) => {
     const f = json(findings_json);
     const calc = json(calc_json);
     const sent = json(photo_ids_json) ?? [];
@@ -124,8 +124,9 @@ export function buyerStatus(db, claim) {
   const last = (type) => db.prepare("SELECT payload FROM audit WHERE claim_id = ? AND type = ? ORDER BY id DESC LIMIT 1").get(claim.id, type);
   const line = db.prepare("SELECT title FROM order_lines WHERE id = ?").get(claim.line_id);
   const offer = latestOffer(db, claim.id);
+  const store = db.prepare("SELECT m.name FROM orders o JOIN merchants m ON m.id = o.merchant_id WHERE o.id = ?").get(claim.order_id)?.name ?? null;
   return {
-    ref: claim.ref, status: claim.status, message: BUYER_WORDING[claim.status], item: line.title, quantity: claim.quantity,
+    store, ref: claim.ref, status: claim.status, message: BUYER_WORDING[claim.status], item: line.title, quantity: claim.quantity,
     infoRequest: claim.status === "needs_info" ? json(last("claim.info_requested")?.payload)?.message : null,
     closeReason: claim.status === "closed" ? json(last("claim.closed")?.payload)?.reason : null,
     refund: op && ["COMPLETED", "PENDING", "SUBMITTING", "UNKNOWN"].includes(op.status)

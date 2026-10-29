@@ -204,6 +204,38 @@ CREATE TABLE IF NOT EXISTS policy_settings (
   created_at TEXT NOT NULL
 );
 
+-- Merchants on Refund Relay. 'demo' is the store in this repo; its PayPal app comes from .env.
+-- Everyone else signs up on /dashboard and connects their own PayPal REST app.
+CREATE TABLE IF NOT EXISTS merchants (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT UNIQUE,
+  password_hash TEXT,
+  created_at TEXT NOT NULL
+);
+
+-- Secret keys for the merchant's server (POST /v1/orders). Only a hash is kept; the key is shown once.
+CREATE TABLE IF NOT EXISTS api_keys (
+  id TEXT PRIMARY KEY,
+  merchant_id TEXT NOT NULL REFERENCES merchants(id),
+  label TEXT NOT NULL,
+  prefix TEXT NOT NULL,
+  key_hash TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL,
+  last_used_at TEXT,
+  revoked_at TEXT
+);
+
+-- The merchant's own PayPal REST app. The secret is encrypted (AES-256-GCM, src/merchants/crypto.js).
+CREATE TABLE IF NOT EXISTS paypal_connections (
+  merchant_id TEXT PRIMARY KEY REFERENCES merchants(id),
+  client_id TEXT NOT NULL,
+  secret_enc TEXT NOT NULL,
+  payee_merchant_id TEXT,
+  verified_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS audit (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   claim_id TEXT,
@@ -221,6 +253,10 @@ const MIGRATIONS = [
   "ALTER TABLE evidence ADD COLUMN phash TEXT",
   "ALTER TABLE evidence ADD COLUMN sharpness INTEGER",
   "ALTER TABLE assessments ADD COLUMN photo_ids_json TEXT",
+  // Multi-merchant: rows from before belong to the demo store.
+  "ALTER TABLE orders ADD COLUMN merchant_id TEXT NOT NULL DEFAULT 'demo'",
+  "ALTER TABLE order_lines ADD COLUMN category TEXT",
+  "ALTER TABLE policy_settings ADD COLUMN merchant_id TEXT NOT NULL DEFAULT 'demo'",
 ];
 
 // Every lookup the app makes by foreign key or by time. Without these, each claim submission and
@@ -245,6 +281,9 @@ CREATE INDEX IF NOT EXISTS audit_by_claim ON audit(claim_id, type);
 CREATE INDEX IF NOT EXISTS audit_by_op ON audit(op_id);
 CREATE INDEX IF NOT EXISTS offers_by_actor ON offers(actor, status, created_at);
 CREATE INDEX IF NOT EXISTS refund_ops_by_created ON refund_ops(created_at);
+CREATE INDEX IF NOT EXISTS orders_by_merchant ON orders(merchant_id, created_at);
+CREATE INDEX IF NOT EXISTS api_keys_by_merchant ON api_keys(merchant_id, created_at);
+CREATE INDEX IF NOT EXISTS policy_by_merchant ON policy_settings(merchant_id, created_at);
 `;
 
 export function openDb(path = process.env.DATABASE_PATH || "data/refund-relay.db") {

@@ -24,14 +24,24 @@ import { assessmentQueue } from "./queue.js";
 import { PRODUCTS } from "./catalog.js";
 import { DEFAULT_POLICY, PolicyError, currentPolicy, savePolicy, severityTable } from "./policy/settings.js";
 import { POLICY_VERSION } from "./policy/refundPolicy.js";
+import { AccountError, DEMO, ensureDemoMerchant, getMerchant, merchantClients, routedPayPal } from "./merchants/accounts.js";
+import { platformRoutes } from "./merchants/routes.js";
+import { RegisterError, catalogPhotoPath, fetchCatalogImage } from "./merchants/register.js";
 
 // Whole multipart request: 100 photos already shrunk by the browser fit with lots of room.
 const MAX_REQUEST_BYTES = Number(process.env.MAX_REQUEST_MB || 300) * 1024 * 1024;
 const started = Date.now();
 
-export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence, suggest = defaultSuggester(), match = defaultMatcher(), parseRules = defaultRuleParser(),
-  queue = assessmentQueue(db, assess, { suggest, match, after: (claimId) => runAgent(db, pp, claimId) }) } = {}) {
+// pp is the demo store's PayPal client; paypalFor(credentials) makes one for a connected merchant.
+// Every refund, ledger check and reconciliation goes through `pay`, which picks the account the
+// order was paid to.
+export function createApp({ db = openDb(), pp = paypal, paypalFor = paypal.paypalClient, fetchImage = fetchCatalogImage, assess = assessEvidence,
+  suggest = defaultSuggester(), match = defaultMatcher(), parseRules = defaultRuleParser(), queue = null } = {}) {
   seedRemedies(db);
+  ensureDemoMerchant(db);
+  const clientFor = merchantClients(db, pp, paypalFor);
+  const pay = routedPayPal(db, pp, clientFor);
+  queue ??= assessmentQueue(db, assess, { suggest, match, after: (claimId) => runAgent(db, pay, claimId) });
   const app = express();
   app.disable("x-powered-by");
   // Behind Render's (or any) load balancer, req.ip is the proxy unless we trust its X-Forwarded-For;
@@ -52,6 +62,12 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
     next();
   });
   app.use(express.static(new URL("../public", import.meta.url).pathname, { extensions: ["html"] }));
+  // Connected stores' catalog photos, stored when the order was registered (src/merchants/register.js).
+  app.get("/assets/m/:file", (req, res) => {
+    if (!/^[0-9a-f]{64}\.jpg$/.test(req.params.file)) return res.status(404).end();
+    res.set({ "Content-Type": "image/jpeg", "Cache-Control": "public, max-age=86400, immutable" });
+    res.sendFile(resolve(catalogPhotoPath(req.params.file)), { cacheControl: false, lastModified: false }, (err) => err && !res.headersSent && res.status(404).end());
+  });
 
   app.get("/healthz", (_req, res) => {
     try {
@@ -96,7 +112,8 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
   };
 
   const wrap = (fn) => (req, res) => Promise.resolve(fn(req, res)).catch((err) => {
-    if (err instanceof GateError || err instanceof ClaimError || err instanceof OrderError || err instanceof ImageRejected || err instanceof RuleError || err instanceof PolicyError) {
+    if (err instanceof GateError || err instanceof ClaimError || err instanceof OrderError || err instanceof ImageRejected || err instanceof RuleError || err instanceof PolicyError
+      || err instanceof AccountError || err instanceof RegisterError) {
       const status = err.status || ({ CAPTURE_NOT_REFUNDABLE: 409, EXTERNAL_REFUND_DETECTED: 409, NOT_FOUND: 404, STALE_CASE: 409, REFUND_IN_PROGRESS: 409, NOT_READY: 409, NO_OPTIONS: 409, TOO_MANY_REMEDIES: 409 }[err.code] ?? 400);
       return res.status(status).json({ error: err.code || "IMAGE_REJECTED", message: err.message, debugId: err.debugId });
     }
@@ -114,11 +131,11 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
 
   // Body { items: [{ sku, quantity }] }; an empty body buys the default demo cart.
   app.post("/api/demo/orders", limit(10, 60e3), wrap(async (req, res) => {
-    res.status(201).json(await startOrder(db, pp, req.body?.items));
+    res.status(201).json(await startOrder(db, pay, req.body?.items));
   }));
 
   app.post("/api/demo/orders/:paypalOrderId/capture", limit(20, 60e3), wrap(async (req, res) => {
-    const { order, claimToken, alreadyCaptured } = await captureOrder(db, pp, req.params.paypalOrderId);
+    const { order, claimToken, alreadyCaptured } = await captureOrder(db, pay, req.params.paypalOrderId);
     res.json({
       orderId: order.id, captureId: order.capture_id, amount: order.amount_cents, alreadyCaptured,
       claimUrl: claimToken ? `/claim?order=${order.id}#t=${claimToken}` : null,
@@ -140,7 +157,8 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
     const order = orderForClaimToken(req);
     const lines = db.prepare("SELECT id, title, quantity, unit_cents, ref_image FROM order_lines WHERE order_id = ?").all(order.id);
     const open = db.prepare("SELECT id, ref FROM claims WHERE order_id = ? AND status NOT IN ('closed','refunded','resolved')").get(order.id);
-    res.json({ orderId: order.id, amountCents: order.amount_cents, capturedAt: order.delivered_at, lines, openClaimRef: open?.ref ?? null });
+    res.json({ orderId: order.id, amountCents: order.amount_cents, capturedAt: order.delivered_at, lines, openClaimRef: open?.ref ?? null,
+      store: { name: getMerchant(db, order.merchant_id)?.name ?? null, demo: order.merchant_id === DEMO } });
   }));
 
   app.post("/api/claims", limit(5, 60e3), photos, wrap(async (req, res) => {
@@ -173,9 +191,9 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
     // PayPal is asked first only when the pick moves money; a replacement settles without it.
     const open = db.prepare("SELECT options_json FROM offers WHERE id = ? AND claim_id = ? AND status = 'open' AND decided_at IS NULL").get(String(req.body.offerId || ""), claim.id);
     const picked = open && JSON.parse(open.options_json).find((o) => o.id === String(req.body.optionId || ""));
-    if (!picked || picked.refundCents > 0) await checkPayPalLedger(db, pp, claim.id);
+    if (!picked || picked.refundCents > 0) await checkPayPalLedger(db, pay, claim.id);
     const { op, duplicate } = acceptOffer(db, { claimId: claim.id, offerId: String(req.body.offerId || ""), optionId: String(req.body.optionId || "") });
-    if (op && !duplicate) await submit(db, pp, op, "buyer");
+    if (op && !duplicate) await submit(db, pay, op, "buyer");
     res.json(buyerStatus(db, db.prepare("SELECT * FROM claims WHERE id = ?").get(claim.id)));
   }));
 
@@ -192,15 +210,33 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
   // ---- Merchant ------------------------------------------------------------------------------
   app.post("/api/merchant/login", limit(10, 60e3), (req, res) => {
     if (!checkMerchantPassword(req.body?.password ?? "")) return res.status(401).json({ error: "BAD_PASSWORD", message: "Wrong password." });
-    issueSession(res);
+    issueSession(res, DEMO);
     res.json({ ok: true });
   });
   app.post("/api/merchant/logout", (_req, res) => { clearSession(res); res.json({ ok: true }); });
 
   const m = express.Router();
   m.use(requireMerchant);
-  m.get("/me", (_req, res) => res.json({ actor: "merchant" }));
-  m.get("/claims", (req, res) => res.json(inbox(db, { limit: req.query.limit, before: req.query.before })));
+  // A merchant only ever sees and acts on requests from their own orders.
+  const ownClaim = (req, id) => db.prepare("SELECT 1 FROM claims c JOIN orders o ON o.id = c.order_id WHERE c.id = ? AND o.merchant_id = ?").get(id, req.merchantId);
+  m.param("id", (req, res, next, id) => {
+    if (req.path.startsWith("/claims/") && !ownClaim(req, id)) return res.status(404).json({ error: "NOT_FOUND", message: "No such request." });
+    if (req.path.startsWith("/refunds/") && !db.prepare("SELECT 1 FROM refund_ops r JOIN orders o ON o.id = r.order_id WHERE r.id = ? AND o.merchant_id = ?").get(id, req.merchantId)) {
+      return res.status(404).json({ error: "NOT_FOUND", message: "No such refund." });
+    }
+    if (req.path.startsWith("/evidence/") && !db.prepare("SELECT 1 FROM evidence e JOIN claims c ON c.id = e.claim_id JOIN orders o ON o.id = c.order_id WHERE e.id = ? AND o.merchant_id = ?").get(id, req.merchantId)) {
+      return res.status(404).json({ error: "NOT_FOUND", message: "No such photo." });
+    }
+    next();
+  });
+  // The remedy library and the refund agent work on the demo store's catalog, so far.
+  const demoOnly = (req, res, next) => req.merchantId === DEMO ? next()
+    : res.status(404).json({ error: "DEMO_STORE_ONLY", message: "The remedy library and the refund agent are coming to connected stores soon." });
+  m.get("/me", (req, res) => {
+    const me = getMerchant(db, req.merchantId);
+    res.json({ actor: "merchant", merchant: { id: me?.id, name: me?.name }, demo: req.merchantId === DEMO });
+  });
+  m.get("/claims", (req, res) => res.json(inbox(db, { limit: req.query.limit, before: req.query.before, merchantId: req.merchantId })));
   m.get("/claims/:id", wrap(async (req, res) => {
     const detail = caseDetail(db, req.params.id);
     if (!detail) throw new ClaimError("NOT_FOUND", "No such request.", 404);
@@ -232,12 +268,12 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
   }));
   m.post("/claims/:id/approve-refund", wrap(async (req, res) => {
     const { claimVersion, proposalId, amountCents, reason } = req.body;
-    await checkPayPalLedger(db, pp, req.params.id);
+    await checkPayPalLedger(db, pay, req.params.id);
     const { op, duplicate } = approveAndReserve(db, {
       claimId: req.params.id, claimVersion: Number(claimVersion), proposalId, amountCents: Number(amountCents), reason, actor: req.actor,
     });
     // A duplicate click never submits again; it reports the operation that already exists.
-    if (!duplicate) await submit(db, pp, op, req.actor);
+    if (!duplicate) await submit(db, pay, op, req.actor);
     res.status(duplicate ? 409 : 200).json({ duplicate, ...caseDetail(db, req.params.id) });
   }));
   m.post("/claims/:id/send-offer", wrap(async (req, res) => {
@@ -249,22 +285,23 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
     withdrawOffer(db, { claimId: req.params.id, actor: req.actor });
     res.json(caseDetail(db, req.params.id));
   }));
-  m.get("/remedies", (_req, res) => res.json(remedyLibrary(db)));
-  m.post("/remedies", wrap(async (req, res) => res.status(201).json(createRemedy(db, req.body))));
-  m.patch("/remedies/:id", wrap(async (req, res) => res.json(updateRemedy(db, req.params.id, req.body))));
+  m.get("/remedies", demoOnly, (_req, res) => res.json(remedyLibrary(db)));
+  m.post("/remedies", demoOnly, wrap(async (req, res) => res.status(201).json(createRemedy(db, req.body))));
+  m.patch("/remedies/:id", demoOnly, wrap(async (req, res) => res.json(updateRemedy(db, req.params.id, req.body))));
   // ---- The refund policy: severity table, limits and how sure the photo check must be ----
-  const policyView = () => {
-    const policy = currentPolicy(db);
-    return { version: POLICY_VERSION, policy, defaults: DEFAULT_POLICY, severity: severityTable(policy), spentCents: agentSpent(db) };
+  const policyView = (merchantId) => {
+    const policy = currentPolicy(db, merchantId);
+    return { version: POLICY_VERSION, policy, defaults: DEFAULT_POLICY, severity: severityTable(policy), spentCents: merchantId === DEMO ? agentSpent(db) : 0 };
   };
-  m.get("/policy", (_req, res) => res.json(policyView()));
+  m.get("/policy", (req, res) => res.json(policyView(req.merchantId)));
   // New settings apply to reviews from now on; cases already reviewed keep the decision they got.
   m.put("/policy", wrap(async (req, res) => {
-    savePolicy(db, req.body ?? {}, req.actor);
-    res.json(policyView());
+    savePolicy(db, req.body ?? {}, req.actor, req.merchantId);
+    res.json(policyView(req.merchantId));
   }));
   // ---- The refund agent's rules ----
   // What is on, what the agent did lately, and what it has sent in the last 24 hours.
+  m.use("/agent", demoOnly);
   m.get("/agent", (_req, res) => {
     const recent = db.prepare(`SELECT a.type, a.payload, a.at, c.id claim_id, c.ref, c.status, l.title FROM audit a
       JOIN claims c ON c.id = a.claim_id JOIN order_lines l ON l.id = c.line_id
@@ -297,10 +334,12 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
   }));
   m.delete("/agent", (req, res) => { stopMandate(db, req.actor); res.json({ mandate: null }); });
   m.post("/refunds/:id/reconcile", wrap(async (req, res) => {
-    const op = await reconcile(db, pp, req.params.id, req.actor);
+    const op = await reconcile(db, pay, req.params.id, req.actor);
     res.json(caseDetail(db, op.claim_id));
   }));
   app.use("/api/merchant", m);
+  // Sign-up, PayPal connection, API keys (/api/dashboard) and the store API (/v1).
+  platformRoutes(app, { db, clientFor, paypalFor, fetchImage, limit, wrap });
 
   app.use("/api", (_req, res) => res.status(404).json({ error: "NOT_FOUND" }));
   // Upload limits (too many files, file too large) fail inside multer, before any route handler.
@@ -311,7 +350,7 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
     }
     next(err);
   });
-  return { app, db, queue };
+  return { app, db, queue, pay };
 }
 
 // A hosted demo for judges can print its sandbox sign-ins on the store and merchant pages. Off
@@ -335,13 +374,13 @@ export function checkConfig(env = process.env) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   checkConfig();
-  const { app, db, queue } = createApp();
+  const { app, db, queue, pay } = createApp();
   // Resume reconciliation of refunds that were in flight when the server last stopped, and any
   // claims that were waiting for assessment.
-  reconcileOpen(db, paypal, { atStartup: true }).then((n) => n && console.log(`Reconciled ${n} open refund operation(s)`));
+  reconcileOpen(db, pay, { atStartup: true }).then((n) => n && console.log(`Reconciled ${n} open refund operation(s)`));
   const waiting = queue.resume();
   if (waiting) console.log(`Resumed assessment of ${waiting} claim(s)`);
-  setInterval(() => reconcileOpen(db, paypal).catch(() => {}), 60_000).unref();
+  setInterval(() => reconcileOpen(db, pay).catch(() => {}), 60_000).unref();
   // Hosts like Render cannot attach a web service's disk to a separate cron job, so the server
   // backs itself up when asked to.
   const backupHours = Number(process.env.BACKUP_INTERVAL_HOURS || 0);
