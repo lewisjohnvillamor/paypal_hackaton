@@ -73,7 +73,7 @@ export function offerOptions(db, proposal) {
     .map((s) => ({ id: `ai_${s.id}`, kind: s.kind, title: s.title, item: s.item, source: "haiku", refundCents: Math.min(s.refund_unit_cents * quantity, amountCents) }))
     .filter((o) => o.refundCents < amountCents);
   if (!approved.length) return base;
-  const refund = base.find((o) => o.kind === "refund") ?? (amountCents > 0 ? { id: "refund", kind: "refund", title: "Full refund", refundCents: amountCents } : null);
+  const refund = base.find((o) => o.kind === "refund") ?? (amountCents > 0 ? { id: "refund", kind: "refund", title: calc.calculation?.percent != null && calc.calculation.percent < 100 ? "Partial refund" : "Full refund", refundCents: amountCents } : null);
   if (!refund) return base;
   return [refund, ...base.filter((o) => o.kind !== "refund"), ...approved];
 }

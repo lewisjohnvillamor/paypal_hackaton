@@ -12,12 +12,35 @@ export const REASON_TEXT = {
   STOCK_PHOTO_SUSPECTED: "The photo looks like a professional or stock image, not the buyer's own snapshot.",
   INSTRUCTIONS_IN_PHOTO: "The photo contains written text aimed at the reviewer. It was ignored; check it yourself.",
   PHOTO_REUSED_FROM_OTHER_CLAIM: "A photo closely matches one sent with a different refund request.",
-  PHOTO_MATCHES_CATALOG: "A photo closely matches your own catalog photo.",
+  PHOTO_MATCHES_CATALOG: "A photo is a near-copy of your own catalog photo, not a photo of the item received.",
   PRIOR_CLAIM_ON_ORDER: "This order already had an earlier refund request.",
   REPEAT_CLAIMANT: "This buyer filed requests on other orders in the last 90 days.",
   MULTI_UNIT_CLAIM: "More than one unit is claimed. Confirm how many are actually broken.",
-  OUTSIDE_CLAIM_WINDOW: "Reported more than 14 days after delivery.",
+  OUTSIDE_CLAIM_WINDOW: "Reported after your damage reporting window closed.",
+  NOTHING_REFUNDABLE: "This payment has already been refunded in full.",
+  NO_DAMAGE_SEEN: "The photos are clear and the photo check is confident they show no damage.",
+  DIFFERENT_PRODUCT: "Two independent checks agree the photos show a different product from the one sold.",
+  NO_REFUND_FOR_DAMAGE_TYPE: "Your refund policy pays 0% for this kind of damage.",
+  DAMAGE_TYPE_UNSURE: "The photo check isn't sure enough what kind of damage this is to price it.",
+  DAMAGE_TYPE_UNCLEAR: "Damage is visible, but it doesn't fit any damage type in your refund policy.",
+  OVER_AUTO_REFUND_LIMIT: "The amount is above your limit for automatic refunds.",
+  DAILY_AUTO_LIMIT_REACHED: "This would take automatic refunds past your daily limit.",
+  NO_AMOUNT: "There is no amount to refund automatically.",
+  ALL_CHECKS_PASSED: "Every check passed: clear photos of your product, a confident damage type, no risk flags, within your limits.",
   CAPPED_AT_REFUNDABLE_BALANCE: "Amount capped at the remaining refundable balance.",
   QUANTITY_EXCEEDS_PURCHASED: "Claimed quantity exceeds the quantity purchased.",
   AI_UNAVAILABLE: "AI assessment unavailable. Review the photos yourself.",
+};
+
+// What the buyer reads when a request is closed for one of the policy's decline reasons. Written
+// for the buyer: no model names, no scores.
+export const BUYER_DECLINE = {
+  OUTSIDE_CLAIM_WINDOW: "This was reported after the shop's damage reporting window had closed.",
+  QUANTITY_EXCEEDS_PURCHASED: "More items were reported than were bought on this order.",
+  NOTHING_REFUNDABLE: "This payment has already been refunded in full.",
+  PHOTO_MATCHES_CATALOG: "The photo sent is the shop's own product photo, not a photo of the item you received.",
+  NO_DAMAGE_SEEN: "We looked closely at your photos and couldn't see any damage to the item.",
+  DIFFERENT_PRODUCT: "The photos show a different item from the one on your order.",
+  NO_REFUND_FOR_DAMAGE_TYPE: "This kind of wear isn't covered by the shop's damage policy.",
+  DEFAULT: "This request is outside the shop's refund policy.",
 };

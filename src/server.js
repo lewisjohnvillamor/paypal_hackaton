@@ -22,6 +22,8 @@ import { RuleError, checkRules, describeRules, ruleVocabulary } from "./agent/ru
 import { decideSuggestion } from "./suggest/suggestions.js";
 import { assessmentQueue } from "./queue.js";
 import { PRODUCTS } from "./catalog.js";
+import { DEFAULT_POLICY, PolicyError, currentPolicy, savePolicy, severityTable } from "./policy/settings.js";
+import { POLICY_VERSION } from "./policy/refundPolicy.js";
 
 // Whole multipart request: 100 photos already shrunk by the browser fit with lots of room.
 const MAX_REQUEST_BYTES = Number(process.env.MAX_REQUEST_MB || 300) * 1024 * 1024;
@@ -94,7 +96,7 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
   };
 
   const wrap = (fn) => (req, res) => Promise.resolve(fn(req, res)).catch((err) => {
-    if (err instanceof GateError || err instanceof ClaimError || err instanceof OrderError || err instanceof ImageRejected || err instanceof RuleError) {
+    if (err instanceof GateError || err instanceof ClaimError || err instanceof OrderError || err instanceof ImageRejected || err instanceof RuleError || err instanceof PolicyError) {
       const status = err.status || ({ CAPTURE_NOT_REFUNDABLE: 409, EXTERNAL_REFUND_DETECTED: 409, NOT_FOUND: 404, STALE_CASE: 409, REFUND_IN_PROGRESS: 409, NOT_READY: 409, NO_OPTIONS: 409, TOO_MANY_REMEDIES: 409 }[err.code] ?? 400);
       return res.status(status).json({ error: err.code || "IMAGE_REJECTED", message: err.message, debugId: err.debugId });
     }
@@ -250,6 +252,17 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
   m.get("/remedies", (_req, res) => res.json(remedyLibrary(db)));
   m.post("/remedies", wrap(async (req, res) => res.status(201).json(createRemedy(db, req.body))));
   m.patch("/remedies/:id", wrap(async (req, res) => res.json(updateRemedy(db, req.params.id, req.body))));
+  // ---- The refund policy: severity table, limits and how sure the photo check must be ----
+  const policyView = () => {
+    const policy = currentPolicy(db);
+    return { version: POLICY_VERSION, policy, defaults: DEFAULT_POLICY, severity: severityTable(policy), spentCents: agentSpent(db) };
+  };
+  m.get("/policy", (_req, res) => res.json(policyView()));
+  // New settings apply to reviews from now on; cases already reviewed keep the decision they got.
+  m.put("/policy", wrap(async (req, res) => {
+    savePolicy(db, req.body ?? {}, req.actor);
+    res.json(policyView());
+  }));
   // ---- The refund agent's rules ----
   // What is on, what the agent did lately, and what it has sent in the last 24 hours.
   m.get("/agent", (_req, res) => {
@@ -257,7 +270,7 @@ export function createApp({ db = openDb(), pp = paypal, assess = assessEvidence,
       JOIN claims c ON c.id = a.claim_id JOIN order_lines l ON l.id = c.line_id
       WHERE a.type IN ('agent.acted', 'agent.left_for_merchant') ORDER BY a.id DESC LIMIT 20`).all()
       .map((r) => ({ ...JSON.parse(r.payload), acted: r.type === "agent.acted", at: r.at, claimId: r.claim_id, ref: r.ref, status: r.status, title: r.title }));
-    res.json({ mandate: activeMandate(db), spentCents: agentSpent(db), recent, canWrite: !!parseRules });
+    res.json({ mandate: activeMandate(db), spentCents: agentSpent(db), policyDailyCents: currentPolicy(db).dailyAutoRefundCents, recent, canWrite: !!parseRules });
   });
   // Plain English in, checked rules and their read-back out. Nothing is turned on here.
   m.post("/agent/preview", limit(20, 60e3), wrap(async (req, res) => {

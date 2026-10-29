@@ -50,10 +50,14 @@
       AI_UNAVAILABLE: "AI assessment unavailable. Review the photos yourself.",
     };
     const ROUTE = {
+      auto_refund: ["Safe to refund automatically", "ok"],
       propose: ["Policy suggests a refund", "ok"],
       manual_review: ["Needs your judgment", "warn"],
+      reject: ["No refund advised", "bad"],
       request_info: ["Ask for more photos", "warn"],
     };
+    const AUTO = ["auto_refund", "propose"];
+    const SEVERITY = { total: "destroyed", major: "can't be used", moderate: "usable, visibly damaged", minor: "cosmetic only" };
     const REFUND = { COMPLETED: ["completed", "ok"], PENDING: ["pending", "warn"], SUBMITTING: ["sending", "warn"], UNKNOWN: ["status unknown", "warn"], FAILED: ["failed", "bad"] };
     const EVENT = {
       "claim.submitted": "Buyer reported damage",
@@ -154,14 +158,17 @@
       }
       const [routeLabel, tone] = ROUTE[proposal.route];
       const c = proposal.calculation;
-      const suggested = proposal.amountCents || c.grossCents;
+      const suggested = proposal.amountCents || c.severityCents || c.grossCents;
       // When the photos can't be used, or may show a different product, asking the buyer is the
       // natural next step, so it leads; refunding anyway stays one tap away.
-      const mismatch = proposal.reasons.includes("OFFERS_HELD_ITEM_MISMATCH");
-      const askFirst = proposal.route === "request_info" || mismatch;
+      const mismatch = proposal.reasons.includes("OFFERS_HELD_ITEM_MISMATCH") && proposal.route !== "reject";
+      const photos = proposal.route === "request_info" || proposal.askForPhotos;
+      const askFirst = photos || mismatch;
+      // A decline the policy advises leads with closing the request; refunding stays one tap away.
+      const declineFirst = proposal.route === "reject" && !photos;
       const ask = mismatch
         ? "Please send a photo of the whole item and its label or tag, so we can confirm it is the one you ordered."
-        : proposal.route === "request_info" ? "Please send a clear, well-lit photo that shows the damage and the whole item." : "";
+        : photos ? "Please send a clear, well-lit photo that shows the damage and the whole item." : "";
       const askBlock = `<div class="ask-block${askFirst ? " lead" : ""}">
           ${askFirst ? `<b>Ask the buyer for another photo</b><div class="small muted" style="margin:2px 0 10px">${mismatch ? "Repair kits and other remedies stay held back until the item is confirmed as yours." : "No amount is drafted until usable photos arrive."}</div>` : `<label for="info">Ask the buyer for more photos</label>`}
           <textarea id="info" rows="3" placeholder="Please photograph the damage and the whole item.">${esc(ask)}</textarea>
@@ -170,26 +177,36 @@
       const refundBlock = `
         <label for="amount">Refund amount <span class="hint">Up to ${usd(payment.refundableCents)} left on this payment</span></label>
         <input id="amount" type="number" inputmode="decimal" min="0.01" step="0.01" max="${(payment.refundableCents / 100).toFixed(2)}" value="${(suggested / 100).toFixed(2)}">
-        <div id="reason-wrap" class="${proposal.route === "propose" ? "hidden" : ""}">
+        <div id="reason-wrap" class="${AUTO.includes(proposal.route) ? "hidden" : ""}">
           <label for="reason">Why? <span class="hint">Saved with your approval.</span></label>
           <input id="reason" placeholder="For example: photo 2 clearly shows the snapped handle">
         </div>
         <button id="approve" class="approve" style="margin-top:20px"></button>
         <p class="footnote center" style="margin:10px 0 0">Paid back through PayPal, on the buyer’s original payment.</p>`;
+      const noAmount = proposal.route === "request_info" || proposal.route === "reject";
+      // How the amount was worked out: the damage type, its severity and the merchant's percentage.
+      const priced = c.percent != null
+        ? `${esc(DAMAGE[c.damageKind] ?? c.damageKind)} · ${SEVERITY[c.severity] ?? c.severity} · ${c.percent}% of ${c.quantity} × ${usd(c.unitCents)}`
+        : `${c.quantity} × ${usd(c.unitCents)} unit price paid`;
+      const others = proposal.reasons.filter((r) => r !== proposal.decidedBy && !(askFirst && r === "OFFERS_HELD_ITEM_MISMATCH"));
+      const closeBlock = (lead) => `<div class="ask-block${lead ? " lead" : ""}">
+          ${lead ? `<b>Close without a refund</b><div class="small muted" style="margin:2px 0 10px">The buyer sees this reason. You can edit it.</div>` : `<label for="close-reason">Close without a refund</label>`}
+          <div class="row"><input id="close-reason" placeholder="Reason the buyer will see" style="flex:1" value="${esc(lead ? proposal.declineText ?? "" : "")}"><button id="close" class="danger">Close</button></div>
+        </div>`;
       return `<div class="card">
         ${head}
         <div class="calc">
           <span class="pill ${tone}">${routeLabel}</span>
-          <div class="total">${proposal.route === "request_info" ? "—" : usd(proposal.amountCents)}${proposal.route === "request_info" ? "" : " <small>USD</small>"}</div>
-          <div class="small muted">${proposal.route === "request_info" ? "No amount until clearer photos arrive." : `${c.quantity} × ${usd(c.unitCents)} unit price paid`}</div>
+          <div class="total">${noAmount ? (proposal.route === "reject" && !photos ? "$0.00" : "—") : usd(proposal.amountCents)}${noAmount && photos ? "" : " <small>USD</small>"}</div>
+          <div class="small muted">${photos ? "No amount until clearer photos arrive." : proposal.route === "reject" ? "No refund under your policy" : priced}</div>
         </div>
-        ${proposal.reasons.length ? `<ul class="reasons">${proposal.reasons.filter((r) => !(askFirst && r === "OFFERS_HELD_ITEM_MISMATCH")).map((r) => `<li>${esc(proposal.reasonText?.[r] || REASON[r] || r)}</li>`).join("")}</ul>` : ""}
-        ${askFirst ? askBlock : offerHtml(proposal) + refundBlock}
-        ${askFirst ? `<details class="more"><summary>Refund anyway</summary>${refundBlock}</details>` : ""}
+        ${proposal.decidedByText ? `<p class="small decided" style="margin:0 0 8px"><b>Why:</b> ${esc(proposal.decidedByText)} <a href="/merchant/policy">Your refund policy</a></p>` : ""}
+        ${others.length ? `<ul class="reasons">${others.map((r) => `<li>${esc(proposal.reasonText?.[r] || REASON[r] || r)}</li>`).join("")}</ul>` : ""}
+        ${askFirst ? askBlock : declineFirst ? closeBlock(true) : offerHtml(proposal) + refundBlock}
+        ${askFirst || declineFirst ? `<details class="more"><summary>Refund anyway</summary>${refundBlock}</details>` : ""}
         <details class="more"><summary>More options</summary>
           ${askFirst ? "" : askBlock}
-          <label for="close-reason">Close without a refund</label>
-          <div class="row"><input id="close-reason" placeholder="Reason the buyer will see" style="flex:1"><button id="close" class="danger">Close</button></div>
+          ${declineFirst ? "" : closeBlock(false)}
           <p style="margin:16px 0 0"><button id="assess" class="plain">Run the AI review again</button></p>
         </details>
       </div>`;
@@ -319,7 +336,7 @@
       if (amount && approve) {
         const sync = () => {
           const cents = Math.round(Number(amount.value) * 100);
-          const differs = cents !== d.proposal.amountCents || d.proposal.route !== "propose";
+          const differs = cents !== d.proposal.amountCents || !AUTO.includes(d.proposal.route);
           $("reason-wrap").classList.toggle("hidden", !differs);
           approve.textContent = `Approve ${usd(cents || 0)} refund`;
           approve.disabled = !(cents > 0);

@@ -71,7 +71,7 @@ function requestSummary(d) {
     ref: d.claim.ref, id: d.claim.id, status: d.claim.status, item: `${d.claim.quantity} × ${d.line.title}`, paid_each: usd(d.line.unitCents),
     buyer_said: d.claim.statement,
     photo_check: f ? { damage_visible: f.visible_breakage, damage_type: f.damage_kind, same_product: f.product_consistency, photos_usable: f.evidence_usable } : (d.assessment?.error ?? "not yet"),
-    policy: d.proposal && { route: d.proposal.route, amount: usd(d.proposal.amountCents), concerns: Object.values(d.proposal.reasonText ?? {}) },
+    policy: d.proposal && { route: d.proposal.route, amount: usd(d.proposal.amountCents), why: d.proposal.decidedByText, concerns: Object.values(d.proposal.reasonText ?? {}) },
     refund_agent: agent ? `${agent.title}: ${agent.detail}` : "no rules on, or not reviewed yet",
     refunds: d.refunds.map((r) => ({ paypal_refund_id: r.providerRefundId, status: r.status, amount: usd(r.amountCents) })),
     paypal: { order_id: d.payment.paypalOrderId, capture_id: d.payment.captureId, refundable_now: usd(d.payment.refundableCents) },

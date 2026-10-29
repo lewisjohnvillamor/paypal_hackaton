@@ -9,9 +9,14 @@ import { checkPayPalLedger, reserve, submit } from "../refunds/execute.js";
 import { openOffer } from "../offers.js";
 import { offerOptions } from "../suggest/suggestions.js";
 import { checkRules, decide, describeRules } from "./rules.js";
+import { agentSpent } from "./spend.js";
+import { closeClaim } from "../claims.js";
+import { currentPolicy } from "../policy/settings.js";
+import { BUYER_DECLINE } from "../reasons.js";
+
+export { agentSpent };
 
 const json = (s) => (s ? JSON.parse(s) : null);
-const DAY = 86400e3;
 
 const view = (m) => !m ? null : {
   id: m.id, text: m.text, ...json(m.rules_json), model: m.model, createdAt: m.created_at,
@@ -41,17 +46,9 @@ export function stopMandate(db, actor) {
   if (r.changes) audit(db, { actor, type: "agent.rules_off" });
 }
 
-// What the agent has committed in the last 24 hours: refunds it approved, refunds buyers picked
-// from options it sent, and the largest amount still open on any offer it sent.
-export function agentSpent(db, at = Date.now()) {
-  const since = new Date(at - DAY).toISOString();
-  const refunded = db.prepare(`SELECT COALESCE(SUM(o.amount_cents), 0) n FROM refund_ops o JOIN approvals a ON a.id = o.approval_id
-    WHERE o.status != 'FAILED' AND o.created_at >= ?
-      AND (a.actor = 'agent' OR o.id IN (SELECT op_id FROM offers WHERE actor = 'agent' AND op_id IS NOT NULL))`).get(since).n;
-  const open = db.prepare("SELECT options_json FROM offers WHERE actor = 'agent' AND status = 'open' AND decided_at IS NULL AND created_at >= ?").all(since)
-    .reduce((s, o) => s + Math.max(0, ...json(o.options_json).map((x) => x.refundCents)), 0);
-  return refunded + open;
-}
+const policyFacts = (calc) => ({
+  reasons: calc.reasons ?? [], decidedBy: calc.decidedBy ?? null, hardReject: !!calc.hardReject, askForPhotos: !!calc.askForPhotos,
+});
 
 // Facts the agent decides on, for a case still waiting on its current proposal.
 function caseFacts(db, claimId) {
@@ -64,9 +61,9 @@ function caseFacts(db, claimId) {
   return {
     claim, proposal,
     ctx: {
-      route: proposal.route, reasons: json(proposal.calc_json).reasons ?? [], amountCents: proposal.amount_cents,
+      ...policyFacts(json(proposal.calc_json)), route: proposal.route, amountCents: proposal.amount_cents,
       sku: line.sku, findings: json(assessment?.findings_json), options: offerOptions(db, proposal).length,
-      spentCents: agentSpent(db),
+      spentCents: agentSpent(db), policy: currentPolicy(db),
     },
   };
 }
@@ -104,6 +101,10 @@ export async function runAgent(db, paypal, claimId) {
       const again = decide(current, facts.ctx);
       if (again.act !== d.act) throw Object.assign(new Error(again.why), { code: again.code });
       audit(db, { claimId, actor: "agent", type: "agent.acted", payload: { mandateId: mandate.id, act: d.act, rule: d.rule, why: d.why } });
+      if (d.act === "decline") {
+        closeClaim(db, claimId, BUYER_DECLINE[facts.ctx.decidedBy] ?? BUYER_DECLINE.DEFAULT, "agent", true);
+        return null;
+      }
       if (d.act === "offer") {
         openOffer(db, { claimId, claimVersion: facts.claim.version, proposalId: facts.proposal.id, actor: "agent" });
         return null;
@@ -124,6 +125,7 @@ export async function runAgent(db, paypal, claimId) {
 // day's total were zero. Read only; shown before the merchant turns the rules on.
 export function replay(db, rules, limit = 12) {
   const mandate = checkRules(rules);
+  const policy = currentPolicy(db);
   return db.prepare(`SELECT c.id, c.ref, l.title, l.sku, p.route, p.amount_cents, p.calc_json, p.id proposal_id, a.findings_json
     FROM claims c JOIN order_lines l ON l.id = c.line_id
     JOIN proposals p ON p.id = (SELECT id FROM proposals x WHERE x.claim_id = c.id ORDER BY x.created_at DESC LIMIT 1)
@@ -131,8 +133,8 @@ export function replay(db, rules, limit = 12) {
     ORDER BY c.created_at DESC LIMIT ?`).all(limit).map((r) => {
     const proposal = { id: r.proposal_id, amount_cents: r.amount_cents, calc_json: r.calc_json };
     const d = decide(mandate, {
-      route: r.route, reasons: json(r.calc_json).reasons ?? [], amountCents: r.amount_cents, sku: r.sku,
-      findings: json(r.findings_json), options: offerOptions(db, proposal).length, spentCents: 0,
+      ...policyFacts(json(r.calc_json)), route: r.route, amountCents: r.amount_cents, sku: r.sku,
+      findings: json(r.findings_json), options: offerOptions(db, proposal).length, spentCents: 0, policy,
     });
     return { id: r.id, ref: r.ref, title: r.title, amountCents: r.amount_cents, act: d.act, why: d.why };
   });

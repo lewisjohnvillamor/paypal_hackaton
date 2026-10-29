@@ -196,6 +196,14 @@ CREATE TABLE IF NOT EXISTS mandates (
   ended_at TEXT
 );
 
+-- The merchant's refund policy settings (src/policy/settings.js); the newest row is in force.
+CREATE TABLE IF NOT EXISTS policy_settings (
+  id TEXT PRIMARY KEY,
+  settings_json TEXT NOT NULL,
+  actor TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS audit (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   claim_id TEXT,

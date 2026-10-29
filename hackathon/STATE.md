@@ -201,3 +201,35 @@ the empty inbox, clipped grid columns, remedies columns on phones, the second-re
 broken-link help, closing-reason punctuation, the inbox link contrast. The buyer's status no longer
 carries AI fit scores, and a $0 replacement pick no longer needs PayPal to answer. Open items are
 in the audit doc.
+
+## Refund policy v3: three outcomes, decided by plain code (2026-10-28)
+
+Every request now lands in exactly one of `auto_refund`, `manual_review` or `reject`
+(`draftProposal` in `src/policy/refundPolicy.js`). The photo check only supplies signals; the rules
+are fixed code over those signals, the shop's records and the merchant's settings
+(`src/policy/settings.js`, page `/merchant/policy`). Each proposal stores `decidedBy` (the rule that
+settled it), every concern, the settings version and all inputs, so it replays to the same answer.
+
+- Reject, from the records: reported after the window (14 days), more units than bought, nothing
+  left to refund, a photo that is the shop's own catalog photo. With the agent on, it closes these
+  itself (setting `agentDeclines`) and tells the buyer why.
+- Reject, from clear photos: unusable photos (buyer asked for clearer ones), no damage on clear photos
+  (breakage 20% or less), two independent checks agreeing it is a different product, or damage the
+  table pays 0% for. These wait for the merchant's one click; the AI never closes a case alone.
+- Manual review: AI unavailable, borderline photos, breakage below 80%, damage type below 60% sure or
+  not in the table, any product doubt, stock-looking photo, text in photo, reused photo, prior or
+  repeat claims, more than one unit, amount capped by the balance, over $50 a request, or over $150
+  of automatic refunds in 24 hours.
+- Auto-refund: everything else. Amount = unit price x units x the severity percentage, rounded down.
+
+Default severity table: broken into pieces, handle off, crack or chip, headband or hinge broken,
+tear or hole 100%; split seam or peeling print 50%; torn ear cushion 40%; stain 30%; scratches or
+dents 20%. The agent refunds only `auto_refund` cases, under the lower of its own rule limits and
+the policy's limits as they stand at that moment; the reserve/submit gate and PayPal ledger check
+are unchanged.
+
+Live (2026-10-28, `scripts/e2e-policy.js`, real PayPal sandbox and photo check): scuffed $120
+headphones auto-refunded $24.00 (`8HU84413NP619734E` COMPLETED); chipped mug $20.00
+(`1AA72858XS0707636` COMPLETED); snapped headphones held for review ($120 over the $50 limit); a
+report 30 days late closed by the agent with no PayPal call; with the daily limit at $50 and $44
+sent, the next $20 mug was held for review. 120 tests pass (23 new in `tests/policy.test.js`).

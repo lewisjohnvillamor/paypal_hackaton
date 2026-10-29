@@ -13,13 +13,13 @@
 <body>
   <header class="top app">
     <a class="brand" href="/merchant" aria-label="Refund Relay merchant home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span><span class="brand-name">Refund Relay</span> <span class="ctx">Merchant</span></a>
-    <nav aria-label="Merchant"><a href="/merchant">Requests</a><a href="/merchant/agent" aria-current="page">Refund agent</a><a href="/merchant/remedies">Remedies</a><a href="/" class="wide-only">Store</a><a href="#" id="logout" data-logout>Sign out</a></nav>
+    <nav aria-label="Merchant"><a href="/merchant">Requests</a><a href="/merchant/agent" aria-current="page">Refund agent</a><a href="/merchant/remedies">Remedies</a><a href="/merchant/policy">Policy</a><a href="/" class="wide-only">Store</a><a href="#" id="logout" data-logout>Sign out</a></nav>
   </header>
   <main>
     <section id="page" class="hidden">
       <p class="eyebrow">Juniper Market</p>
       <h1>Refund agent</h1>
-      <p class="lede">Tell your agent, in your own words, which damage reports it may settle without you. It reads every report after the photo check, refunds through PayPal when a report fits your rules, and leaves everything else for you with a note on why.</p>
+      <p class="lede">Tell your agent, in your own words, which damage reports it may settle without you. It reads every report after the photo check, refunds through PayPal when a report fits your rules and your <a href="/merchant/policy">refund policy</a> marks it safe, and leaves everything else for you with a note on why.</p>
       <div id="notice" class="notice hidden" role="status"></div>
 
       <div id="on" class="card agent-on hidden"></div>
@@ -63,12 +63,14 @@
       $("on").classList.toggle("hidden", !m);
       $("write-title").textContent = m ? "Change your rules" : "Your rules";
       if (!m) return;
-      const share = Math.min(100, Math.round((state.spentCents / m.dailyLimitCents) * 100));
+      // The lower of the rules' own daily limit and the refund policy's applies.
+      const daily = Math.min(m.dailyLimitCents, state.policyDailyCents ?? Infinity);
+      const share = Math.min(100, Math.round((state.spentCents / daily) * 100));
       $("on").innerHTML = `
         <div class="card-head"><h2 style="margin:0">Your agent is on</h2><span class="pill ok">On</span></div>
         <p class="small muted" style="margin:0 0 6px">You wrote: “${esc(m.text)}”</p>
         ${readback(m.readback)}
-        <div class="agent-budget"><div class="row spread small"><span>Sent in the last 24 hours</span><b class="amount">${usd(state.spentCents)} of ${usd(m.dailyLimitCents)}</b></div>
+        <div class="agent-budget"><div class="row spread small"><span>Sent in the last 24 hours</span><b class="amount">${usd(state.spentCents)} of ${usd(daily)}</b></div>
           <span class="meter wide" aria-hidden="true"><i style="width:${share}%"></i></span></div>
         <button type="button" class="danger" id="off" style="margin-top:14px">Turn the agent off</button>`;
       $("off").onclick = async (e) => {
@@ -83,7 +85,7 @@
       $("activity").classList.toggle("hidden", !r.length);
       $("activity").innerHTML = `<h2>What your agent did lately</h2><ul class="list agent-log">${r.map((x) => `
         <li><a href="/merchant/case?id=${encodeURIComponent(x.claimId)}">
-          <span class="pill ${x.acted ? "ok" : "warn"}">${x.acted ? (x.act === "offer" ? "Offered choices" : "Refunded") : "Left for you"}</span>
+          <span class="pill ${x.acted ? "ok" : "warn"}">${x.acted ? (x.act === "offer" ? "Offered choices" : x.act === "decline" ? "Closed" : "Refunded") : "Left for you"}</span>
           <span><b>${esc(x.ref)}</b> · ${esc(x.title)}<span class="small muted" style="display:block">${esc(x.why)}</span></span>
           <span class="small muted">${when(x.at)}</span></a></li>`).join("")}</ul>`;
     }

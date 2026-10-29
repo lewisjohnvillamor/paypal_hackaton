@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f5f7">
+  <title>Refund policy · Refund Relay</title>
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/app.css">
+  <style>
+    .outcomes { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+    .outcomes li { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; }
+    .outcomes .pill { min-width: 92px; justify-content: flex-start; }
+    .outcomes p { margin: 0; font-size: 15px; line-height: 1.45; }
+    .sev { width: 100%; border-collapse: collapse; font-size: 15px; }
+    .sev th { text-align: left; font-weight: 600; font-size: 13px; color: var(--text-2); padding: 0 8px 8px 0; }
+    .sev td { padding: 8px 8px 8px 0; border-top: 1px solid var(--separator); vertical-align: middle; }
+    .sev td:last-child, .sev th:last-child { text-align: right; padding-right: 0; }
+    .sev input { width: 76px; min-height: 36px; padding: 4px 8px; text-align: right; }
+    .pct { display: inline-flex; align-items: center; gap: 6px; }
+    .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .fields input[type=number] { width: 100%; }
+    .optin { display: flex; gap: 12px; align-items: flex-start; margin-top: 18px; }
+    .optin input { width: 20px; height: 20px; min-height: 0; padding: 0; margin: 2px 0 0; flex: none; box-shadow: none; }
+    .optin label { flex: 1; margin: 0; }
+    @media (max-width: 620px) { .sev .lvl { display: none; } }
+  </style>
+</head>
+<body>
+  <header class="top app">
+    <a class="brand" href="/merchant" aria-label="Refund Relay merchant home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span><span class="brand-name">Refund Relay</span> <span class="ctx">Merchant</span></a>
+    <nav aria-label="Merchant"><a href="/merchant">Requests</a><a href="/merchant/agent">Refund agent</a><a href="/merchant/remedies">Remedies</a><a href="/merchant/policy" aria-current="page">Policy</a><a href="/" class="wide-only">Store</a><a href="#" id="logout" data-logout>Sign out</a></nav>
+  </header>
+  <main>
+    <section id="page" class="hidden">
+      <p class="eyebrow">Juniper Market</p>
+      <h1>Refund policy</h1>
+      <p class="lede">How every damage report is decided. The AI photo check only reports what it sees and how sure it is. These rules make the decision, the same way every time, and each case shows you the rule that settled it.</p>
+      <div id="notice" class="notice hidden" role="status"></div>
+
+      <section class="card" aria-labelledby="h-outcomes">
+        <h2 id="h-outcomes">Every request gets one of three outcomes</h2>
+        <ol class="outcomes" id="outcomes"></ol>
+      </section>
+
+      <form id="form">
+        <section class="card" aria-labelledby="h-sev">
+          <div class="card-head"><h2 id="h-sev">What each kind of damage is worth</h2></div>
+          <p class="small muted" style="margin:-6px 0 14px">A percentage of the price paid, rounded down to the cent. Set one to 0% and that damage is declined.</p>
+          <table class="sev">
+            <thead><tr><th scope="col">Damage</th><th scope="col" class="lvl">Severity</th><th scope="col">On a <span id="example-price"></span> item</th><th scope="col">Refund</th></tr></thead>
+            <tbody id="sev"></tbody>
+          </table>
+        </section>
+
+        <section class="card" aria-labelledby="h-limits">
+          <h2 id="h-limits">Limits on automatic refunds</h2>
+          <div class="fields">
+            <div><label for="autoMax">Most per request <span class="hint">Above this, you decide.</span></label><input id="autoMax" type="number" min="0.01" step="0.01" inputmode="decimal" required></div>
+            <div><label for="daily">Most in any 24 hours <span class="hint" id="spent">Across every automatic refund.</span></label><input id="daily" type="number" min="0.01" step="0.01" inputmode="decimal" required></div>
+            <div><label for="window">Reporting window, days <span class="hint">Later reports are declined.</span></label><input id="window" type="number" min="1" max="90" step="1" inputmode="numeric" required></div>
+          </div>
+          <div class="optin"><input type="checkbox" id="declines"><label for="declines">Let the refund agent close requests your own records rule out <span class="hint">Late reports, more items than were bought, a payment already refunded, or your own catalog photo sent back. A decline based on the photos always waits for you.</span></label></div>
+        </section>
+
+        <section class="card" aria-labelledby="h-sure">
+          <h2 id="h-sure">How sure the photo check must be</h2>
+          <div class="fields">
+            <div><label for="seen">Damage is visible <span class="hint">80% to 99%. Below this, you decide.</span></label><input id="seen" type="number" min="80" max="99" step="1" inputmode="numeric" required></div>
+            <div><label for="kind">The kind of damage <span class="hint">50% to 95%. Below this, you decide.</span></label><input id="kind" type="number" min="50" max="95" step="1" inputmode="numeric" required></div>
+            <div><label for="none">No damage at all <span class="hint">1% to 20%. At or under this on clear photos, no refund is advised.</span></label><input id="none" type="number" min="1" max="20" step="1" inputmode="numeric" required></div>
+          </div>
+        </section>
+
+        <div class="row" style="margin-top:20px"><button class="approve" type="submit" id="save" style="flex:1">Save policy</button><button type="button" id="defaults">Use the defaults</button></div>
+        <p class="footnote" style="margin:10px 0 0" id="saved"></p>
+      </form>
+    </section>
+    <div id="signin" class="card hidden center" style="max-width:400px;margin:40px auto 0;padding:32px">
+      <p style="margin:0">Sign in on the <a href="/merchant">requests page</a> first.</p>
+    </div>
+  </main>
+  <script type="module">
+    import { api, usd, esc, busy, settle, when } from "/app.js";
+    const $ = (id) => document.getElementById(id);
+    const EXAMPLE = 12000; // the over-ear headphones: the dearest item in the store
+    let state = null;
+
+    function say(text, tone = "") {
+      $("notice").textContent = text;
+      $("notice").className = text ? `notice ${tone}` : "notice hidden";
+    }
+
+    function drawOutcomes(p) {
+      $("outcomes").innerHTML = [
+        ["ok", "Refund", `Every check passes: clear photos of your product, damage the photo check is at least ${Math.round(p.minDamageSeen * 100)}% sure of, its kind at least ${Math.round(p.minDamageTypeSure * 100)}% sure, no risk flags, and the amount from the table below is at most ${usd(p.autoRefundMaxCents)} and keeps the day under ${usd(p.dailyAutoRefundCents)}. Your refund agent sends it, or you approve it in one click.`],
+        ["warn", "You review", "Anything doubtful, risky or over a limit: borderline photos, an unsure damage type, a possibly different product, a reused or stock-looking photo, a repeat claimant, more than one item, or an amount above your limits. You see the drafted amount and the reason."],
+        ["bad", "No refund", `Ruled out by your records (reported more than ${p.claimWindowDays} days after delivery, more items than bought, nothing left to refund, your own catalog photo), or by clear photos: no damage seen, two checks agreeing it is a different product, or damage your table pays 0% for. Unusable photos ask the buyer for clearer ones.`],
+      ].map(([tone, label, text]) => `<li><span class="pill ${tone}">${label}</span><p>${esc(text)}</p></li>`).join("");
+    }
+
+    function draw(p) {
+      $("example-price").textContent = usd(EXAMPLE);
+      $("sev").innerHTML = state.severity.map((r) => `<tr>
+          <td>${esc(r.label.charAt(0).toUpperCase() + r.label.slice(1))}</td>
+          <td class="lvl muted">${esc(r.levelLabel)}</td>
+          <td class="amount" data-example="${r.kind}">${usd(Math.floor((EXAMPLE * p.refundPercent[r.kind]) / 100))}</td>
+          <td><span class="pct"><input type="number" min="0" max="100" step="1" inputmode="numeric" required data-kind="${r.kind}" value="${p.refundPercent[r.kind]}" aria-label="Refund percentage for ${esc(r.label)}">%</span></td>
+        </tr>`).join("");
+      document.querySelectorAll("[data-kind]").forEach((i) => (i.oninput = () => {
+        const v = Number(i.value);
+        document.querySelector(`[data-example="${i.dataset.kind}"]`).textContent = Number.isInteger(v) && v >= 0 && v <= 100 ? usd(Math.floor((EXAMPLE * v) / 100)) : "—";
+      }));
+      $("autoMax").value = (p.autoRefundMaxCents / 100).toFixed(2);
+      $("daily").value = (p.dailyAutoRefundCents / 100).toFixed(2);
+      $("spent").textContent = `${usd(state.spentCents)} sent automatically in the last 24 hours.`;
+      $("window").value = p.claimWindowDays;
+      $("declines").checked = p.agentDeclines;
+      $("seen").value = Math.round(p.minDamageSeen * 100);
+      $("kind").value = Math.round(p.minDamageTypeSure * 100);
+      $("none").value = Math.round(p.noDamageBelow * 100);
+      $("saved").textContent = `${p.savedAt ? `Saved ${when(p.savedAt)}.` : "These are the defaults."} New settings apply to reviews from now on; each case keeps the settings it was decided under.`;
+      drawOutcomes(p);
+    }
+
+    const cents = (id) => Math.round(Number($(id).value) * 100);
+    const share = (id) => Math.round(Number($(id).value)) / 100;
+    function read() {
+      return {
+        refundPercent: Object.fromEntries([...document.querySelectorAll("[data-kind]")].map((i) => [i.dataset.kind, Number(i.value)])),
+        autoRefundMaxCents: cents("autoMax"), dailyAutoRefundCents: cents("daily"), claimWindowDays: Number($("window").value),
+        agentDeclines: $("declines").checked, minDamageSeen: share("seen"), minDamageTypeSure: share("kind"), noDamageBelow: share("none"),
+      };
+    }
+
+    async function save(body, btn, label) {
+      say("");
+      busy(btn, true, label);
+      try {
+        state = await api("/api/merchant/policy", { method: "PUT", merchant: true, body });
+        draw(state.policy);
+        say("Saved. New reports are decided under these settings.", "ok");
+      } catch (err) { say(err.message, "bad"); }
+      busy(btn, false);
+    }
+    $("form").onsubmit = (e) => { e.preventDefault(); save(read(), $("save"), "Saving"); };
+    $("defaults").onclick = (e) => save(state.defaults, e.currentTarget, "Saving");
+
+    try {
+      state = await api("/api/merchant/policy");
+      $("page").classList.remove("hidden");
+      draw(state.policy); settle();
+    } catch (e) {
+      if (e.status === 401) $("signin").classList.remove("hidden");
+      else say(e.message, "bad");
+    }
+  </script>
+</body>
+</html>

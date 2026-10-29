@@ -16,7 +16,7 @@
 <body>
   <header class="top app">
     <a class="brand" href="/merchant" aria-label="Refund Relay merchant home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span><span class="brand-name">Refund Relay</span> <span class="ctx">Merchant</span></a>
-    <nav aria-label="Merchant"><a href="/merchant" aria-current="page">Requests</a><a href="/merchant/agent">Refund agent</a><a href="/merchant/remedies">Remedies</a><a href="/" class="wide-only">Store</a><a href="#" id="logout" data-logout class="hidden">Sign out</a></nav>
+    <nav aria-label="Merchant"><a href="/merchant" aria-current="page">Requests</a><a href="/merchant/agent">Refund agent</a><a href="/merchant/remedies">Remedies</a><a href="/merchant/policy">Policy</a><a href="/" class="wide-only">Store</a><a href="#" id="logout" data-logout class="hidden">Sign out</a></nav>
   </header>
   <main class="wide">
     <form id="login" class="card hidden center" style="max-width:400px;margin:40px auto 0;padding:40px 32px">
@@ -50,12 +50,13 @@
     document.querySelectorAll("[data-icon]").forEach((el) => (el.outerHTML = ICON[el.dataset.icon]));
     const $ = (id) => document.getElementById(id);
     let filter = "all", rows = [];
-    const ROUTE = { propose: "Suggested refund", manual_review: "Needs your judgment", request_info: "Ask for photos" };
+    const ROUTE = { auto_refund: "Safe to refund", propose: "Suggested refund", manual_review: "Needs your judgment", reject: "No refund advised", request_info: "Ask for photos" };
 
     const DAMAGE = { shattered: "Broken", handle_off: "Handle off", crack_or_chip: "Crack or chip", stain: "Stain", tear_or_hole: "Tear or hole",
       seam_or_print: "Seam or print", snapped: "Snapped", cushion_torn: "Cushion torn", cosmetic: "Scratches", none_visible: "None seen" };
     const OUTCOME = (r) => r.agent === "acted" && r.status === "refunded" ? "Refunded by your agent"
       : r.agent === "acted" && r.status === "offer_sent" ? "Your agent offered choices"
+      : r.agent === "acted" && r.status === "closed" ? "Closed by your agent"
       : r.agent === "left" && r.status === "ready" ? `Agent left it for you: ${r.agent_why}`
       : r.chosen_option && r.chosen_option !== "refund" ? `Buyer chose: ${r.chosen_title}`
       : r.status === "refunded" ? "Refunded" : r.status === "closed" ? "Closed" : r.status === "offer_sent" ? "Buyer choosing"
