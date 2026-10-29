@@ -39,6 +39,8 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
+      - key: CREDENTIALS_KEY
+        generateValue: true
       - key: APP_BASE_URL
         sync: false
       - key: REPEAT_CLAIM_LIMIT

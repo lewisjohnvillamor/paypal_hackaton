@@ -88,5 +88,13 @@ export const optionArt = (o) => o.kind === "refund" ? ICON.check : /kintsugi|gol
 document.querySelectorAll("[data-logout]").forEach((a) => (a.onclick = async (e) => {
   e.preventDefault();
   await api("/api/merchant/logout", { method: "POST" }).catch(() => {});
-  location.href = "/merchant/";
+  location.href = location.pathname.startsWith("/dashboard") ? "/dashboard" : "/merchant/";
 }));
+
+// Merchant pages: the signed-in store's name, and the pages only the demo store has so far.
+if (document.querySelector("[data-store], [data-demo-only]")) {
+  api("/api/merchant/me").then((me) => {
+    if (me.merchant?.name) document.querySelectorAll("[data-store]").forEach((el) => (el.textContent = me.merchant.name));
+    if (!me.demo) document.querySelectorAll("[data-demo-only]").forEach((el) => el.classList.add("hidden"));
+  }).catch(() => {});
+}

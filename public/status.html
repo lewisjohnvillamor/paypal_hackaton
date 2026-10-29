@@ -63,6 +63,7 @@
     function render(s) {
       if (JSON.stringify(s) === last) return;
       last = JSON.stringify(s);
+      if (s.store) document.title = `Your request · ${s.store}`;
       const refunded = s.refund?.state === "issued";
       $("card").innerHTML = `
         <div class="card hero">

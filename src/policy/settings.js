@@ -76,19 +76,20 @@ export function checkPolicy(input = {}) {
   };
 }
 
-// The settings in force: the latest saved version, or the defaults (id null) before any save.
-export function currentPolicy(db) {
-  const row = db.prepare("SELECT id, settings_json, created_at FROM policy_settings ORDER BY created_at DESC, rowid DESC LIMIT 1").get();
+// The settings in force for one merchant: the latest saved version, or the defaults (id null)
+// before any save.
+export function currentPolicy(db, merchantId = "demo") {
+  const row = db.prepare("SELECT id, settings_json, created_at FROM policy_settings WHERE merchant_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1").get(merchantId);
   return row ? { id: row.id, savedAt: row.created_at, ...checkPolicy(JSON.parse(row.settings_json)) } : { id: null, savedAt: null, ...checkPolicy() };
 }
 
-export function savePolicy(db, input, actor) {
+export function savePolicy(db, input, actor, merchantId = "demo") {
   const settings = checkPolicy(input);
   return tx(db, () => {
     const id = randomUUID();
-    db.prepare("INSERT INTO policy_settings (id, settings_json, actor, created_at) VALUES (?, ?, ?, ?)").run(id, JSON.stringify(settings), actor, now());
-    audit(db, { actor, type: "policy.saved", payload: { policyId: id, ...settings } });
-    return currentPolicy(db);
+    db.prepare("INSERT INTO policy_settings (id, merchant_id, settings_json, actor, created_at) VALUES (?, ?, ?, ?, ?)").run(id, merchantId, JSON.stringify(settings), actor, now());
+    audit(db, { actor, type: "policy.saved", payload: { policyId: id, merchantId, ...settings } });
+    return currentPolicy(db, merchantId);
   });
 }
 

@@ -24,8 +24,9 @@ export function checkMerchantPassword(given) {
   return timingSafeEqual(h(given), h(expected));
 }
 
-export function issueSession(res) {
-  const payload = Buffer.from(JSON.stringify({ sub: "merchant", exp: Date.now() + SESSION_HOURS * 3600e3 })).toString("base64url");
+// sub is the merchant's id: "demo" for the demo store's password, or a dashboard account.
+export function issueSession(res, sub = "demo") {
+  const payload = Buffer.from(JSON.stringify({ sub, exp: Date.now() + SESSION_HOURS * 3600e3 })).toString("base64url");
   res.cookie(COOKIE, `${payload}.${sign(payload)}`, {
     httpOnly: true, sameSite: "strict", secure: process.env.APP_BASE_URL?.startsWith("https://"), path: "/",
     maxAge: SESSION_HOURS * 3600e3,
@@ -52,6 +53,8 @@ export function requireMerchant(req, res, next) {
     return res.status(403).json({ error: "CSRF", message: "Missing request header." });
   }
   req.actor = "merchant";
+  // Sessions issued before there were several merchants say "merchant": that was the demo store.
+  req.merchantId = !session.sub || session.sub === "merchant" ? "demo" : session.sub;
   next();
 }
 

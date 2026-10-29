@@ -54,6 +54,8 @@ const policyFacts = (calc) => ({
 function caseFacts(db, claimId) {
   const claim = db.prepare("SELECT * FROM claims WHERE id = ?").get(claimId);
   if (!claim || claim.status !== "ready") return null;
+  // The agent works for the demo store only, so far; a connected store's cases wait for a person.
+  if (db.prepare("SELECT merchant_id FROM orders WHERE id = ?").get(claim.order_id)?.merchant_id !== "demo") return null;
   const proposal = db.prepare("SELECT * FROM proposals WHERE claim_id = ? ORDER BY created_at DESC LIMIT 1").get(claimId);
   if (!proposal || proposal.claim_version !== claim.version) return null;
   const assessment = db.prepare("SELECT findings_json FROM assessments WHERE id = ?").get(proposal.assessment_id);
@@ -127,7 +129,7 @@ export function replay(db, rules, limit = 12) {
   const mandate = checkRules(rules);
   const policy = currentPolicy(db);
   return db.prepare(`SELECT c.id, c.ref, l.title, l.sku, p.route, p.amount_cents, p.calc_json, p.id proposal_id, a.findings_json
-    FROM claims c JOIN order_lines l ON l.id = c.line_id
+    FROM claims c JOIN order_lines l ON l.id = c.line_id JOIN orders o ON o.id = c.order_id AND o.merchant_id = 'demo'
     JOIN proposals p ON p.id = (SELECT id FROM proposals x WHERE x.claim_id = c.id ORDER BY x.created_at DESC LIMIT 1)
     LEFT JOIN assessments a ON a.id = p.assessment_id
     ORDER BY c.created_at DESC LIMIT ?`).all(limit).map((r) => {
