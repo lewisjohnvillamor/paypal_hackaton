@@ -19,6 +19,8 @@
     "bench": "node --disable-warning=ExperimentalWarning bench/run.js",
     "mcp:buyer": "node mcp/buyer.js",
     "mcp:merchant": "node --env-file-if-exists=.env mcp/merchant.js",
+    "e2e:platform": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/e2e-platform.js",
+    "example:store": "node examples/acme-store/server.js",
     "demo:agents": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/agent-to-agent.js"
   },
   "dependencies": {

@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f5f7">
+  <title>Set up · Refund Relay</title>
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/app.css">
+  <style>
+    .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+    .steps li { display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: center; min-height: 48px; padding: 8px 0; border-bottom: 0.5px solid var(--separator); }
+    .steps li:last-child { border-bottom: 0; }
+    .steps .dot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 600; background: var(--fill); color: var(--text-2); }
+    .steps .done .dot { background: var(--green-fill); color: #fff; }
+    .steps .done .dot svg { width: 14px; height: 14px; }
+    .steps a { font-size: 14px; }
+    .step-n { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--tint-blue); color: var(--blue-text); font-size: 14px; font-weight: 700; margin-right: 10px; flex: none; }
+    .card h2 { display: flex; align-items: center; }
+    .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    pre.code { margin: 0; padding: 16px; border-radius: 14px; background: #1d1d1f; color: #f5f5f7; font: 13px/1.55 var(--mono); overflow-x: auto; white-space: pre; tab-size: 2; }
+    .code-wrap { position: relative; }
+    .code-wrap .copy { position: absolute; top: 10px; right: 10px; min-height: 30px; padding: 4px 12px; font-size: 13px; background: rgb(255 255 255 / 0.14); color: #fff; border: 0; }
+    .code-wrap .copy:hover { background: rgb(255 255 255 / 0.24); }
+    .newkey { padding: 14px 16px; border-radius: 14px; background: var(--tint-green); margin: 12px 0; }
+    .newkey .mono { font-size: 14px; display: block; margin: 6px 0; }
+    .keys li > div { min-width: 0; }
+    .keys .revoked { opacity: 0.5; }
+    .auth-tabs { margin: 0 auto 20px; }
+    #auth form { display: grid; gap: 12px; text-align: left; }
+    #auth form input { width: 100%; }
+    .preview { padding: 20px; border-radius: 14px; background: var(--surface-2); border: 0.5px dashed var(--border); }
+    .cats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .ways { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+    .ways li { padding: 16px; border-radius: 14px; background: var(--surface-2); }
+    .ways b { display: block; margin-bottom: 4px; }
+    .ways p { margin: 0; font-size: 14px; line-height: 1.45; color: var(--text-2); }
+  </style>
+</head>
+<body>
+  <header class="top app">
+    <a class="brand" href="/dashboard" aria-label="Refund Relay setup"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span><span class="brand-name">Refund Relay</span> <span class="ctx">For merchants</span></a>
+    <nav aria-label="Merchant"><a href="/merchant" id="nav-requests" class="hidden">Requests</a><a href="/dashboard" aria-current="page">Setup</a><a href="#" data-logout id="nav-logout" class="hidden">Sign out</a></nav>
+  </header>
+  <main>
+    <section id="auth" class="hidden">
+      <div class="card center" style="max-width:440px;margin:24px auto 0;padding:36px 28px">
+        <h1 style="font-size:30px;margin-bottom:6px">Refund Relay for your store</h1>
+        <p class="muted small" style="margin:0 0 20px">Damage reports with photos, checked by AI, refunded through your own PayPal account once you approve.</p>
+        <div class="segmented auth-tabs" role="group" aria-label="Account">
+          <button type="button" data-tab="signup" aria-pressed="true">Create account</button>
+          <button type="button" data-tab="login" aria-pressed="false">Sign in</button>
+        </div>
+        <form id="signup">
+          <div><label for="s-name">Store name</label><input id="s-name" autocomplete="organization" required maxlength="80"></div>
+          <div><label for="s-email">Email</label><input id="s-email" type="email" autocomplete="email" required></div>
+          <div><label for="s-pass">Password <span class="hint">At least 10 characters.</span></label><input id="s-pass" type="password" autocomplete="new-password" minlength="10" required></div>
+          <button class="primary lg" type="submit">Create account</button>
+        </form>
+        <form id="login" class="hidden">
+          <div><label for="l-email">Email</label><input id="l-email" type="email" autocomplete="email" required></div>
+          <div><label for="l-pass">Password</label><input id="l-pass" type="password" autocomplete="current-password" required></div>
+          <button class="primary lg" type="submit">Sign in</button>
+        </form>
+        <div id="auth-error" class="notice bad hidden" role="alert" style="text-align:left"></div>
+        <p class="small muted" style="margin:18px 0 0">Running the demo store? <a href="/merchant">Sign in with its password</a>.</p>
+      </div>
+    </section>
+
+    <section id="page" class="hidden">
+      <p class="eyebrow" id="store-name"></p>
+      <h1>Set up Refund Relay</h1>
+      <p class="lede">Four steps. When they are done, buyers can report damaged items from your order page, and you approve each refund from <a href="/merchant">your requests</a>. Refunds go out through your own PayPal account.</p>
+      <div id="notice" class="notice hidden" role="status"></div>
+
+      <section class="card" aria-labelledby="h-check">
+        <div class="card-head"><h2 id="h-check">Checklist</h2><span id="progress" class="pill plain"></span></div>
+        <ol class="steps" id="steps"></ol>
+      </section>
+
+      <section class="card" id="step-paypal" aria-labelledby="h-paypal">
+        <h2 id="h-paypal"><span class="step-n">1</span>Connect your PayPal account</h2>
+        <div id="pp-connected" class="hidden"></div>
+        <form id="pp-form" class="hidden">
+          <p class="small muted" style="margin:0 0 14px">In the <a href="https://developer.paypal.com/dashboard/applications/sandbox" target="_blank" rel="noopener">PayPal Developer Dashboard</a>, open Apps &amp; Credentials, pick the sandbox app your checkout uses, and paste its Client ID and Secret. Refund Relay checks them with PayPal before saving. The secret is stored encrypted and is never shown again. One-click <i>Connect with PayPal</i> arrives once PayPal approves Refund Relay as a partner.</p>
+          <div class="fields">
+            <div><label for="pp-id">Client ID</label><input id="pp-id" autocomplete="off" spellcheck="false" required></div>
+            <div><label for="pp-secret">Secret</label><input id="pp-secret" type="password" autocomplete="off" required></div>
+            <div><label for="pp-payee">PayPal merchant ID <span class="hint">Optional. Orders paid to any other account are refused. Left empty, it is learned from your first order.</span></label><input id="pp-payee" autocomplete="off" spellcheck="false"></div>
+          </div>
+          <div class="row" style="margin-top:16px"><button class="primary" type="submit" id="pp-save">Check and connect</button><button type="button" id="pp-cancel" class="hidden">Cancel</button></div>
+        </form>
+      </section>
+
+      <section class="card" id="step-key" aria-labelledby="h-key">
+        <h2 id="h-key"><span class="step-n">2</span>Create a secret key</h2>
+        <p class="small muted" style="margin:0 0 12px">Your server sends it with every call. Keep it on the server, never in a web page or an app.</p>
+        <div id="newkey" class="newkey hidden" role="status"></div>
+        <ul class="list keys" id="keys"></ul>
+        <form id="key-form" class="row" style="margin-top:12px">
+          <label for="key-label" class="sr-only">Key name</label>
+          <input id="key-label" placeholder="Key name, such as Production server" maxlength="60" style="flex:1;min-width:200px">
+          <button type="submit" id="key-create">Create key</button>
+        </form>
+      </section>
+
+      <section class="card" id="step-order" aria-labelledby="h-order">
+        <h2 id="h-order"><span class="step-n">3</span>Send each paid order to Refund Relay</h2>
+        <p class="small muted" style="margin:0 0 12px">Right after your server captures a PayPal payment, send the PayPal order ID and the items. Refund Relay looks the order up in your PayPal account and checks the capture, amount, currency and payee before it accepts it, then returns the buyer's private <code>claim_url</code>. It works for <span id="link-days">14</span> days.</p>
+        <div class="segmented" role="group" aria-label="Language" id="langs" style="margin-bottom:12px">
+          <button type="button" data-lang="node" aria-pressed="true">Node.js</button>
+          <button type="button" data-lang="python" aria-pressed="false">Python</button>
+          <button type="button" data-lang="curl" aria-pressed="false">curl</button>
+        </div>
+        <div class="code-wrap"><pre class="code" id="snippet"></pre><button type="button" class="copy" data-copy="snippet">Copy</button></div>
+        <p class="small muted" style="margin:12px 0 0"><code>category</code> sets what the photo check looks for. One of:</p>
+        <div class="cats" id="cats"></div>
+        <p class="small muted" style="margin:10px 0 0"><code>image_url</code> is the product's catalog photo; the buyer's photos are compared with it.</p>
+      </section>
+
+      <section class="card" id="step-button" aria-labelledby="h-button">
+        <h2 id="h-button"><span class="step-n">4</span>Show buyers the button</h2>
+        <p class="small muted" style="margin:0 0 12px">Put it on the order confirmation page, or send the <code>claim_url</code> as a link in your receipt email.</p>
+        <div class="code-wrap"><pre class="code" id="button-snippet"></pre><button type="button" class="copy" data-copy="button-snippet">Copy</button></div>
+        <p class="small muted" style="margin:14px 0 8px">How it looks:</p>
+        <div class="preview"><div id="button-preview"></div></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-ways">
+        <h2 id="h-ways">Other ways in</h2>
+        <ul class="ways">
+          <li><b>AI assistants (MCP)</b><p>A shopper's assistant can file a request with the claim link alone, and yours can check requests and PayPal refunds. See <code>mcp/</code> in the repository.</p></li>
+          <li><b>Shopify and WooCommerce</b><p>Plugins that send orders and add the button with no code are next. Refunds will go through the platform so your order records stay in step.</p></li>
+        </ul>
+      </section>
+    </section>
+  </main>
+  <script type="module">
+    import { api, esc, when, ICON } from "/app.js";
+    const $ = (id) => document.getElementById(id);
+    let state = null, lang = "node";
+
+    const show = (id, on = true) => $(id).classList.toggle("hidden", !on);
+    const notice = (text, tone = "ok") => {
+      $("notice").className = `notice ${tone}`;
+      $("notice").textContent = text;
+      show("notice", !!text);
+    };
+
+    // ---- Account ----
+    document.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => {
+      document.querySelectorAll("[data-tab]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      show("signup", b.dataset.tab === "signup");
+      show("login", b.dataset.tab === "login");
+      show("auth-error", false);
+    }));
+    const authFail = (e) => { $("auth-error").textContent = e.message; show("auth-error"); };
+    $("signup").onsubmit = async (e) => {
+      e.preventDefault();
+      try { await api("/api/dashboard/signup", { method: "POST", body: { name: $("s-name").value, email: $("s-email").value, password: $("s-pass").value } }); load(); }
+      catch (err) { authFail(err); }
+    };
+    $("login").onsubmit = async (e) => {
+      e.preventDefault();
+      try { await api("/api/dashboard/login", { method: "POST", body: { email: $("l-email").value, password: $("l-pass").value } }); load(); }
+      catch (err) { authFail(err); }
+    };
+
+    // ---- Page ----
+    const SNIPPETS = {
+      node: (b) => `// On your server, right after the PayPal capture succeeds.
+const res = await fetch("${b}/v1/orders", {
+  method: "POST",
+  headers: {
+    Authorization: \`Bearer \${process.env.REFUND_RELAY_KEY}\`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    paypal_order_id: order.id,          // the order your checkout captured
+    items: [{
+      sku: "MUG-01",
+      title: "Stoneware mug",
+      quantity: 2,
+      unit_price: "18.50",              // USD, as a string
+      category: "ceramic-mug",
+      image_url: "https://cdn.yourstore.com/mug.jpg",
+    }],
+  }),
+});
+if (!res.ok) throw new Error((await res.json()).message);
+const { claim_url } = await res.json(); // show it with relay.js or email it`,
+      python: (b) => `# On your server, right after the PayPal capture succeeds.
+import os, requests
+
+res = requests.post(
+    "${b}/v1/orders",
+    headers={"Authorization": f"Bearer {os.environ['REFUND_RELAY_KEY']}"},
+    json={
+        "paypal_order_id": order_id,      # the order your checkout captured
+        "items": [{
+            "sku": "MUG-01",
+            "title": "Stoneware mug",
+            "quantity": 2,
+            "unit_price": "18.50",        # USD, as a string
+            "category": "ceramic-mug",
+            "image_url": "https://cdn.yourstore.com/mug.jpg",
+        }],
+    },
+    timeout=30,
+)
+res.raise_for_status()
+claim_url = res.json()["claim_url"]       # show it with relay.js or email it`,
+      curl: (b) => `curl ${b}/v1/orders \\
+  -H "Authorization: Bearer $REFUND_RELAY_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "paypal_order_id": "5O190127TN364715T",
+    "items": [{ "sku": "MUG-01", "title": "Stoneware mug", "quantity": 2, "unit_price": "18.50",
+                "category": "ceramic-mug", "image_url": "https://cdn.yourstore.com/mug.jpg" }]
+  }'`,
+    };
+    const buttonSnippet = (b) => `<script src="${b}/relay.js" defer><\/script>
+<div data-refund-relay data-claim-url="{{ claim_url }}"></div>`;
+
+    document.querySelectorAll("[data-lang]").forEach((b) => (b.onclick = () => {
+      lang = b.dataset.lang;
+      document.querySelectorAll("[data-lang]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      $("snippet").textContent = SNIPPETS[lang](state.baseUrl);
+    }));
+    document.querySelectorAll("[data-copy]").forEach((b) => (b.onclick = async () => {
+      try { await navigator.clipboard.writeText($(b.dataset.copy).textContent); b.textContent = "Copied"; setTimeout(() => (b.textContent = "Copy"), 1500); } catch {}
+    }));
+
+    function render(s, created) {
+      state = s;
+      $("store-name").textContent = s.merchant.name;
+      document.title = `Set up · ${s.merchant.name}`;
+      const done = s.checklist.filter((x) => x.done).length;
+      $("progress").textContent = `${done} of ${s.checklist.length} done`;
+      $("progress").className = `pill ${done === s.checklist.length ? "ok" : "plain"}`;
+      const target = { paypal: "step-paypal", key: "step-key", order: "step-order", button: "step-button" };
+      $("steps").innerHTML = s.checklist.map((x, i) => `<li class="${x.done ? "done" : ""}"><span class="dot">${x.done ? ICON.check : i + 1}</span>
+        <span>${esc(x.title)}</span><a href="#${target[x.id]}">${x.done ? "Done" : "Go"}</a></li>`).join("");
+
+      // PayPal
+      const c = s.connection;
+      show("pp-connected", !!c);
+      show("pp-form", !c && !s.demo);
+      if (c) {
+        $("pp-connected").innerHTML = `<div class="kv-row"><span>App</span><span class="mono">${esc(c.clientId)}</span></div>
+          <div class="kv-row"><span>Paid to</span><span class="mono">${esc(c.payeeMerchantId || "Learned from your first order")}</span></div>
+          <div class="kv-row"><span>Checked with PayPal</span><span>${c.source === "server" ? "Set on the server" : esc(when(c.verifiedAt))}</span></div>
+          ${s.demo ? `<p class="small muted" style="margin:12px 0 0">The demo store's PayPal app is set on the server.</p>`
+            : `<div class="row" style="margin-top:14px"><button type="button" id="pp-replace">Replace</button><button type="button" id="pp-remove" class="danger">Disconnect</button></div>`}`;
+        if (!s.demo) {
+          $("pp-replace").onclick = () => { show("pp-connected", false); show("pp-form"); show("pp-cancel"); $("pp-id").focus(); };
+          $("pp-remove").onclick = async () => {
+            try { render(await api("/api/dashboard/paypal", { method: "DELETE", merchant: true })); notice("PayPal disconnected. Refunds on your orders wait until you connect again.", "warn"); }
+            catch (err) { notice(err.message, "bad"); }
+          };
+        }
+      }
+
+      // Keys
+      $("keys").innerHTML = s.keys.length ? s.keys.map((k) => `<li class="${k.revokedAt ? "revoked" : ""}"><div><b>${esc(k.label)}</b>
+        <div class="small muted"><span class="mono">${esc(k.prefix)}</span> · created ${esc(when(k.createdAt))}${k.lastUsedAt ? ` · last used ${esc(when(k.lastUsedAt))}` : ""}${k.revokedAt ? " · revoked" : ""}</div></div>
+        ${k.revokedAt ? "" : `<button type="button" class="danger" data-revoke="${esc(k.id)}">Revoke</button>`}</li>`).join("")
+        : `<li class="muted small">No keys yet.</li>`;
+      document.querySelectorAll("[data-revoke]").forEach((b) => (b.onclick = async () => {
+        try { render(await api(`/api/dashboard/keys/${encodeURIComponent(b.dataset.revoke)}`, { method: "DELETE", merchant: true })); notice("Key revoked. Calls that use it now fail.", "warn"); }
+        catch (err) { notice(err.message, "bad"); }
+      }));
+      if (created) {
+        $("newkey").innerHTML = `<b>Copy your new key now.</b> It is shown only this once.<span class="mono" id="newkey-value">${esc(created.key)}</span><button type="button" id="newkey-copy">Copy key</button>`;
+        $("newkey-copy").onclick = () => navigator.clipboard.writeText(created.key).then(() => ($("newkey-copy").textContent = "Copied")).catch(() => {});
+        show("newkey");
+      }
+
+      $("link-days").textContent = s.claimLinkDays;
+      $("cats").innerHTML = s.categories.map((x) => `<span class="pill plain mono">${esc(x)}</span>`).join("");
+      $("snippet").textContent = SNIPPETS[lang](s.baseUrl);
+      $("button-snippet").textContent = buttonSnippet(s.baseUrl);
+      show("nav-requests"); show("nav-logout");
+    }
+
+    $("pp-form").onsubmit = async (e) => {
+      e.preventDefault();
+      const btn = $("pp-save");
+      btn.disabled = true;
+      try {
+        render(await api("/api/dashboard/paypal", { method: "PUT", merchant: true, body: { clientId: $("pp-id").value, clientSecret: $("pp-secret").value, payeeMerchantId: $("pp-payee").value } }));
+        $("pp-secret").value = "";
+        notice("PayPal accepted your app. Refund Relay can now check your orders and refund them once you approve.");
+      } catch (err) { notice(err.message, "bad"); }
+      finally { btn.disabled = false; }
+    };
+    $("pp-cancel").onclick = () => render(state);
+    $("key-form").onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        const r = await api("/api/dashboard/keys", { method: "POST", merchant: true, body: { label: $("key-label").value } });
+        $("key-label").value = "";
+        render(r, r.created);
+      } catch (err) { notice(err.message, "bad"); }
+    };
+
+    // A live preview of the button, from this server's own relay.js.
+    const preview = document.createElement("script");
+    preview.src = "/relay.js";
+    preview.onload = () => window.RefundRelay.mount($("button-preview"), { claimUrl: `${location.origin}/claim?order=preview` });
+    document.head.append(preview);
+    $("button-preview").addEventListener("click", (e) => e.composedPath().some((n) => n.tagName === "A") && e.preventDefault());
+
+    async function load() {
+      try {
+        render(await api("/api/dashboard"));
+        show("auth", false); show("page");
+      } catch (err) {
+        if (err.status !== 401) return notice(err.message, "bad");
+        show("page", false); show("auth");
+      }
+    }
+    load();
+  </script>
+</body>
+</html>

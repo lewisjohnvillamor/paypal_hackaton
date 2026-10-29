@@ -16,6 +16,24 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/). It 
 6. **Or the refund agent does it.** On the [Refund agent page](hackathon/screenshots/27-agent-activity.png) the merchant writes standing rules in plain English, such as "Refund chipped mugs under $25 on your own. Ask me about anything above that." Claude Haiku turns the words into a structure (products, damage types, a limit per request, a daily limit); the server checks it and reads it back in its own words, and the merchant turns it on. After every review the agent refunds through PayPal with no click when a clear case fits a rule, or leaves it for the merchant with one sentence on why ("$40.00 is above your $25.00 limit", "None of your rules covers the clear glass bud vase"). A rule can also say to offer the buyer the remedy list instead. See `src/agent/`.
 7. **Refund.** One idempotent PayPal partial refund runs against the original capture. The app shows PayPal's real refund ID and status.
 
+## How merchants use it
+
+Refund Relay is a hosted service, not a single shop. Juniper Market, the store in this repo, is one merchant on it. Any other store that takes PayPal can plug in, in one of three ways.
+
+1. **Hosted dashboard and API (works today).** The store signs up at `/dashboard` and follows a four-step checklist:
+   - **Connect PayPal.** Paste the Client ID and Secret of the store's own PayPal REST app. Refund Relay checks them with PayPal before saving and stores the secret encrypted (AES-256-GCM). One-click *Connect with PayPal* (Partner Referrals) needs PayPal to approve Refund Relay as a partner; until then, pasting credentials is the way in.
+   - **Create a secret key** for the store's server (`rr_sk_test_…`, shown once, stored as a hash, revocable).
+   - **Send each paid order** to `POST /v1/orders` right after the capture. Refund Relay looks the order up in the store's own PayPal account and checks the capture, amount, currency and payee before it accepts it, then returns the buyer's private `claim_url`. The dashboard has copy-ready Node.js, Python and curl code; see also [`examples/python/register_order.py`](examples/python/register_order.py).
+   - **Show the button.** Two lines of HTML on the order confirmation page: `<script src=".../relay.js">` and `<div data-refund-relay data-claim-url="...">`. Or email the link.
+
+   Requests land in the store's own console at `/merchant`, under its own refund policy, and every refund goes out through the store's own PayPal account. One store never sees another's requests.
+2. **Store plugins (next).** Shopify and WooCommerce apps that send orders and add the button with no code. On those platforms refunds will go through the platform's own refund API, so the store's order records stay in step.
+3. **AI assistants (works today).** The MCP servers in [Agent-to-agent commerce](#agent-to-agent-commerce) let a shopper's assistant file a request with nothing but the claim link, and the merchant's assistant check requests against PayPal's own records.
+
+[`examples/acme-store`](examples/acme-store/server.js) is a second store with its own PayPal checkout that uses Refund Relay this way; the whole integration is about 20 lines. `npm run e2e:platform` runs it live against the PayPal sandbox: Acme Ceramics signs up, connects PayPal, creates a key, sells two mugs, the buyer clicks the button on Acme's confirmation page and reports a broken handle, and Acme approves a $24.00 refund that PayPal completes on Acme's capture. Screenshots are in [`hackathon/screenshots/platform`](hackathon/screenshots/platform).
+
+So far the refund agent and the remedy library work on the demo store's catalog only; a connected store gets the photo check, its own refund policy and one-click approvals. Product kinds are the four the photo check knows (`ceramic-mug`, `glass-vase`, `cotton-tee`, `headphones`); adding one is one entry in `src/kinds.js`.
+
 ## Agent-to-agent commerce
 
 A shopper's own AI assistant can deal with the shop's refund agent directly. Both ends run on MCP, and the money moves on PayPal.
@@ -77,7 +95,7 @@ The store keeps each buyer's private claim and tracking links in the browser, so
 ### Tests and checks
 
 ```sh
-npm test                                     # 51 tests: money, policy, duplicate/concurrent approvals, tampering,
+npm test                                     # 125 tests: money, policy, duplicate/concurrent approvals, tampering,
                                              # stale approvals, timeouts, restart recovery, access control, edge cases
 npm run probe                                # live Jev run over 19 labelled photos (uses your API key)
 npm run probe:stability -- 5                 # each photo 5 times: does the refund route ever change between runs?
@@ -119,6 +137,10 @@ src/agent/rules.js          the refund agent's rules: check, read-back, decide (
 src/agent/autopilot.js      the refund agent: acts on a fresh proposal, or leaves it with a reason
 mcp/buyer.js                MCP server for a shopper's AI assistant (claim link is its only permission)
 mcp/merchant.js             MCP server for the merchant's assistant, with PayPal Agent Toolkit lookups
+src/merchants/              other stores: accounts, keys, encrypted PayPal connections, POST /v1/orders
+public/dashboard.html       merchant sign-up and setup checklist
+public/relay.js             the Report a problem button for a store's own pages
+examples/                   a second store (Acme Ceramics) and a Python snippet using the API
 src/claims.js, orders.js    workflow
 src/ai/select.js            which photos the model sees
 src/queue.js                bounded assessment queue
@@ -140,7 +162,7 @@ hackathon/                  state, probe report, screenshots
 
 ## Limits
 
-- Single merchant, USD only, sandbox only, one active request per order.
+- USD only, sandbox only, one active request per order. Connected stores paste PayPal credentials until PayPal approves one-click partner onboarding.
 - Delivery date is a labelled synthetic value (the capture time), not carrier data.
 - Refunds made outside the app are detected before every refund and block the case until reconciled; formal PayPal disputes are not detected. Ordinary refund requests are not PayPal disputes, and buyers keep PayPal's own resolution options.
 - Photos are not proof of fraud, cause, or liability. The model helps the merchant review; the merchant decides.

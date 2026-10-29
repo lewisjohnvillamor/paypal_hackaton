@@ -16,7 +16,7 @@
   </header>
   <main class="narrow">
     <div id="intro">
-      <p class="eyebrow">Juniper Market</p>
+      <p class="eyebrow" id="store">Juniper Market</p>
       <h1>Something wrong?<br>Let's fix it.</h1>
       <p class="lede" id="order-summary">Loading your order…</p>
     </div>
@@ -98,6 +98,7 @@
     try {
       const o = await api(`/api/claim-link/${encodeURIComponent(orderId)}`, { token });
       paidCents = o.amountCents;
+      if (o.store?.name) { $("store").textContent = o.store.name; document.title = `Report a problem · ${o.store.name}`; }
       $("order-summary").textContent = `Your ${usd(o.amountCents)} order, paid with PayPal on ${new Date(o.capturedAt).toLocaleDateString(undefined, { dateStyle: "long" })}. Tell the shop what happened and add a photo.`;
       if (o.openClaimRef) {
         // Not an error: the earlier request is still open. Say so calmly and point to it.
