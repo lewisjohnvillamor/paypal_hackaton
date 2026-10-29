@@ -1,5 +1,6 @@
 // Read models for the UI. Buyer views expose only that buyer's safe status.
 import { refundableBalance } from "./policy/refundPolicy.js";
+import { latestProposal } from "./refunds/execute.js";
 import { offerOptions, proposalSuggestions } from "./suggest/suggestions.js";
 import { BUYER_DECLINE, REASON_TEXT } from "./reasons.js";
 import { latestOffer } from "./offers.js";
@@ -60,7 +61,7 @@ export function caseDetail(db, claimId) {
   // Damage boxes are stored in the order the photos were sent to Jev.
   const locations = json(assessment?.findings_json)?.locations ?? [];
   const damageBox = new Map(sentIds.map((id, i) => [id, locations[i]?.box ?? null]));
-  const proposal = db.prepare("SELECT * FROM proposals WHERE claim_id = ? ORDER BY created_at DESC LIMIT 1").get(claimId);
+  const proposal = latestProposal(db, claimId);
   const ops = db.prepare("SELECT * FROM refund_ops WHERE capture_id = ? ORDER BY created_at").all(order.capture_id);
   const approvals = db.prepare("SELECT id, actor, amount_cents, override_reason, claim_version, created_at FROM approvals WHERE claim_id = ? ORDER BY created_at").all(claimId);
   const history = db.prepare("SELECT actor, type, payload, at FROM audit WHERE claim_id = ? ORDER BY id").all(claimId)

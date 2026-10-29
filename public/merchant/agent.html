@@ -85,7 +85,7 @@
       $("activity").classList.toggle("hidden", !r.length);
       $("activity").innerHTML = `<h2>What your agent did lately</h2><ul class="list agent-log">${r.map((x) => `
         <li><a href="/merchant/case?id=${encodeURIComponent(x.claimId)}">
-          <span class="pill ${x.acted ? "ok" : "warn"}">${x.acted ? (x.act === "offer" ? "Offered choices" : x.act === "decline" ? "Closed" : "Refunded") : "Left for you"}</span>
+          <span class="pill ${x.acted ? "ok" : "warn"}">${x.acted ? (x.act === "offer" ? "Offered choices" : x.act === "decline" ? "Closed" : x.act === "ask" ? "Asked for photos" : "Refunded") : "Left for you"}</span>
           <span><b>${esc(x.ref)}</b> · ${esc(x.title)}<span class="small muted" style="display:block">${esc(x.why)}</span></span>
           <span class="small muted">${when(x.at)}</span></a></li>`).join("")}</ul>`;
     }
@@ -93,13 +93,13 @@
     function drawPreview() {
       $("preview").classList.toggle("hidden", !draft);
       if (!draft) return;
-      const acted = draft.replay.filter((x) => x.act).length;
+      const acted = draft.replay.filter((x) => x.act && x.act !== "ask").length;
       $("preview").innerHTML = `
         <h2>Here's what your agent will do</h2>
         ${readback(draft.readback)}
         ${draft.notUnderstood ? `<div class="notice warn">Not turned into a rule: ${esc(draft.notUnderstood)}</div>` : ""}
         ${draft.replay.length ? `<h3 style="margin:18px 0 6px">On your latest ${draft.replay.length} requests, it would have settled ${acted}</h3>
-          <ul class="list agent-log">${draft.replay.map((x) => `<li><span class="pill ${x.act ? "ok" : ""}">${x.act ? (x.act === "offer" ? "Offer choices" : `Refund ${usd(x.amountCents)}`) : "Leave for you"}</span>
+          <ul class="list agent-log">${draft.replay.map((x) => `<li><span class="pill ${x.act ? "ok" : ""}">${x.act ? (x.act === "offer" ? "Offer choices" : x.act === "decline" ? "Close, no refund" : x.act === "ask" ? "Ask for photos" : `Refund ${usd(x.amountCents)}`) : "Leave for you"}</span>
             <span><b>${esc(x.ref)}</b> · ${esc(x.title)}<span class="small muted" style="display:block">${esc(x.why)}</span></span></li>`).join("")}</ul>` : ""}
         <div class="row" style="margin-top:18px"><button class="approve" type="button" id="turn-on" style="flex:1">Turn on these rules</button>
           <button type="button" id="edit">Edit</button></div>`;

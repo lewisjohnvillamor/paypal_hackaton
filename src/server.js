@@ -147,10 +147,15 @@ export function createApp({ db = openDb(), pp = paypal, paypalFor = paypal.paypa
   function orderForClaimToken(req) {
     const orderId = req.params.orderId || req.body.orderId;
     const link = db.prepare("SELECT * FROM claim_links WHERE order_id = ?").get(orderId);
-    if (!link || !tokenMatches(req.get("X-Claim-Token"), link.token_hash) || link.expires_at < new Date().toISOString()) {
+    const order = link && db.prepare("SELECT * FROM orders WHERE id = ?").get(orderId);
+    // The link lasts at least as long as the store's reporting window, which the merchant may set
+    // longer than the link's own 14 days.
+    const windowMs = Date.parse(order?.delivered_at) + (order ? currentPolicy(db, order.merchant_id).claimWindowDays : 0) * 86400e3;
+    const until = Math.max(Date.parse(link?.expires_at), Number.isFinite(windowMs) ? windowMs : 0);
+    if (!link || !order || !tokenMatches(req.get("X-Claim-Token"), link.token_hash) || !(until >= Date.now())) {
       throw new ClaimError("LINK_INVALID", "This claim link is invalid or has expired.", 403);
     }
-    return db.prepare("SELECT * FROM orders WHERE id = ?").get(orderId);
+    return order;
   }
 
   app.get("/api/claim-link/:orderId", wrap(async (req, res) => {

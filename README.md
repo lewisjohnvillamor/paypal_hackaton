@@ -13,7 +13,7 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/). It 
 1. **Purchase.** The buyer fills a bag from four very different products (mug, glass vase, T-shirt, headphones) and pays with PayPal Checkout. The server sets the price from its catalog, captures the payment, checks the amount, currency and payee, and gives the buyer a private claim link.
 2. **Complaint.** The buyer clicks "Report a problem" next to an item, picks the quantity, describes the problem, and uploads up to 100 photos. The page shrinks them in the browser before sending.
 3. **Evidence check.** [Jev](https://docs.typesafe.ai) (TypeSafe, `jev-1.14.0`) answers narrow typed questions about the photos: are they usable, is damage visible, what kind of damage, is it the same kind of product as the catalog photo. The questions and damage types come from the product kind (`src/kinds.js`), so a T-shirt is checked for stains and tears and headphones for a snapped headband or torn cushion. See [hackathon/PRODUCTS.md](hackathon/PRODUCTS.md). Only the photos go to the model, never the buyer's text, so a complaint cannot talk the model into anything.
-4. **Policy.** A pure function turns the findings into a draft: "propose $20.00", "needs your judgment", or "ask for better photos". A negative finding never denies a claim by itself.
+4. **Policy.** A pure function turns the findings and the merchant's own settings (a refund percentage per kind of damage, a reporting window, limits on automatic refunds) into exactly one of three outcomes: safe to refund automatically (with the amount), needs the merchant's judgment, or no refund. Unusable photos lead to a request for clearer ones. Only the shop's own records (reported too late, more items than bought, nothing left to refund, the shop's own catalog photo) can close a request with no person involved; a decline from the photos alone always waits for the merchant.
 5. **Approval.** The merchant sees the customer's words, the model's observations and the PayPal payment side by side, and clicks **Approve $20.00 refund**. A different amount, or approving a case the policy did not propose, requires a written reason.
 6. **Or the refund agent does it.** On the [Refund agent page](hackathon/screenshots/27-agent-activity.png) the merchant writes standing rules in plain English, such as "Refund chipped mugs under $25 on your own. Ask me about anything above that." Claude Haiku turns the words into a structure (products, damage types, a limit per request, a daily limit); the server checks it and reads it back in its own words, and the merchant turns it on. After every review the agent refunds through PayPal with no click when a clear case fits a rule, or leaves it for the merchant with one sentence on why ("$40.00 is above your $25.00 limit", "None of your rules covers the clear glass bud vase"). A rule can also say to offer the buyer the remedy list instead. See `src/agent/`.
 7. **Refund.** One idempotent PayPal partial refund runs against the original capture. The app shows PayPal's real refund ID and status.
@@ -76,7 +76,7 @@ Add the buyer server to an MCP host, for example Claude Desktop's `claude_deskto
 
 ## Run it
 
-Requires Node.js 22.15 or newer, a [PayPal sandbox app](https://developer.paypal.com/dashboard/applications/sandbox), and a [TypeSafe](https://typesafe.ai) API key.
+Requires Node.js 22.15 or newer, a [PayPal sandbox app](https://developer.paypal.com/dashboard/applications/sandbox), and a [TypeSafe](https://typesafe.ai) API key. An Anthropic API key (`ANTHROPIC_API_KEY`) is optional but turns on the refund agent's plain-English rules, the remedy suggestions and the second product check; without it the agent page cannot read new rules.
 
 ```sh
 npm install
@@ -86,18 +86,18 @@ npm start               # http://localhost:8888
 
 - Store: `http://localhost:8888`. Pay with a sandbox **Personal** account.
 - Merchant console: `http://localhost:8888/merchant`. Sign in with `MERCHANT_PASSWORD`.
-- Sample damage photos for the vase, T-shirt and headphones are in `probe/products/`; mug photos are in `probe/cases/`. `broken-handle-white.jpg` usually gets a one-click proposal; `damage-not-shown.jpg` goes to manual review, and `broken-rocket-mug.jpg` is flagged as a different design from the catalog mug.
+- Ready-made damage photos of the four store products are in `demo-photos/` (for example `1-kit-chipped-mug.jpg`, `2-vase-cracked.jpg`, `7-tee-stained.jpg`). More real photos for the vase, T-shirt and headphones are in `probe/products/`; mug photos are in `probe/cases/`. `broken-handle-white.jpg` usually gets a one-click proposal; `damage-not-shown.jpg` goes to manual review, and `broken-rocket-mug.jpg` is flagged as a different design from the catalog mug.
 
 ### Hosted demo for judges
 
-Set `PUBLIC_DEMO=1` to print the sandbox sign-ins on the pages themselves: the merchant password on the merchant sign-in screen, and `DEMO_BUYER_EMAIL` / `DEMO_BUYER_PASSWORD` (a sandbox **Personal** account) under the PayPal button. It is off by default and the app refuses to run outside the PayPal sandbox, so nothing real can be refunded. Judges can also skip the PayPal sign-in and use **Debit or Credit Card** with a test card from PayPal's [card generator](https://developer.paypal.com/tools/sandbox/card-testing/).
+Set `PUBLIC_DEMO=1` to print the sandbox sign-ins on the pages themselves (`render.yaml` does this; also fill in `ANTHROPIC_API_KEY` there so judges can try the refund agent): the merchant password on the merchant sign-in screen, and `DEMO_BUYER_EMAIL` / `DEMO_BUYER_PASSWORD` (a sandbox **Personal** account) under the PayPal button. It is off by default and the app refuses to run outside the PayPal sandbox, so nothing real can be refunded. Judges can also skip the PayPal sign-in and use **Debit or Credit Card** with a test card from PayPal's [card generator](https://developer.paypal.com/tools/sandbox/card-testing/).
 
 The store keeps each buyer's private claim and tracking links in the browser, so a reload after paying does not lose them.
 
 ### Tests and checks
 
 ```sh
-npm test                                     # 125 tests: money, policy, duplicate/concurrent approvals, tampering,
+npm test                                     # 128 tests: money, policy, duplicate/concurrent approvals, tampering,
                                              # stale approvals, timeouts, restart recovery, access control, edge cases
 npm run probe                                # live Jev run over 19 labelled photos (uses your API key)
 npm run probe:stability -- 5                 # each photo 5 times: does the refund route ever change between runs?

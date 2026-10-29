@@ -4,6 +4,7 @@
 // paid, or the suggestion is dropped.
 import { randomUUID } from "node:crypto";
 import { audit, now, tx } from "../db.js";
+import { latestProposal } from "../refunds/execute.js";
 import { ClaimError } from "../claims.js";
 import { MAX_SUGGESTIONS } from "../ai/haiku.js";
 
@@ -50,7 +51,7 @@ export function decideSuggestion(db, { claimId, suggestionId, approve, actor }) 
     const claim = db.prepare("SELECT * FROM claims WHERE id = ?").get(claimId);
     const s = db.prepare("SELECT * FROM suggestions WHERE id = ? AND claim_id = ?").get(suggestionId, claimId);
     if (!claim || !s) throw new ClaimError("NOT_FOUND", "No such suggestion.", 404);
-    const proposal = db.prepare("SELECT * FROM proposals WHERE claim_id = ? ORDER BY created_at DESC LIMIT 1").get(claimId);
+    const proposal = latestProposal(db, claimId);
     if (claim.status !== "ready" || proposal?.id !== s.proposal_id || proposal.claim_version !== claim.version) {
       throw new ClaimError("STALE_CASE", "This suggestion is no longer open. Reload the case.", 409);
     }
