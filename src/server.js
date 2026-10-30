@@ -17,8 +17,8 @@ import { caseDetail, inbox, buyerStatus } from "./views.js";
 import { acceptOffer, sendOffer, withdrawOffer } from "./offers.js";
 import { createRemedy, remedyLibrary, seedRemedies, updateRemedy } from "./remedies.js";
 import { defaultMatcher, defaultRuleParser, defaultSuggester } from "./ai/haiku.js";
-import { activeMandate, agentSpent, replay, runAgent, saveMandate, stopMandate } from "./agent/autopilot.js";
-import { RuleError, checkRules, describeRules, ruleVocabulary } from "./agent/rules.js";
+import { activeMandate, agentSpent, replay, runAgent, saveMandate, stopMandate, storeCatalog, unseenByAgent } from "./agent/autopilot.js";
+import { RuleError, checkRules, damageChoices, describeRules, ruleVocabulary } from "./agent/rules.js";
 import { decideSuggestion } from "./suggest/suggestions.js";
 import { assessmentQueue } from "./queue.js";
 import { PRODUCTS } from "./catalog.js";
@@ -36,12 +36,12 @@ const started = Date.now();
 // Every refund, ledger check and reconciliation goes through `pay`, which picks the account the
 // order was paid to.
 export function createApp({ db = openDb(), pp = paypal, paypalFor = paypal.paypalClient, fetchImage = fetchCatalogImage, assess = assessEvidence,
-  suggest = defaultSuggester(), match = defaultMatcher(), parseRules = defaultRuleParser(), queue = null } = {}) {
+  suggest = defaultSuggester(), match = defaultMatcher(), parseRules = defaultRuleParser(), queue = null, retryDelays } = {}) {
   seedRemedies(db);
   ensureDemoMerchant(db);
   const clientFor = merchantClients(db, pp, paypalFor);
   const pay = routedPayPal(db, pp, clientFor);
-  queue ??= assessmentQueue(db, assess, { suggest, match, after: (claimId) => runAgent(db, pay, claimId) });
+  queue ??= assessmentQueue(db, assess, { suggest, match, retryDelays, after: (claimId) => runAgent(db, pay, claimId) });
   const app = express();
   app.disable("x-powered-by");
   // Behind Render's (or any) load balancer, req.ip is the proxy unless we trust its X-Forwarded-For;
@@ -196,9 +196,19 @@ export function createApp({ db = openDb(), pp = paypal, paypalFor = paypal.paypa
     // PayPal is asked first only when the pick moves money; a replacement settles without it.
     const open = db.prepare("SELECT options_json FROM offers WHERE id = ? AND claim_id = ? AND status = 'open' AND decided_at IS NULL").get(String(req.body.offerId || ""), claim.id);
     const picked = open && JSON.parse(open.options_json).find((o) => o.id === String(req.body.optionId || ""));
-    if (!picked || picked.refundCents > 0) await checkPayPalLedger(db, pay, claim.id);
-    const { op, duplicate } = acceptOffer(db, { claimId: claim.id, offerId: String(req.body.offerId || ""), optionId: String(req.body.optionId || "") });
-    if (op && !duplicate) await submit(db, pay, op, "buyer");
+    // The refund gate's messages are written for the merchant ("Reconnect PayPal", "Reconcile it");
+    // the buyer is told what it means for them, and the code stays the same.
+    const forBuyer = (err) => {
+      if (err instanceof GateError && BUYER_GATE[err.code]) throw Object.assign(new GateError(err.code, BUYER_GATE[err.code]), { status: err.status });
+      throw err;
+    };
+    if (!picked || picked.refundCents > 0) await checkPayPalLedger(db, pay, claim.id).catch(forBuyer);
+    let accepted;
+    try {
+      accepted = acceptOffer(db, { claimId: claim.id, offerId: String(req.body.offerId || ""), optionId: String(req.body.optionId || "") });
+    } catch (err) { forBuyer(err); }
+    const { op, duplicate } = accepted;
+    if (op && !duplicate) await submit(db, pay, op, "buyer").catch((err) => { if (err.code !== "PAYPAL_NOT_CONNECTED") throw err; });
     res.json(buyerStatus(db, db.prepare("SELECT * FROM claims WHERE id = ?").get(claim.id)));
   }));
 
@@ -234,9 +244,9 @@ export function createApp({ db = openDb(), pp = paypal, paypalFor = paypal.paypa
     }
     next();
   });
-  // The remedy library and the refund agent work on the demo store's catalog, so far.
+  // The remedy library works on the demo store's catalog, so far.
   const demoOnly = (req, res, next) => req.merchantId === DEMO ? next()
-    : res.status(404).json({ error: "DEMO_STORE_ONLY", message: "The remedy library and the refund agent are coming to connected stores soon." });
+    : res.status(404).json({ error: "DEMO_STORE_ONLY", message: "The remedy library is coming to connected stores soon." });
   m.get("/me", (req, res) => {
     const me = getMerchant(db, req.merchantId);
     res.json({ actor: "merchant", merchant: { id: me?.id, name: me?.name }, demo: req.merchantId === DEMO });
@@ -296,7 +306,11 @@ export function createApp({ db = openDb(), pp = paypal, paypalFor = paypal.paypa
   // ---- The refund policy: severity table, limits and how sure the photo check must be ----
   const policyView = (merchantId) => {
     const policy = currentPolicy(db, merchantId);
-    return { version: POLICY_VERSION, policy, defaults: DEFAULT_POLICY, severity: severityTable(policy), spentCents: merchantId === DEMO ? agentSpent(db) : 0 };
+    // Only the damage types the store's products can have are shown (a mug shop has no torn ear
+    // cushions); the others keep their values and are saved unchanged.
+    const sold = damageChoices(undefined, storeCatalog(db, merchantId));
+    const severity = severityTable(policy).map((r) => ({ ...r, sold: r.kind in sold }));
+    return { version: POLICY_VERSION, policy, defaults: DEFAULT_POLICY, severity, spentCents: agentSpent(db, merchantId) };
   };
   m.get("/policy", (req, res) => res.json(policyView(req.merchantId)));
   // New settings apply to reviews from now on; cases already reviewed keep the decision they got.
@@ -305,39 +319,41 @@ export function createApp({ db = openDb(), pp = paypal, paypalFor = paypal.paypa
     res.json(policyView(req.merchantId));
   }));
   // ---- The refund agent's rules ----
-  // What is on, what the agent did lately, and what it has sent in the last 24 hours.
-  m.use("/agent", demoOnly);
-  m.get("/agent", (_req, res) => {
+  // What is on, what the agent did lately, and what it has sent in the last 24 hours. Every store
+  // has its own agent, rules and daily total.
+  m.get("/agent", (req, res) => {
     const recent = db.prepare(`SELECT a.type, a.payload, a.at, c.id claim_id, c.ref, c.status, l.title FROM audit a
-      JOIN claims c ON c.id = a.claim_id JOIN order_lines l ON l.id = c.line_id
-      WHERE a.type IN ('agent.acted', 'agent.left_for_merchant') ORDER BY a.id DESC LIMIT 20`).all()
+      JOIN claims c ON c.id = a.claim_id JOIN order_lines l ON l.id = c.line_id JOIN orders o ON o.id = c.order_id
+      WHERE a.type IN ('agent.acted', 'agent.left_for_merchant') AND o.merchant_id = ? ORDER BY a.id DESC LIMIT 20`).all(req.merchantId)
       .map((r) => ({ ...JSON.parse(r.payload), acted: r.type === "agent.acted", at: r.at, claimId: r.claim_id, ref: r.ref, status: r.status, title: r.title }));
-    res.json({ mandate: activeMandate(db), spentCents: agentSpent(db), policyDailyCents: currentPolicy(db).dailyAutoRefundCents, recent, canWrite: !!parseRules });
+    res.json({ mandate: activeMandate(db, req.merchantId), spentCents: agentSpent(db, req.merchantId),
+      policyDailyCents: currentPolicy(db, req.merchantId).dailyAutoRefundCents, recent, canWrite: !!parseRules, demo: req.merchantId === DEMO });
   });
   // Plain English in, checked rules and their read-back out. Nothing is turned on here.
   m.post("/agent/preview", limit(20, 60e3), wrap(async (req, res) => {
     const text = String(req.body?.text ?? "").trim();
     if (text.length < 8 || text.length > 1000) throw new RuleError("Write your rules in 8 to 1000 characters.");
     if (!parseRules) throw Object.assign(new RuleError("Writing rules in plain English needs the AI, which is off on this server."), { status: 503 });
+    const products = storeCatalog(db, req.merchantId);
     let parsed;
     try {
-      parsed = await parseRules({ text, ...ruleVocabulary() });
+      parsed = await parseRules({ text, ...ruleVocabulary(products) });
     } catch (err) {
       throw Object.assign(new RuleError(`The AI could not read those rules (${String(err.message).slice(0, 120)}). Try again.`), { status: 502 });
     }
     let checked;
     try {
-      checked = checkRules(parsed);
+      checked = checkRules(parsed, products);
     } catch (err) {
       if (err instanceof RuleError && parsed.notUnderstood) err.message += ` The AI said: ${parsed.notUnderstood}`;
       throw err;
     }
-    res.json({ text, ...checked, readback: describeRules(checked), notUnderstood: parsed.notUnderstood || null, model: parsed.model, replay: replay(db, checked) });
+    res.json({ text, ...checked, readback: describeRules(checked, products), notUnderstood: parsed.notUnderstood || null, model: parsed.model, replay: replay(db, checked, { merchantId: req.merchantId }) });
   }));
   m.post("/agent", wrap(async (req, res) => {
-    res.json(saveMandate(db, { text: req.body?.text, rules: req.body?.rules, model: req.body?.model ?? null, actor: req.actor }));
+    res.json(saveMandate(db, { text: req.body?.text, rules: req.body?.rules, model: req.body?.model ?? null, actor: req.actor, merchantId: req.merchantId }));
   }));
-  m.delete("/agent", (req, res) => { stopMandate(db, req.actor); res.json({ mandate: null }); });
+  m.delete("/agent", (req, res) => { stopMandate(db, req.actor, req.merchantId); res.json({ mandate: null }); });
   m.post("/refunds/:id/reconcile", wrap(async (req, res) => {
     const op = await reconcile(db, pay, req.params.id, req.actor);
     res.json(caseDetail(db, op.claim_id));
@@ -357,6 +373,15 @@ export function createApp({ db = openDb(), pp = paypal, paypalFor = paypal.paypa
   });
   return { app, db, queue, pay };
 }
+
+// What a buyer reads when the refund gate stops their pick. Nothing was refunded in any of these.
+const SHOP_FIXING = "The shop needs to sort something out with PayPal before this refund can go out. Nothing was refunded yet; your choice is still open, so try again later.";
+const BUYER_GATE = {
+  PAYPAL_NOT_CONNECTED: SHOP_FIXING, ORDER_NOT_ON_ACCOUNT: SHOP_FIXING, EXTERNAL_REFUND_DETECTED: SHOP_FIXING, CAPTURE_NOT_FOUND: SHOP_FIXING,
+  REFUND_IN_PROGRESS: "A refund on this order is still being processed. Nothing more was refunded; try again in a few minutes.",
+  CAPTURE_NOT_REFUNDABLE: "PayPal no longer lets this payment be refunded here. Contact the shop about your order.",
+  INSUFFICIENT_REFUNDABLE_BALANCE: "This order doesn't have enough left to refund for that choice. Contact the shop about your order.",
+};
 
 // A hosted demo for judges can print its sandbox sign-ins on the store and merchant pages. Off
 // unless PUBLIC_DEMO=1, and only ever for the sandbox (the PayPal client refuses live mode).
@@ -385,6 +410,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   reconcileOpen(db, pay, { atStartup: true }).then((n) => n && console.log(`Reconciled ${n} open refund operation(s)`));
   const waiting = queue.resume();
   if (waiting) console.log(`Resumed assessment of ${waiting} claim(s)`);
+  // Reviews that finished just before the server stopped still get the refund agent's look.
+  (async () => {
+    for (const id of unseenByAgent(db)) await runAgent(db, pay, id).catch((err) => console.error("agent", id, err.message));
+  })();
   setInterval(() => reconcileOpen(db, pay).catch(() => {}), 60_000).unref();
   // Hosts like Render cannot attach a web service's disk to a separate cron job, so the server
   // backs itself up when asked to.

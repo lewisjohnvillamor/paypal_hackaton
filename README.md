@@ -34,7 +34,7 @@ Refund Relay is a hosted service, not a single shop. Juniper Market, the store i
 
 [`examples/acme-store`](examples/acme-store/server.js) is a second store with its own PayPal checkout that uses Refund Relay this way; the whole integration is about 20 lines. `npm run e2e:platform` runs it live against the PayPal sandbox: Acme Ceramics signs up, connects PayPal, creates a key, sells two mugs, the buyer clicks the button on Acme's confirmation page and reports a broken handle, and Acme approves a $24.00 refund that PayPal completes on Acme's capture. Screenshots are in [`hackathon/screenshots/platform`](hackathon/screenshots/platform).
 
-So far the refund agent and the remedy library work on the demo store's catalog only; a connected store gets the photo check, its own refund policy and one-click approvals. Product kinds are the four the photo check knows (`ceramic-mug`, `glass-vase`, `cotton-tee`, `headphones`); adding one is one entry in `src/kinds.js`.
+Every connected store gets the photo check, its own refund policy, one-click approvals and its own refund agent (rules over the products it has sold, its own daily total, refunds through its own PayPal). So far the remedy library and remedy suggestions work on the demo store's catalog only. Product kinds are the four the photo check knows (`ceramic-mug`, `glass-vase`, `cotton-tee`, `headphones`); adding one is one entry in `src/kinds.js`.
 
 ## Agent-to-agent commerce
 
@@ -97,7 +97,7 @@ The store keeps each buyer's private claim and tracking links in the browser, so
 ### Tests and checks
 
 ```sh
-npm test                                     # 128 tests: money, policy, duplicate/concurrent approvals, tampering,
+npm test                                     # 143 tests: money, policy, duplicate/concurrent approvals, tampering,
                                              # stale approvals, timeouts, restart recovery, access control, edge cases
 npm run probe                                # live Jev run over 19 labelled photos (uses your API key)
 npm run probe:stability -- 5                 # each photo 5 times: does the refund route ever change between runs?

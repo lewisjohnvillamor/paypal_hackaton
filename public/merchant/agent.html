@@ -13,7 +13,7 @@
 <body>
   <header class="top app">
     <a class="brand" href="/merchant" aria-label="Refund Relay merchant home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span><span class="brand-name">Refund Relay</span> <span class="ctx">Merchant</span></a>
-    <nav aria-label="Merchant"><a href="/merchant">Requests</a><a data-demo-only href="/merchant/agent" aria-current="page">Refund agent</a><a data-demo-only href="/merchant/remedies">Remedies</a><a href="/merchant/policy">Policy</a><a href="/dashboard">Setup</a><a data-demo-only href="/" class="wide-only">Store</a><a href="#" id="logout" data-logout>Sign out</a></nav>
+    <nav aria-label="Merchant"><a href="/merchant">Requests</a><a href="/merchant/agent" aria-current="page">Refund agent</a><a data-demo-only href="/merchant/remedies">Remedies</a><a href="/merchant/policy">Policy</a><a href="/dashboard">Setup</a><a data-demo-only href="/" class="wide-only">Store</a><a href="#" id="logout" data-logout>Sign out</a></nav>
   </header>
   <main>
     <section id="page" class="hidden">
@@ -30,9 +30,10 @@
         <textarea id="text" maxlength="1000" required placeholder="Refund chipped mugs under $25 on your own. Ask me about anything above that."></textarea>
         <div class="row agent-examples" aria-label="Examples">
           <span class="small muted">Try:</span>
-          <button type="button" class="chip" data-ex="Refund chipped mugs under $25 on your own. Ask me about anything above that.">Chipped mugs under $25</button>
-          <button type="button" class="chip" data-ex="Refund any broken mug or vase up to $50. For stained or torn T-shirts up to $25, offer the buyer my remedies. Never more than $150 a day.">Mugs, vases and tees</button>
-          <button type="button" class="chip" data-ex="Headphones with torn ear cushions: refund up to $40. Everything else comes to me.">Headphone cushions</button>
+          <button type="button" class="chip" data-demo-only data-ex="Refund chipped mugs under $25 on your own. Ask me about anything above that.">Chipped mugs under $25</button>
+          <button type="button" class="chip" data-demo-only data-ex="Refund any broken mug or vase up to $50. For stained or torn T-shirts up to $25, offer the buyer my remedies. Never more than $150 a day.">Mugs, vases and tees</button>
+          <button type="button" class="chip" data-demo-only data-ex="Headphones with torn ear cushions: refund up to $40. Everything else comes to me.">Headphone cushions</button>
+          <button type="button" class="chip" data-ex="Refund anything that arrived broken, up to $25 a request. Ask me about anything above that. Never more than $100 a day.">Anything broken under $25</button>
         </div>
         <button class="primary lg" type="submit" id="read">Read it back to me</button>
         <p class="footnote" style="margin:10px 0 0">Nothing turns on until you check the read-back. The agent only ever follows the read-back, not your original words.</p>
@@ -136,7 +137,7 @@
         if (state.mandate && !$("text").value) $("text").value = state.mandate.text;
         drawOn(); drawActivity(); settle();
       } catch (e) {
-        // Signed out, or a connected store (the agent and remedies are the demo store's so far):
+        // Signed out, or the server refused:
         // the page itself stays hidden, so the reason shows in the card instead.
         if (e.status !== 401) $("signin").firstElementChild.textContent = e.message;
         $("signin").classList.remove("hidden");

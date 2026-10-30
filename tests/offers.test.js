@@ -221,3 +221,21 @@ test("the buyer's choices carry no AI scores, and a replacement pick needs no Pa
     assert.equal(r.body.status, "resolved");
   } finally { t.close(); }
 });
+
+test("a buyer whose pick the refund gate stops reads what it means for them, not the merchant's to-do", async () => {
+  let external = false;
+  const pp = fakePayPal({ payerEmail: () => `gate${++n}@example.com`, ledger: () => (external ? { refunds: [{ id: "DASHBOARD-1", status: "COMPLETED", amount: { value: "5.00" } }] } : {}) });
+  const t = await setup({ pp, assess: fakeAssess(handleOff) });
+  try {
+    const o = await offered(t);
+    const s = await o.status();
+    external = true; // the shop refunded something from the PayPal dashboard meanwhile
+    const r = await o.choose({ offerId: s.offer.id, optionId: "refund" });
+    assert.equal(r.status, 409);
+    assert.equal(r.body.error, "EXTERNAL_REFUND_DETECTED");
+    assert.doesNotMatch(r.body.message, /Reconcile|Refund Relay/);
+    assert.match(r.body.message, /Nothing was refunded/);
+    assert.equal(t.pp.calls.refunds.length, 0);
+    assert.equal((await o.status()).status, "offer_sent", "the choice stays open");
+  } finally { t.close(); }
+});

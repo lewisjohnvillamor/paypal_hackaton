@@ -272,3 +272,22 @@ test("unusable photos: with rules on, the agent asks the buyer for clearer ones 
     assert.equal(t.pp.calls.refunds.length, 1);
   } finally { t.close(); }
 });
+
+test("after a restart, a review the agent never saw gets its look; reviews from before the rules do not", async () => {
+  const t = await setup({ pp: uniqueEmails(), assess: fakeAssess(chipped), parseRules: fakeParser(chippedMugs(1000)) });
+  try {
+    const before = await purchaseAndClaim(t); // reviewed with no rules on
+    await new Promise((r) => setTimeout(r, 5));
+    await withRules(t);
+    const c = await purchaseAndClaim(t); // $20 is over the $10 rule: the agent leaves it with a note
+    const { unseenByAgent, runAgent } = await import("../src/agent/autopilot.js");
+    assert.deepEqual(unseenByAgent(t.db), []);
+    // The server stopped between the review and the agent's look.
+    t.db.prepare("DELETE FROM audit WHERE claim_id = ? AND type LIKE 'agent.%'").run(c.claimId);
+    assert.deepEqual(unseenByAgent(t.db), [c.claimId]);
+    assert.ok(!unseenByAgent(t.db).includes(before.claimId));
+    await runAgent(t.db, t.pp, c.claimId);
+    assert.equal((await t.merchant("GET", "/claims")).body.find((r) => r.id === c.claimId).agent, "left");
+    assert.deepEqual(unseenByAgent(t.db), []);
+  } finally { t.close(); }
+});

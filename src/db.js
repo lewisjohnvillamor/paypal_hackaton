@@ -257,6 +257,7 @@ const MIGRATIONS = [
   "ALTER TABLE orders ADD COLUMN merchant_id TEXT NOT NULL DEFAULT 'demo'",
   "ALTER TABLE order_lines ADD COLUMN category TEXT",
   "ALTER TABLE policy_settings ADD COLUMN merchant_id TEXT NOT NULL DEFAULT 'demo'",
+  "ALTER TABLE mandates ADD COLUMN merchant_id TEXT NOT NULL DEFAULT 'demo'",
 ];
 
 // Every lookup the app makes by foreign key or by time. Without these, each claim submission and
@@ -284,6 +285,7 @@ CREATE INDEX IF NOT EXISTS refund_ops_by_created ON refund_ops(created_at);
 CREATE INDEX IF NOT EXISTS orders_by_merchant ON orders(merchant_id, created_at);
 CREATE INDEX IF NOT EXISTS api_keys_by_merchant ON api_keys(merchant_id, created_at);
 CREATE INDEX IF NOT EXISTS policy_by_merchant ON policy_settings(merchant_id, created_at);
+CREATE INDEX IF NOT EXISTS mandates_by_merchant ON mandates(merchant_id, ended_at, created_at);
 `;
 
 export function openDb(path = process.env.DATABASE_PATH || "data/refund-relay.db") {

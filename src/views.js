@@ -26,7 +26,7 @@ export function inbox(db, { limit = 100, before = null, merchantId = "demo" } = 
       (SELECT COALESCE(SUM(amount_cents), 0) FROM refund_ops r WHERE r.claim_id = c.id AND r.status = 'COMPLETED') AS refunded_cents,
       (SELECT type || ' ' || payload FROM audit d WHERE d.claim_id = c.id AND d.type IN ('agent.acted', 'agent.left_for_merchant') ORDER BY d.id DESC LIMIT 1) AS agent_note
     FROM claims c JOIN order_lines l ON l.id = c.line_id JOIN orders o ON o.id = c.order_id
-    LEFT JOIN proposals p ON p.id = (SELECT id FROM proposals x WHERE x.claim_id = c.id ORDER BY x.created_at DESC LIMIT 1)
+    LEFT JOIN proposals p ON p.id = (SELECT id FROM proposals x WHERE x.claim_id = c.id ORDER BY x.created_at DESC, x.rowid DESC LIMIT 1)
     LEFT JOIN assessments a ON a.id = p.assessment_id
     WHERE o.merchant_id = ? AND (? IS NULL OR c.created_at < ?)
     ORDER BY c.created_at DESC LIMIT ?`).all(merchantId, before, before, n).map(({ calc_json, findings_json, photo_ids_json, offer_options, agent_note, ...r }) => {
@@ -55,7 +55,7 @@ export function caseDetail(db, claimId) {
   const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(claim.order_id);
   const line = db.prepare("SELECT * FROM order_lines WHERE id = ?").get(claim.line_id);
   const evidence = db.prepare("SELECT id, width, height, created_at FROM evidence WHERE claim_id = ? ORDER BY created_at").all(claimId);
-  const assessment = db.prepare("SELECT * FROM assessments WHERE claim_id = ? ORDER BY created_at DESC LIMIT 1").get(claimId);
+  const assessment = db.prepare("SELECT * FROM assessments WHERE claim_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1").get(claimId);
   const sentIds = json(assessment?.photo_ids_json) ?? [];
   const sentToAi = new Set(sentIds);
   // Damage boxes are stored in the order the photos were sent to Jev.

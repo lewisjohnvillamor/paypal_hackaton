@@ -31,7 +31,7 @@
 <body>
   <header class="top app">
     <a class="brand" href="/merchant" aria-label="Refund Relay merchant home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span><span class="brand-name">Refund Relay</span> <span class="ctx">Merchant</span></a>
-    <nav aria-label="Merchant"><a href="/merchant">Requests</a><a data-demo-only href="/merchant/agent">Refund agent</a><a data-demo-only href="/merchant/remedies">Remedies</a><a href="/merchant/policy" aria-current="page">Policy</a><a href="/dashboard">Setup</a><a data-demo-only href="/" class="wide-only">Store</a><a href="#" id="logout" data-logout>Sign out</a></nav>
+    <nav aria-label="Merchant"><a href="/merchant">Requests</a><a href="/merchant/agent">Refund agent</a><a data-demo-only href="/merchant/remedies">Remedies</a><a href="/merchant/policy" aria-current="page">Policy</a><a href="/dashboard">Setup</a><a data-demo-only href="/" class="wide-only">Store</a><a href="#" id="logout" data-logout>Sign out</a></nav>
   </header>
   <main>
     <section id="page" class="hidden">
@@ -62,7 +62,7 @@
             <div><label for="daily">Most in any 24 hours <span class="hint" id="spent">Across every automatic refund.</span></label><input id="daily" type="number" min="0.01" step="0.01" inputmode="decimal" required></div>
             <div><label for="window">Reporting window, days <span class="hint">Later reports are declined.</span></label><input id="window" type="number" min="1" max="90" step="1" inputmode="numeric" required></div>
           </div>
-          <div class="optin" data-demo-only><input type="checkbox" id="declines"><label for="declines">Let the refund agent close requests your own records rule out <span class="hint">Late reports, more items than were bought, a payment already refunded, or your own catalog photo sent back. A decline based on the photos always waits for you.</span></label></div>
+          <div class="optin"><input type="checkbox" id="declines"><label for="declines">Let the refund agent close requests your own records rule out <span class="hint">Late reports, more items than were bought, a payment already refunded, or your own catalog photo sent back. A decline based on the photos always waits for you.</span></label></div>
         </section>
 
         <section class="card" aria-labelledby="h-sure">
@@ -103,7 +103,9 @@
 
     function draw(p) {
       $("example-price").textContent = usd(EXAMPLE);
-      $("sev").innerHTML = state.severity.map((r) => `<tr>
+      $("sev").innerHTML = state.severity.map((r) => r.sold === false
+        ? `<tr hidden><td colspan="4"><input type="hidden" data-kind="${r.kind}" value="${p.refundPercent[r.kind]}"></td></tr>`
+        : `<tr>
           <td>${esc(r.label.charAt(0).toUpperCase() + r.label.slice(1))}</td>
           <td class="lvl muted">${esc(r.levelLabel)}</td>
           <td class="amount" data-example="${r.kind}">${usd(Math.floor((EXAMPLE * p.refundPercent[r.kind]) / 100))}</td>
