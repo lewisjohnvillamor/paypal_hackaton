@@ -108,7 +108,7 @@
 
       <section class="card" id="step-order" aria-labelledby="h-order">
         <h2 id="h-order"><span class="step-n">3</span>Send each paid order to Refund Relay</h2>
-        <p class="small muted" style="margin:0 0 12px">Right after your server captures a PayPal payment, send the PayPal order ID and the items. Refund Relay looks the order up in your PayPal account and checks the capture, amount, currency and payee before it accepts it, then returns the buyer's private <code>claim_url</code>. It works for <span id="link-days">14</span> days.</p>
+        <p class="small muted" style="margin:0 0 12px">Right after your server captures a PayPal payment, send the PayPal order ID and the items. Refund Relay looks the order up in your PayPal account and checks the capture, amount (items plus any <code>shipping</code> and <code>tax</code>), currency and payee before it accepts it, then returns the buyer's private <code>claim_url</code>. It works for <span id="link-days">14</span> days.</p>
         <div class="segmented" role="group" aria-label="Language" id="langs" style="margin-bottom:12px">
           <button type="button" data-lang="node" aria-pressed="true">Node.js</button>
           <button type="button" data-lang="python" aria-pressed="false">Python</button>
@@ -187,6 +187,8 @@ const res = await fetch("${b}/v1/orders", {
       category: "ceramic-mug",
       image_url: "https://cdn.yourstore.com/mug.jpg",
     }],
+    shipping: "4.95",                   // optional, with tax: items + shipping + tax = the capture
+    tax: "0.00",
   }),
 });
 if (!res.ok) throw new Error((await res.json()).message);
@@ -207,6 +209,8 @@ res = requests.post(
             "category": "ceramic-mug",
             "image_url": "https://cdn.yourstore.com/mug.jpg",
         }],
+        "shipping": "4.95",               # optional, with tax: items + shipping + tax = the capture
+        "tax": "0.00",
     },
     timeout=30,
 )

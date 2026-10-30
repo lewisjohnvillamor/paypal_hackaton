@@ -30,7 +30,7 @@ if __name__ == "__main__":
         "sku": "MUG-01",
         "title": "Stoneware mug",
         "quantity": 2,
-        "unit_price": "18.50",            # USD, as a string; must add up to the PayPal capture
+        "unit_price": "18.50",            # USD, as a string; items + shipping + tax = the capture
         "category": "ceramic-mug",        # ceramic-mug, glass-vase, cotton-tee or headphones
         "image_url": "https://cdn.yourstore.com/mug.jpg",
     }])

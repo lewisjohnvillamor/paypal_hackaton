@@ -12,6 +12,7 @@ const PRODUCT = {
   sku: "ACME-MUG-W", title: "Everyday white mug", unit_price: "24.00", category: "ceramic-mug",
   image_url: process.env.ACME_IMAGE_URL || "https://raw.githubusercontent.com/lewisjohnvillamor/paypal_hackaton/main/public/assets/catalog-mug.jpg",
 };
+const SHIPPING = "4.95"; // flat rate per order, captured with the items and sent to Refund Relay too
 
 async function paypal(method, path, body) {
   const auth = Buffer.from(`${process.env.ACME_PAYPAL_CLIENT_ID}:${process.env.ACME_PAYPAL_CLIENT_SECRET}`).toString("base64");
@@ -32,7 +33,7 @@ app.get("/", (_req, res) => res.send(page("Acme Ceramics", `<h1>${PRODUCT.title}
 // Checkout: the store's own PayPal order, priced on its own server.
 app.post("/api/checkout", async (req, res) => {
   const quantity = Math.min(Math.max(Number(req.body?.quantity) || 1, 1), 10);
-  const value = (Number(PRODUCT.unit_price) * quantity).toFixed(2);
+  const value = (Number(PRODUCT.unit_price) * quantity + Number(SHIPPING)).toFixed(2);
   const order = await paypal("POST", "/v2/checkout/orders", { intent: "CAPTURE", purchase_units: [{ amount: { currency_code: "USD", value } }] });
   orders.set(order.id, { quantity });
   res.json({ id: order.id, approveUrl: order.links.find((l) => l.rel === "approve").href });
@@ -47,7 +48,7 @@ app.post("/api/checkout/:id/capture", async (req, res) => {
   const r = await fetch(`${RELAY}/v1/orders`, {
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.REFUND_RELAY_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ paypal_order_id: req.params.id, items: [{ ...PRODUCT, quantity: o.quantity }] }),
+    body: JSON.stringify({ paypal_order_id: req.params.id, items: [{ ...PRODUCT, quantity: o.quantity }], shipping: SHIPPING }),
   });
   const registered = await r.json();
   if (!r.ok) return res.status(502).json(registered);
@@ -59,7 +60,7 @@ app.post("/api/checkout/:id/capture", async (req, res) => {
 app.get("/orders/:id", (req, res) => {
   const o = orders.get(req.params.id);
   if (!o?.claimUrl) return res.status(404).send(page("Not found", "<h1>No such order</h1>"));
-  res.send(page("Thank you", `<h1>Thank you for your order</h1><p>${o.quantity} × ${PRODUCT.title}, paid with PayPal. It ships tomorrow.</p>
+  res.send(page("Thank you", `<h1>Thank you for your order</h1><p>${o.quantity} × ${PRODUCT.title}, paid with PayPal. Shipping $${SHIPPING}. It ships tomorrow.</p>
 <p>If anything arrives broken, tell us here:</p>
 <script src="${RELAY}/relay.js" defer></script>
 <div data-refund-relay data-claim-url="${o.claimUrl.replace(/"/g, "&quot;")}"></div>`));

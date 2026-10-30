@@ -41,7 +41,12 @@ export async function checkPayPalLedger(db, paypal, claimId) {
   let res;
   try {
     res = await paypal.getOrder(order.paypal_order_id);
-  } catch {
+  } catch (err) {
+    // A connected store that disconnected PayPal (or whose saved secret can no longer be read):
+    // retrying will not help, reconnecting will.
+    if (err?.code === "PAYPAL_NOT_CONNECTED") {
+      throw new GateError("PAYPAL_NOT_CONNECTED", "The store's PayPal account is not connected, so nothing was refunded. Reconnect PayPal on the Setup page, then try again.", { status: 409 });
+    }
     res = null;
   }
   if (!res || res.status !== 200) {
