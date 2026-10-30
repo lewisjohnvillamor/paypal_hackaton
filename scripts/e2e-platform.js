@@ -18,7 +18,6 @@ const shots = process.env.SHOTS_DIR || "hackathon/screenshots/platform";
 mkdirSync(shots, { recursive: true });
 const photo = process.env.E2E_PHOTO || "probe/cases/broken-handle-white.jpg";
 const log = (...a) => console.log("[platform]", ...a);
-const stamp = Date.now().toString(36);
 
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -29,17 +28,35 @@ const shot = async (name, p = page) => { await p.waitForTimeout(700); return p.s
 await page.goto(`${BASE}/dashboard`);
 await page.waitForSelector("#auth:not(.hidden)");
 await shot("1-dashboard-signup");
+// One Acme account, reused on later runs: a PayPal app connects to one store only, so a new Acme
+// each run could not connect the same sandbox app again.
+const ACME_EMAIL = "owner@acme-ceramics.test", ACME_PASS = "acme-ceramics-sandbox";
 await page.fill("#s-name", "Acme Ceramics");
-await page.fill("#s-email", `owner+${stamp}@acme-ceramics.test`);
-await page.fill("#s-pass", "acme-ceramics-sandbox");
+await page.fill("#s-email", ACME_EMAIL);
+await page.fill("#s-pass", ACME_PASS);
 await page.click("#signup button[type=submit]");
-await page.waitForSelector("#page:not(.hidden)");
+await page.waitForSelector("#page:not(.hidden), #auth-error:not(.hidden)");
+if (await page.isVisible("#auth-error")) {
+  log("Acme already has an account from an earlier run; signing in");
+  await page.click('[data-tab="login"]');
+  await page.fill("#l-email", ACME_EMAIL);
+  await page.fill("#l-pass", ACME_PASS);
+  await page.click("#login button[type=submit]");
+  await page.waitForSelector("#page:not(.hidden)");
+}
 await shot("2-dashboard-empty");
-await page.fill("#pp-id", process.env.PAYPAL_CLIENT_ID);
-await page.fill("#pp-secret", process.env.PAYPAL_CLIENT_SECRET);
-await page.click("#pp-save");
-await page.waitForSelector("#pp-connected:not(.hidden)", { timeout: 30_000 });
-log("PayPal connected:", await page.textContent("#notice"));
+if (await page.isVisible("#pp-id")) {
+  await page.fill("#pp-id", process.env.PAYPAL_CLIENT_ID);
+  await page.fill("#pp-secret", process.env.PAYPAL_CLIENT_SECRET);
+  await page.click("#pp-save");
+  await page.waitForSelector("#pp-connected:not(.hidden)", { timeout: 30_000 });
+  log("PayPal connected:", await page.textContent("#notice"));
+} else log("PayPal already connected");
+// Keys from earlier runs are revoked, so reruns never reach the limit of active keys.
+await page.evaluate(async () => {
+  const { keys } = await (await fetch("/api/dashboard")).json();
+  for (const k of keys.filter((x) => !x.revokedAt)) await fetch(`/api/dashboard/keys/${k.id}`, { method: "DELETE", headers: { "X-Refund-Relay": "1" } });
+});
 await page.fill("#key-label", "Acme store server");
 await page.click("#key-create");
 await page.waitForSelector("#newkey:not(.hidden)");

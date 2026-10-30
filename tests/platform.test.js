@@ -13,7 +13,7 @@ function merchantPayPal(orders) {
   const calls = { refunds: [], getOrder: 0 };
   const refunds = new Map();
   return {
-    calls,
+    calls, orders,
     async accessToken() { return "token"; },
     async getOrder(id) {
       calls.getOrder++;
@@ -194,7 +194,10 @@ test("POST /v1/orders checks the order in the merchant's own PayPal account befo
 
     // A second store cannot claim the first store's order, even with its own keys.
     await p.call("POST", "/api/dashboard/signup", { body: { name: "Other Shop", email: "b@other.test", password: "another long password" }, as: "b" });
-    await p.call("PUT", "/api/dashboard/paypal", { body: { clientId: CLIENT_ID, clientSecret: SECRET }, as: "b" });
+    const shared = await p.call("PUT", "/api/dashboard/paypal", { body: { clientId: CLIENT_ID, clientSecret: SECRET }, as: "b" });
+    assert.equal(shared.status, 409, "one PayPal app per store");
+    assert.equal(shared.body.error, "APP_IN_USE");
+    await p.call("PUT", "/api/dashboard/paypal", { body: { clientId: "OtherShopClientId_0123456789", clientSecret: OTHER_SECRET }, as: "b" });
     const kb = (await p.call("POST", "/api/dashboard/keys", { body: {}, as: "b" })).body.created.key;
     assert.equal((await p.api(kb, "POST", "/v1/orders", ORDER())).body.error, "ORDER_TAKEN");
     assert.equal((await p.api(kb, "GET", `/v1/orders/${r.body.id}`)).status, 404);
@@ -543,5 +546,29 @@ test("the policy page shows only the damage types the store's products can have,
     assert.equal(saved.status, 200, JSON.stringify(saved.body));
     assert.equal(saved.body.policy.refundPercent.crack_or_chip, 80);
     assert.equal(saved.body.policy.refundPercent.stain, v.policy.refundPercent.stain);
+  } finally { p.close(); }
+});
+
+test("two stores cannot share a PayPal account: not by app, not by merchant ID, not by the orders' payee", async () => {
+  const p = await platform({ "5O190127TN364715T": { total: "37.00" } });
+  try {
+    const { key } = await connectedShop(p); // Acme learns payee SHOPPAYEE1 from its first order
+    assert.equal((await p.api(key, "POST", "/v1/orders", ORDER())).status, 201);
+
+    await p.call("POST", "/api/dashboard/signup", { body: { name: "Copycat", email: "c@copy.test", password: "another long password" }, as: "c" });
+    const byApp = await p.call("PUT", "/api/dashboard/paypal", { body: { clientId: CLIENT_ID, clientSecret: SECRET }, as: "c" });
+    assert.equal(byApp.body.error, "APP_IN_USE");
+    const byPayee = await p.call("PUT", "/api/dashboard/paypal", { body: { clientId: "CopycatClientId_0123456789", clientSecret: OTHER_SECRET, payeeMerchantId: "SHOPPAYEE1" }, as: "c" });
+    assert.equal(byPayee.body.error, "PAYEE_IN_USE");
+    assert.equal(p.db.prepare("SELECT COUNT(*) n FROM paypal_connections").get().n, 1);
+
+    // A second app on the same PayPal account (no merchant ID given): its orders are refused.
+    assert.equal((await p.call("PUT", "/api/dashboard/paypal", { body: { clientId: "CopycatClientId_0123456789", clientSecret: OTHER_SECRET }, as: "c" })).status, 200);
+    p.other.orders["7SAMEACCOUNT0001X"] = { total: "37.00" }; // paid to SHOPPAYEE1 too
+    const kc = (await p.call("POST", "/api/dashboard/keys", { body: {}, as: "c" })).body.created.key;
+    const r = await p.api(kc, "POST", "/v1/orders", ORDER("7SAMEACCOUNT0001X"));
+    assert.equal(r.status, 422);
+    assert.match(r.body.message, /another Refund Relay store has connected/);
+    assert.equal(p.db.prepare("SELECT payee_merchant_id p FROM paypal_connections WHERE client_id = 'CopycatClientId_0123456789'").get().p, null, "the payee is not learned");
   } finally { p.close(); }
 });
