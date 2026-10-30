@@ -7,7 +7,7 @@ Two rules hold throughout:
 1. **The model only routes cases.** A doubtful finding or a risk flag sends the case to the merchant with a plain-language reason. Nothing is paid without the merchant's click, or the refund agent acting inside rules the merchant turned on and the refund policy marked safe. Only the shop's own records (too late, too many units, nothing left to refund, the shop's own catalog photo) close a request with no person involved.
 2. **When in doubt about money, block and reconcile.** If the app cannot be sure what PayPal did, it keeps the funds reserved and refuses new refunds on that payment until the record is clear.
 
-Tests are in `tests/edge-cases.test.js` (E), `tests/workflow.test.js` (W), `tests/unit.test.js` (U), `tests/agent.test.js` (A) and `tests/policy.test.js` (P). They use a fake PayPal and a fake Jev. Rows marked **live** were also checked against the real PayPal sandbox or the real Jev model on 2026-10-22.
+Tests are in `tests/edge-cases.test.js` (E), `tests/workflow.test.js` (W), `tests/unit.test.js` (U), `tests/agent.test.js` (A), `tests/policy.test.js` (P) and `tests/races.test.js` (R). They use a fake PayPal and a fake Jev. Rows marked **live** were also checked against the real PayPal sandbox or the real Jev model on 2026-10-22.
 
 ## Photos and evidence
 
@@ -45,6 +45,8 @@ Tests are in `tests/edge-cases.test.js` (E), `tests/workflow.test.js` (W), `test
 | Buyer adds photos after a refund or closure | Rejected. More photos are accepted only when the merchant asked for them. | evidence route | E |
 | New photos after the merchant started reviewing | Case version goes up and any earlier approval is stale. | `STALE_CASE` | W |
 | Spamming submissions | Rate-limited per address. | `limit()` | — |
+| Payment approved twice (a retried approval, a second tab) | Both calls get PayPal's one capture; only the first stores a claim link, so the link the buyer was handed keeps working. | `captureOrder()` | R: two capture calls… |
+| Buyer picks an option, then PayPal declines its refund | The case goes back to the shop and the buyer is no longer shown that pick as their choice. | `buyerStatus()` | R: a pick whose PayPal refund… |
 
 ## Merchant actions
 
@@ -59,6 +61,7 @@ Tests are in `tests/edge-cases.test.js` (E), `tests/workflow.test.js` (W), `test
 | Claude Haiku slow or down (suggestions, second product check, rule writing) | Each call gives up after 30 s with one retry (`HAIKU_TIMEOUT_MS`), instead of the SDK's 10 minutes and two retries, so a stuck call cannot hold an assessment-queue slot. A failure is recorded and the review goes on without it. | `src/ai/haiku.js` | — |
 | A review throws for a reason other than the model (missing catalog photo, disk error) | Retried twice (after 5 s and 30 s); then the request moves to the merchant's inbox unreviewed, with the error on its timeline, instead of staying "checking" forever. | `src/queue.js` | E: a review that keeps crashing… |
 | Minor damage (scratches, a stain) and a free replacement in the remedy library | No replacement is offered unless the damage earns a full refund, and an AI-suggested listing plus its refund must fit inside the partial refund. | `resolutionOptions()`; `assessClaim()` | P: a free replacement is only offered… |
+| Merchant asks for photos while the AI is still checking the first ones | The request keeps waiting for the buyer's photos; the check that finishes afterwards does not put it back in the inbox. | `assessClaim({ queued })` | R: asking for photos while… |
 | Merchant runs the review again on the same photos, then approves from the old draft | Refused as stale: only the newest proposal can be approved or offered, even though the case version did not change. | `latestProposal()` | E: a review run again… |
 
 ## PayPal side

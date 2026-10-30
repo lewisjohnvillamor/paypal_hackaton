@@ -18,6 +18,8 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/). It 
 6. **Or the refund agent does it.** On the [Refund agent page](hackathon/screenshots/27-agent-activity.png) the merchant writes standing rules in plain English, such as "Refund chipped mugs under $25 on your own. Ask me about anything above that." Claude Haiku turns the words into a structure (products, damage types, a limit per request, a daily limit); the server checks it and reads it back in its own words, and the merchant turns it on. After every review the agent refunds through PayPal with no click when a clear case fits a rule, or leaves it for the merchant with one sentence on why ("$40.00 is above your $25.00 limit", "None of your rules covers the clear glass bud vase"). A rule can also say to offer the buyer the remedy list instead. See `src/agent/`.
 7. **Refund.** One idempotent PayPal partial refund runs against the original capture. The app shows PayPal's real refund ID and status.
 
+The top of the merchant inbox shows the last 30 days at a glance: how many requests came in, how many the refund agent settled with no click, the median wait from report to PayPal refund, and what partial refunds and remedies kept compared with refunding every item in full (`src/stats.js`).
+
 ## How merchants use it
 
 Refund Relay is a hosted service, not a single shop. Juniper Market, the store in this repo, is one merchant on it. Any other store that takes PayPal can plug in, in one of three ways.
@@ -97,7 +99,7 @@ The store keeps each buyer's private claim and tracking links in the browser, so
 ### Tests and checks
 
 ```sh
-npm test                                     # 144 tests: money, policy, duplicate/concurrent approvals, tampering,
+npm test                                     # 149 tests: money, policy, duplicate/concurrent approvals, tampering,
                                              # stale approvals, timeouts, restart recovery, access control, edge cases
 npm run probe                                # live Jev run over 19 labelled photos (uses your API key)
 npm run probe:stability -- 5                 # each photo 5 times: does the refund route ever change between runs?

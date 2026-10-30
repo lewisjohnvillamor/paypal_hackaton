@@ -134,7 +134,9 @@ export function buyerStatus(db, claim) {
       ? { amountCents: op.amount_cents, state: op.status === "COMPLETED" ? "issued" : "processing", refundId: op.provider_refund_id }
       : null,
     // Only what the buyer needs to choose: no model findings, no risk flags.
-    offer: offer && (offer.status === "open" ? claim.status === "offer_sent" : offer.status === "accepted")
+    // An accepted pick shows while it stands; if PayPal declined its refund the case went back to
+    // the shop, and the buyer is not shown a choice that came to nothing.
+    offer: offer && (offer.status === "open" ? claim.status === "offer_sent" : offer.status === "accepted" && ["refund_processing", "refunded", "resolved"].includes(claim.status))
       ? { id: offer.id, open: offer.status === "open", chosen: offer.chosen,
           options: offer.options.map(({ id, kind, title, item, refundCents }) => ({ id, kind, title, item, refundCents })) }
       : null,

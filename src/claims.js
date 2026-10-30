@@ -140,10 +140,12 @@ const productOf = (line) => PRODUCTS[line.sku] && !line.category
 // If Jev fails we record the error and still draft a manual-review proposal; we never invent findings.
 // suggest, when the server has a Claude key, adds Haiku's pending remedy suggestions; match adds
 // Haiku's second product-match check to the findings.
-export async function assessClaim(db, claimId, assess, actor = "system", suggest = null, match = null) {
+// queued: the assessment queue, which only ever reviews requests waiting for a first look. A request
+// the merchant asked new photos for while it was being checked stays waiting for those photos.
+export async function assessClaim(db, claimId, assess, actor = "system", suggest = null, match = null, { queued = false } = {}) {
   const claim = db.prepare("SELECT * FROM claims WHERE id = ?").get(claimId);
   if (!claim) throw new ClaimError("NOT_FOUND", "No such request.", 404);
-  if (!["new", "ready", "needs_info"].includes(claim.status)) {
+  if (!(queued ? ["new"] : ["new", "ready", "needs_info"]).includes(claim.status)) {
     throw new ClaimError("NOT_ASSESSABLE", `Request is ${claim.status}.`, 409);
   }
   const line = db.prepare("SELECT * FROM order_lines WHERE id = ?").get(claim.line_id);

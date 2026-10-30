@@ -35,6 +35,7 @@
       <p class="eyebrow" data-store>&nbsp;</p>
       <h1>Refund requests</h1>
       <p class="lede">Damaged-item reports on your PayPal orders. Nothing is refunded unless you approve it<span>, or it fits the rules you gave <a href="/merchant/agent">your refund agent</a></span>.</p>
+      <div id="impact" class="impact hidden" aria-label="The last 30 days"></div>
       <div class="grid-tools">
         <div class="segmented" id="filters" role="group" aria-label="Filter by status"></div>
         <div class="row" style="gap:8px">
@@ -148,7 +149,22 @@
         : rows.length ? `<div class="empty"><h3>Nothing matches</h3><p class="small" style="margin:0">Try another filter or search.</p></div>`
         : `<div class="empty"><h3>No requests yet</h3><p class="small" style="margin:0">They appear here when a buyer reports a problem.</p></div>`;
     }
+    // The last 30 days at a glance: the numbers a shop owner would quote.
+    const wait = (ms) => ms < 60e3 ? `${Math.max(1, Math.round(ms / 1e3))} s` : ms < 3600e3 ? `${Math.round(ms / 60e3)} min` : ms < 172800e3 ? `${Math.round(ms / 3600e3)} h` : `${Math.round(ms / 86400e3)} days`;
+    async function impact() {
+      const s = await api("/api/merchant/stats").catch(() => null);
+      if (!s?.requests) return $("impact").classList.add("hidden");
+      const tile = (value, label, note) => `<div class="tile-stat"><b>${value}</b><span>${label}</span>${note ? `<small>${note}</small>` : ""}</div>`;
+      $("impact").innerHTML = [
+        tile(s.requests, `Requests in ${s.days} days`, s.open ? `${s.open} still open` : "All settled"),
+        tile(`${s.settledByAgent} of ${s.settled}`, "Settled by your agent", "No click from you"),
+        tile(s.medianRefundMs == null ? "—" : wait(s.medianRefundMs), "Report to PayPal refund", "Median wait for the buyer"),
+        tile(usd(s.keptCents), "Kept by partial refunds and remedies", `${usd(s.refundedCents)} refunded through PayPal`),
+      ].join("");
+      $("impact").classList.remove("hidden");
+    }
     async function load() {
+      impact();
       try {
         const next = await api("/api/merchant/claims");
         if (JSON.stringify(next) === JSON.stringify(rows) && !$("inbox").classList.contains("hidden")) return;

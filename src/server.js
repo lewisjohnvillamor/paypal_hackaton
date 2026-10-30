@@ -14,6 +14,7 @@ import { OrderError, captureOrder, startOrder } from "./orders.js";
 import { ClaimError, addEvidence, assessClaim, closeClaim, createClaim, requestInfo, uploadDir } from "./claims.js";
 import { GateError, approveAndReserve, checkPayPalLedger, reconcile, reconcileOpen, submit } from "./refunds/execute.js";
 import { caseDetail, inbox, buyerStatus } from "./views.js";
+import { storeStats } from "./stats.js";
 import { acceptOffer, sendOffer, withdrawOffer } from "./offers.js";
 import { createRemedy, remedyLibrary, seedRemedies, updateRemedy } from "./remedies.js";
 import { defaultMatcher, defaultRuleParser, defaultSuggester } from "./ai/haiku.js";
@@ -252,6 +253,7 @@ export function createApp({ db = openDb(), pp = paypal, paypalFor = paypal.paypa
     res.json({ actor: "merchant", merchant: { id: me?.id, name: me?.name }, demo: req.merchantId === DEMO });
   });
   m.get("/claims", (req, res) => res.json(inbox(db, { limit: req.query.limit, before: req.query.before, merchantId: req.merchantId })));
+  m.get("/stats", (req, res) => res.json(storeStats(db, req.merchantId)));
   m.get("/claims/:id", wrap(async (req, res) => {
     const detail = caseDetail(db, req.params.id);
     if (!detail) throw new ClaimError("NOT_FOUND", "No such request.", 404);

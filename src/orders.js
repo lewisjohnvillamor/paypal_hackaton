@@ -75,7 +75,10 @@ export async function captureOrder(db, paypal, paypalOrderId) {
 
   const token = newToken();
   const ts = now();
-  tx(db, () => {
+  // Two capture calls for one order (a retried approval, a second tab) both get PayPal's same
+  // answer; only the first stores a claim link, so the link it handed out keeps working.
+  const raced = tx(db, () => {
+    if (db.prepare("SELECT capture_status FROM orders WHERE id = ?").get(order.id).capture_status === "COMPLETED") return true;
     db.prepare(`UPDATE orders SET capture_id = ?, capture_status = ?, payee_merchant_id = ?, buyer_email = ?,
       delivered_at = ?, delivery_source = 'synthetic demo fixture (delivered at capture time)' WHERE id = ?`)
       .run(cap.id, problems.length ? `MISMATCH: ${problems.join("; ")}` : "COMPLETED", payee,
@@ -85,7 +88,9 @@ export async function captureOrder(db, paypal, paypalOrderId) {
         .run(order.id, hashToken(token), new Date(Date.now() + CLAIM_LINK_DAYS * 86400e3).toISOString());
     }
     audit(db, { actor: "buyer", type: "order.captured", payload: { orderId: order.id, captureId: cap.id, problems } });
+    return false;
   });
+  if (raced) return { order: db.prepare("SELECT * FROM orders WHERE id = ?").get(order.id), claimToken: null, alreadyCaptured: true };
   if (problems.length) throw new OrderError("CAPTURE_NOT_VERIFIED", `Capture failed verification: ${problems.join("; ")}`, 502);
   return { order: db.prepare("SELECT * FROM orders WHERE id = ?").get(order.id), claimToken: token, alreadyCaptured: false };
 }

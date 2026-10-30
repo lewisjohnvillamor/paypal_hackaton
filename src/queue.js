@@ -37,7 +37,7 @@ export function assessmentQueue(db, assess, { concurrency = Number(process.env.J
     running++;
     active.add(claimId);
     try {
-      await assessClaim(db, claimId, assess, "system", suggest, match);
+      await assessClaim(db, claimId, assess, "system", suggest, match, { queued: true });
       tries.delete(claimId);
       counts.completed++;
       // The refund agent reads the fresh proposal against the merchant's rules.
