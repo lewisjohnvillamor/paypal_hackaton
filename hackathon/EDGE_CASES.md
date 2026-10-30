@@ -7,7 +7,7 @@ Two rules hold throughout:
 1. **The model only routes cases.** A doubtful finding or a risk flag sends the case to the merchant with a plain-language reason. Nothing is paid without the merchant's click, or the refund agent acting inside rules the merchant turned on and the refund policy marked safe. Only the shop's own records (too late, too many units, nothing left to refund, the shop's own catalog photo) close a request with no person involved.
 2. **When in doubt about money, block and reconcile.** If the app cannot be sure what PayPal did, it keeps the funds reserved and refuses new refunds on that payment until the record is clear.
 
-Tests are in `tests/edge-cases.test.js` (E), `tests/workflow.test.js` (W), `tests/unit.test.js` (U), `tests/agent.test.js` (A), `tests/policy.test.js` (P) and `tests/races.test.js` (R). They use a fake PayPal and a fake Jev. Rows marked **live** were also checked against the real PayPal sandbox or the real Jev model on 2026-10-22.
+Tests are in `tests/edge-cases.test.js` (E), `tests/workflow.test.js` (W), `tests/unit.test.js` (U), `tests/agent.test.js` (A), `tests/policy.test.js` (P), `tests/races.test.js` (R) and `tests/disputes.test.js` (D). They use a fake PayPal and a fake Jev. Rows marked **live** were also checked against the real PayPal sandbox or the real Jev model on 2026-10-22.
 
 ## Photos and evidence
 
@@ -69,6 +69,7 @@ Tests are in `tests/edge-cases.test.js` (E), `tests/workflow.test.js` (W), `test
 | Situation | What happens | Where | Test |
 | --- | --- | --- | --- |
 | Refund made in the PayPal dashboard, outside the app | Before every refund the app reads the order from PayPal. A refund it did not make blocks the case until reconciled. Nothing is reserved. | `checkPayPalLedger()` | E; **live**: a $5 refund made outside the app was detected |
+| Buyer opened a PayPal dispute and also filed a request here | The case page shows the dispute (reason, stage, amount) from PayPal's Disputes API and warns above the refund button that settling in both places pays twice. The refund agent leaves the case to the merchant. If PayPal will not list disputes, the page says so instead of "none", and the agent's other checks still apply. | `src/disputes.js`; `runAgent()` | D; **live**: the disputes call answers for the sandbox app |
 | Capture reversed (chargeback), fully refunded, or still pending | Blocked: "PayPal reports this payment as REVERSED; it cannot be refunded here." | `CAPTURE_NOT_REFUNDABLE` | E |
 | PayPal can't be reached when approving | Nothing is reserved or sent. The merchant sees "try again shortly". | `PAYPAL_UNAVAILABLE` | E |
 | Timeout or 5xx after sending the refund | Recorded as UNKNOWN, not failed. Funds stay reserved, and the retry reuses the same `PayPal-Request-Id` so PayPal cannot refund twice. | `submit()`, `reconcile()` | W |

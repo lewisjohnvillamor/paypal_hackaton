@@ -6,9 +6,19 @@ A small shop gets a "this arrived damaged" message with photos: a broken mug, a 
 
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/). It runs on the PayPal **sandbox** only. This is a prototype, not production software. Juniper Market, the shop you see in the screenshots and the video, is a demo merchant on Refund Relay, not the product.
 
+## Try it in three minutes
+
+On the hosted demo (link on the Devpost page), every sign-in you need is printed on the page itself.
+
+1. **Buy.** In the store, add the classic white mug to the bag and pay with PayPal, using the sandbox buyer shown under the PayPal button (or **Debit or Credit Card** with a PayPal [test card](https://developer.paypal.com/tools/sandbox/card-testing/)).
+2. **Report it chipped.** On the thank-you page, click **Report a problem**, upload [`demo-photos/1-kit-chipped-mug.jpg`](demo-photos/1-kit-chipped-mug.jpg) and send. In about ten seconds the status page shows the refund with PayPal's own refund ID. Nobody clicked: the refund agent settled it under the demo's starter rule, "Refund mugs with a chip, crack or snapped handle under $25 on your own."
+3. **Be the merchant.** Open `/merchant` (the password is on the sign-in screen). The inbox shows the last 30 days at a glance; the case shows what the AI saw, where the damage is, the policy's reasoning, the agent's one-line why, and a live check for PayPal disputes on the payment. Then buy the vase and report it with [`demo-photos/2-vase-cracked.jpg`](demo-photos/2-vase-cracked.jpg): no rule covers vases, so the agent leaves it to you with a reason, and you approve it in one click. Write your own rules on the **Refund agent** page.
+
 ![Merchant case view](hackathon/screenshots/3-merchant-case.png)
 
 ## What happens
+
+![How a damaged-item report becomes a PayPal refund](hackathon/architecture.png)
 
 1. **Purchase.** The buyer fills a bag from four very different products (mug, glass vase, T-shirt, headphones) and pays with PayPal Checkout. The server sets the price from its catalog, captures the payment, checks the amount, currency and payee, and gives the buyer a private claim link.
 2. **Complaint.** The buyer clicks "Report a problem" next to an item, picks the quantity, describes the problem, and uploads up to 100 photos. The page shrinks them in the browser before sending.
@@ -74,6 +84,7 @@ Add the buyer server to an MCP host, for example Claude Desktop's `claude_deskto
 - Database constraints allow one open refund per capture, one approval per case version, and one active request per order. Duplicate clicks get the existing operation back.
 - New photos or a status change bump the case version, so an earlier approval goes stale.
 - Open refunds are reconciled with PayPal when the server starts and every 60 seconds.
+- Before the refund agent acts it asks PayPal's Disputes API whether the buyer opened a dispute on the payment; an open one means PayPal may pay them too, so the case waits for the merchant, and the case page shows the dispute. If PayPal will not list disputes (an app without that permission), the agent's other checks still apply.
 - The refund agent goes through the same gate as a merchant's click (ledger check, reservation, idempotent submit). It acts only on a case the policy proposed with no concerns, only inside the checked rules the merchant turned on (never their raw words), never above $200 on one request, and never past the daily limit; it decides again inside the reservation transaction so two cases cannot both fit under the same limit.
 
 ## Run it
@@ -94,12 +105,14 @@ npm start               # http://localhost:8888
 
 Set `PUBLIC_DEMO=1` to print the sandbox sign-ins on the pages themselves (`render.yaml` does this; also fill in `ANTHROPIC_API_KEY` there so judges can try the refund agent): the merchant password on the merchant sign-in screen, and `DEMO_BUYER_EMAIL` / `DEMO_BUYER_PASSWORD` (a sandbox **Personal** account) under the PayPal button. It is off by default and the app refuses to run outside the PayPal sandbox, so nothing real can be refunded. Judges can also skip the PayPal sign-in and use **Debit or Credit Card** with a test card from PayPal's [card generator](https://developer.paypal.com/tools/sandbox/card-testing/).
 
+With `PUBLIC_DEMO=1` the demo store's refund agent also starts with one rule on ("Refund mugs with a chip, crack or snapped handle under $25 on your own"), so a judge sees it act on the first chipped mug. That happens only on a store that has never had rules, so a judge who turns them off finds them off after a restart. Set `REPEAT_CLAIM_LIMIT=0` as well: every judge pays as the same sandbox buyer, which would otherwise flag each request after the first as a repeat claimant and keep the agent's hands off.
+
 The store keeps each buyer's private claim and tracking links in the browser, so a reload after paying does not lose them.
 
 ### Tests and checks
 
 ```sh
-npm test                                     # 149 tests: money, policy, duplicate/concurrent approvals, tampering,
+npm test                                     # 153 tests: money, policy, duplicate/concurrent approvals, tampering,
                                              # stale approvals, timeouts, restart recovery, access control, edge cases
 npm run probe                                # live Jev run over 19 labelled photos (uses your API key)
 npm run probe:stability -- 5                 # each photo 5 times: does the refund route ever change between runs?

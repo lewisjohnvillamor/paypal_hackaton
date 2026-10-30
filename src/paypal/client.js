@@ -1,4 +1,4 @@
-// PayPal REST client, sandbox only: OAuth, Orders v2, Payments v2 captures and refunds.
+// PayPal REST client, sandbox only: OAuth, Orders v2, Payments v2 captures and refunds, Disputes v1 (read).
 // paypalClient() makes one per set of credentials: the demo store's come from .env, and every
 // connected merchant gets their own (src/merchants/connections.js).
 const SANDBOX = "https://api-m.sandbox.paypal.com";
@@ -71,9 +71,11 @@ export function paypalClient(credentials) {
     refundCapture: (captureId, body, requestId) =>
       call("POST", `/v2/payments/captures/${encodeURIComponent(captureId)}/refund`, body, { "PayPal-Request-Id": requestId }),
     getRefund: (refundId) => call("GET", `/v2/payments/refunds/${encodeURIComponent(refundId)}`),
+    // Disputes the buyer opened in PayPal on one capture (Disputes API v1, read only).
+    listDisputes: (captureId) => call("GET", `/v1/customer/disputes?disputed_transaction_id=${encodeURIComponent(captureId)}`),
   };
 }
 
 // The demo store's own PayPal app, from .env.
 const demo = paypalClient(() => ({ clientId: process.env.PAYPAL_CLIENT_ID, clientSecret: process.env.PAYPAL_CLIENT_SECRET }));
-export const { accessToken, createOrder, captureOrder, getOrder, getCapture, refundCapture, getRefund } = demo;
+export const { accessToken, createOrder, captureOrder, getOrder, getCapture, refundCapture, getRefund, listDisputes } = demo;

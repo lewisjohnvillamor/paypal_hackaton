@@ -201,5 +201,6 @@ export function routedPayPal(db, demoClient, clientFor) {
     getCapture: async (id) => via(byCapture(id)).getCapture(id),
     refundCapture: async (id, body, requestId) => via(byCapture(id)).refundCapture(id, body, requestId),
     getRefund: async (id) => via(byRefund(id)).getRefund(id),
+    listDisputes: async (captureId) => via(byCapture(captureId)).listDisputes(captureId),
   };
 }
