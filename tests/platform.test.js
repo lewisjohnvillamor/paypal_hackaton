@@ -50,7 +50,7 @@ process.env.PAYPAL_CLIENT_ID ||= "DemoStoreClientId_0123456789";
 const CLIENT_ID = "AcmeSandboxClientId_0123456789";
 const SECRET = "AcmeSandboxSecret_abcdefghijklmnop";
 
-async function platform(orders = {}) {
+async function platform(orders = {}, { assess = fakeAssess(), parseRules = null } = {}) {
   const shop = merchantPayPal(orders);
   const credentials = [];
   const paypalFor = (c) => {
@@ -60,7 +60,7 @@ async function platform(orders = {}) {
   const photo = await testPhoto(42);
   const db = openDb(":memory:");
   const demo = fakePayPal();
-  const { app, queue } = createApp({ db, pp: demo, paypalFor, fetchImage: async () => photo, assess: fakeAssess(), suggest: null, match: null, parseRules: null });
+  const { app, queue } = createApp({ db, pp: demo, paypalFor, fetchImage: async () => photo, assess, suggest: null, match: null, parseRules });
   const server = app.listen(0);
   const base = `http://127.0.0.1:${server.address().port}`;
   const jar = new Map(); // one cookie per browser
@@ -253,7 +253,7 @@ test("a connected store's request is reviewed in its own console and refunded th
   } finally { p.close(); }
 });
 
-test("each store keeps its own refund policy; the agent and remedy library stay with the demo store", async () => {
+test("each store keeps its own refund policy and refund agent; the remedy library stays with the demo store", async () => {
   const p = await platform();
   try {
     await connectedShop(p);
@@ -263,7 +263,9 @@ test("each store keeps its own refund policy; the agent and remedy library stay 
     assert.equal(saved.body.policy.claimWindowDays, 30);
     assert.equal((await p.call("GET", "/api/merchant/policy", { as: "demo" })).body.policy.claimWindowDays, 14);
     assert.equal((await p.call("GET", "/api/merchant/remedies")).body.error, "DEMO_STORE_ONLY");
-    assert.equal((await p.call("GET", "/api/merchant/agent")).body.error, "DEMO_STORE_ONLY");
+    const agent = await p.call("GET", "/api/merchant/agent");
+    assert.equal(agent.status, 200);
+    assert.deepEqual([agent.body.mandate, agent.body.policyDailyCents, agent.body.demo], [null, 15000, false]);
     assert.equal((await p.call("GET", "/api/merchant/agent", { as: "demo" })).status, 200);
     const me = (await p.call("GET", "/api/merchant/me")).body;
     assert.deepEqual([me.merchant.name, me.demo], ["Acme Ceramics", false]);
@@ -427,5 +429,61 @@ test("a store that disconnected PayPal is told to reconnect, and nothing reaches
     const again = await approve();
     assert.equal(again.status, 200, JSON.stringify(again.body));
     assert.equal(again.body.claim.status, "refunded");
+  } finally { p.close(); }
+});
+
+test("a connected store's own refund agent refunds inside its rules, through its own PayPal", async () => {
+  const chipped = {
+    evidence_usable: "yes", visible_breakage: "yes", product_consistency: "consistent", damage_kind: "crack_or_chip",
+    design_match: "match", stock_photo_suspected: false, instructions_in_photo: false,
+    signals: { evidence_usable: 0.95, visible_breakage: 0.95, damage_kind: { choice: "crack_or_chip", confidence: 0.9 } },
+  };
+  const seen = [];
+  const parseRules = async (input) => {
+    seen.push(input);
+    return { model: "fake-rules (test double)", notUnderstood: "", dailyLimitCents: null,
+      rules: [{ skus: ["BOWL-01"], damage: ["crack_or_chip"], maxRefundCents: 2000, action: "refund" }] };
+  };
+  const p = await platform({ "5O190127TN364715T": { total: "37.00" } }, { assess: fakeAssess(chipped), parseRules });
+  try {
+    const { key } = await connectedShop(p);
+    const reg = (await p.api(key, "POST", "/v1/orders", ORDER())).body;
+
+    // The store writes rules over the products it has sold, not the demo catalog.
+    const preview = await p.call("POST", "/api/merchant/agent/preview", { body: { text: "Refund chipped mugs up to $20 on your own." } });
+    assert.equal(preview.status, 200, JSON.stringify(preview.body));
+    assert.deepEqual(seen[0].products.map((x) => x.sku), ["BOWL-01"]);
+    assert.equal(preview.body.readback[0], "Refund any hand-thrown stoneware mug with a crack or chip, up to $20.00 a request.");
+    const on = await p.call("POST", "/api/merchant/agent", { body: { text: preview.body.text, rules: { rules: preview.body.rules, dailyLimitCents: null } } });
+    assert.equal(on.status, 200, JSON.stringify(on.body));
+    // A demo-catalog product is not this store's to name.
+    const foreign = await p.call("POST", "/api/merchant/agent", { body: { text: "x", rules: { rules: [{ skus: ["MUG-CLASSIC"], damage: [], maxRefundCents: 1000 }] } } });
+    assert.equal(foreign.status, 400);
+
+    // The demo store's agent is untouched.
+    await p.call("POST", "/api/merchant/login", { body: { password: "test-password" }, as: "demo" });
+    assert.equal((await p.call("GET", "/api/merchant/agent", { as: "demo" })).body.mandate, null);
+
+    const token = reg.claim_url.split("#t=")[1];
+    const link = await p.call("GET", `/api/claim-link/${reg.id}`, { headers: { "X-Claim-Token": token }, as: "buyer" });
+    const form = new FormData();
+    form.set("orderId", reg.id);
+    form.set("lineId", link.body.lines[0].id);
+    form.set("quantity", "1");
+    form.set("statement", "The rim arrived chipped.");
+    form.append("photos", new Blob([await testPhoto(9)], { type: "image/jpeg" }), "p.jpg");
+    const claim = await p.call("POST", "/api/claims", { form, headers: { "X-Claim-Token": token }, as: "buyer" });
+    assert.equal(claim.status, 201, JSON.stringify(claim.body));
+
+    const d = (await p.call("GET", `/api/merchant/claims/${claim.body.claimId}`)).body;
+    assert.equal(d.claim.status, "refunded", JSON.stringify(d.timeline));
+    assert.equal(p.shop.calls.refunds.length, 1);
+    assert.equal(p.shop.calls.refunds[0].body.amount.value, "18.50");
+    assert.equal(p.demo.calls.refunds.length, 0);
+    const agent = (await p.call("GET", "/api/merchant/agent")).body;
+    assert.equal(agent.spentCents, 1850);
+    assert.equal(agent.recent[0].acted, true);
+    // Each store's daily total is its own.
+    assert.equal((await p.call("GET", "/api/merchant/agent", { as: "demo" })).body.spentCents, 0);
   } finally { p.close(); }
 });

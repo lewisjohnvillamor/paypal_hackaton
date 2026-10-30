@@ -86,6 +86,7 @@ export function agentTimeline(db, claimId) {
       case "evidence.added": add({ title: `Buyer sent ${x.count} photo${x.count === 1 ? "" : "s"}` }); break;
       case "assessment.completed":
       case "assessment.failed": steps.push(...reviewSteps(db, claimId, h, photoNumber)); break;
+      case "assessment.crashed": add({ title: "The review could not run, so this one is yours", detail: `Review the photos again, or decide yourself. (${x.error})` }); break;
       case "claim.info_requested": add({ title: who === "agent" ? "The buyer was asked" : "You asked for more photos", detail: x.message }); break;
       case "claim.closed":
         if (who !== "agent") add({ title: "You closed it without a refund", detail: x.reason });

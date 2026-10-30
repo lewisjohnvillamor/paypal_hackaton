@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { clearFindings, fakeAssess, fakePayPal } from "./helpers.js";
 import { fileClaim, purchase, setup } from "./harness.js";
-import { AI_REJECTS, HARD_REJECTS, ROUTES, draftProposal, severityAmount } from "../src/policy/refundPolicy.js";
+import { AI_REJECTS, HARD_REJECTS, ROUTES, draftProposal, resolutionOptions, severityAmount } from "../src/policy/refundPolicy.js";
 import { DEFAULT_POLICY, SEVERITY, checkPolicy } from "../src/policy/settings.js";
 import { checkRules, decide } from "../src/agent/rules.js";
 
@@ -344,13 +344,32 @@ test("the daily limit stops the agent across requests; the merchant's settings c
   } finally { t.close(); }
 });
 
-test("a partial refund is labelled as one in the buyer's choices", async () => {
-  const t = await setup({ pp: pp(), assess: fakeAssess({ ...sure("stain"), remedyFit: { tee_replacement: 0.9 } }) });
+test("a free replacement is only offered when the damage earns a full refund", async () => {
+  // A stain pays 30%: a new T-shirt would be worth more than the policy allows, so it is held back.
+  let t = await setup({ pp: pp(), assess: fakeAssess({ ...sure("stain"), remedyFit: { tee_replacement: 0.9 } }) });
   try {
     await t.login();
     const c = await claim(t, await buy(t, "TEE-ORGANIC"));
     const d = (await t.merchant("GET", `/claims/${c.claimId}`)).body;
     assert.equal(d.proposal.amountCents, 750); // 30% of $25
-    assert.deepEqual(d.proposal.options.map((o) => [o.title, o.refundCents]), [["Partial refund", 750], ["Get a new one, shipped free", 0]]);
+    assert.deepEqual(d.proposal.options, []);
   } finally { t.close(); }
+  // A hole pays 100%: the buyer may choose the replacement instead of the money.
+  t = await setup({ pp: pp(), assess: fakeAssess({ ...sure("tear_or_hole"), remedyFit: { tee_replacement: 0.9 } }) });
+  try {
+    await t.login();
+    const c = await claim(t, await buy(t, "TEE-ORGANIC"));
+    const d = (await t.merchant("GET", `/claims/${c.claimId}`)).body;
+    assert.deepEqual(d.proposal.options.map((o) => [o.title, o.refundCents]), [["Full refund", 2500], ["Get a new one, shipped free", 0]]);
+  } finally { t.close(); }
+});
+
+test("a partial refund is labelled as one in the buyer's choices", () => {
+  const findings = { visible_breakage: "yes", evidence_usable: "yes", remedyFit: { kit: 0.9, swap: 0.9 } };
+  const remedies = [
+    { id: "kit", kind: "repair_kit", title: "Keep it with a kit", item: "a kit", refundUnitCents: 300 },
+    { id: "swap", kind: "replacement", title: "Get a new one", item: "a new one", refundUnitCents: 0 },
+  ];
+  const options = resolutionOptions({ remedies, quantity: 1, findings, amountCents: 750, fullRefund: false });
+  assert.deepEqual(options.map((o) => [o.title, o.refundCents]), [["Partial refund", 750], ["Keep it with a kit", 300]]);
 });

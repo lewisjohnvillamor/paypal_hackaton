@@ -124,7 +124,8 @@ function catalogPhoto(line) {
   const file = line.ref_image ?? PRODUCTS[line.sku].refImage;
   if (!catalog.has(file)) {
     const reference = readFileSync(file.startsWith("m/") ? join(uploadDir(), "catalog", file.slice(2)) : new URL(`../public/assets/${file}`, import.meta.url));
-    catalog.set(file, differenceHash(reference).then((hash) => ({ reference, hash })));
+    // A failed fingerprint is not kept, so the next review tries again.
+    catalog.set(file, differenceHash(reference).then((hash) => ({ reference, hash }), (err) => { catalog.delete(file); throw err; }));
   }
   return catalog.get(file);
 }
@@ -150,8 +151,8 @@ export async function assessClaim(db, claimId, assess, actor = "system", suggest
   const evidence = db.prepare("SELECT * FROM evidence WHERE claim_id = ? ORDER BY created_at").all(claimId);
   const { reference, hash: catalogHash } = await catalogPhoto(line);
   const product = productOf(line);
-  // The remedy library, store listings and refund agent are the demo store's for now; a connected
-  // store gets the photo check, its own refund policy and one-click refunds through its own PayPal.
+  // The remedy library and store listings are the demo store's for now; a connected store gets the
+  // photo check, its own refund policy, its own refund agent and refunds through its own PayPal.
   const demoStore = order.merchant_id === DEMO;
   if (!demoStore) suggest = null;
 
@@ -204,7 +205,7 @@ export async function assessClaim(db, claimId, assess, actor = "system", suggest
     const settings = currentPolicy(db, order.merchant_id);
     const inputs = {
       quantity: claim.quantity, deliveredAt: order.delivered_at, claimedAt: claim.created_at,
-      refundableCents: refundableBalance(order.amount_cents, ops), flags, agentSpentCents: demoStore ? agentSpent(db) : 0,
+      refundableCents: refundableBalance(order.amount_cents, ops), flags, agentSpentCents: agentSpent(db, order.merchant_id),
     };
     const draft = draftProposal({ line, findings: result?.findings ?? null, settings, ...inputs });
     const options = draft.route === "reject" ? [] : resolutionOptions({
@@ -225,10 +226,15 @@ export async function assessClaim(db, claimId, assess, actor = "system", suggest
     if (suggested && draft.route !== "reject" && draft.amountCents > 0 && itemConfirmed(result?.findings)) {
       if (suggested.error) audit(db, { claimId, actor: "system", type: "suggestion.failed", payload: { error: suggested.error } });
       else {
-        storeSuggestions(db, { claimId, proposalId, model: suggested.model, suggestions: suggested.suggestions });
+        // On a partial refund, nothing may be worth more than the policy's amount: no replacements,
+        // and a listing plus its refund must fit inside the drafted refund per item.
+        const full = draft.amountCents >= draft.calculation.grossCents;
+        const perUnit = Math.floor(draft.amountCents / draft.calculation.quantity);
+        const fits = suggested.suggestions.filter((x) => full || (x.listing.kind !== "replacement" && x.listing.priceCents + x.refundUnitCents <= perUnit));
+        storeSuggestions(db, { claimId, proposalId, model: suggested.model, suggestions: fits });
         audit(db, { claimId, actor: "system", type: "suggestion.created", payload: {
           model: suggested.model, latencyMs: suggested.latencyMs, candidates: suggested.candidates,
-          titles: suggested.suggestions.map((x) => x.title), dropped: suggested.dropped } });
+          titles: fits.map((x) => x.title), dropped: suggested.dropped + suggested.suggestions.length - fits.length } });
       }
     }
     return draft;

@@ -139,13 +139,16 @@ export const MAX_OFFERED_REMEDIES = 3;
 // Resolution options the merchant can put to the buyer instead of deciding alone: the full refund
 // (always first, always available) and up to three remedies from the merchant's library that Jev
 // judged to fit the damage in the photos, best fit first. A remedy's refund is the merchant's
-// per-unit amount, capped by the drafted refund; it can be $0 (a replacement). Pure: no I/O.
+// per-unit amount, capped by the drafted refund; it can be $0 (a replacement). A replacement is
+// only offered when the damage earns a full refund: for damage the policy pays part of the price
+// for (scratches, a stain), a new item would be worth more than the policy allows. Pure: no I/O.
 export function resolutionOptions({ remedies = [], quantity, findings, amountCents, fullRefund = true }) {
   if (!findings || !(amountCents > 0) || findings.visible_breakage !== "yes" || findings.evidence_usable === "no") return [];
   if (!itemConfirmed(findings)) return [];
   const fit = findings.remedyFit ?? {};
   const picked = remedies
     .filter((r) => typeof fit[r.id] === "number" && fit[r.id] >= REMEDY_FIT)
+    .filter((r) => fullRefund || r.kind !== "replacement")
     .sort((a, b) => fit[b.id] - fit[a.id])
     .slice(0, MAX_OFFERED_REMEDIES)
     .map((r) => ({

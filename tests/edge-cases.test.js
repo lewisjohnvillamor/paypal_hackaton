@@ -339,3 +339,23 @@ test("the claim link stays open for the store's whole reporting window, even pas
     assert.equal(filed.status, 201, JSON.stringify(filed.body));
   } finally { t.close(); }
 });
+
+test("a review that keeps crashing is retried, then handed to the merchant instead of left checking", async () => {
+  const t = await setup({ pp: uniqueEmails(), retryDelays: [0, 0] });
+  try {
+    const o = await purchase(t);
+    // The catalog photo behind this line is gone: every review of it throws.
+    t.db.prepare("UPDATE order_lines SET ref_image = 'm/missing.jpg' WHERE order_id = ?").run(o.orderId);
+    const filed = await fileClaim(t, o);
+    assert.equal(filed.status, 201);
+    const claimId = filed.body.claimId;
+    const status = () => t.db.prepare("SELECT status FROM claims WHERE id = ?").get(claimId).status;
+    for (let i = 0; i < 100 && status() === "new"; i++) { await new Promise((r) => setTimeout(r, 10)); await t.queue.idle(); }
+    assert.equal(status(), "ready");
+    await t.login();
+    const d = await detail(t, claimId);
+    assert.ok(!d.proposal);
+    assert.ok(d.timeline.some((s) => /could not run/.test(s.title)), JSON.stringify(d.timeline));
+    assert.equal(t.queue.stats().failed, 3); // the first try and two retries
+  } finally { t.close(); }
+});
