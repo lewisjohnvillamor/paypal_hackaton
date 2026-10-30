@@ -50,12 +50,15 @@ process.env.PAYPAL_CLIENT_ID ||= "DemoStoreClientId_0123456789";
 const CLIENT_ID = "AcmeSandboxClientId_0123456789";
 const SECRET = "AcmeSandboxSecret_abcdefghijklmnop";
 
+const OTHER_SECRET = "AcmeSecondAppSecret_abcdefghijk";
+
 async function platform(orders = {}, { assess = fakeAssess(), parseRules = null } = {}) {
   const shop = merchantPayPal(orders);
+  const other = merchantPayPal({}); // a second PayPal app of the same store, which never saw these orders
   const credentials = [];
   const paypalFor = (c) => {
     credentials.push(c);
-    return c.clientSecret === SECRET ? shop : { accessToken: async () => { throw Object.assign(new Error("PayPal OAuth failed"), { status: 401 }); } };
+    return c.clientSecret === SECRET ? shop : c.clientSecret === OTHER_SECRET ? other : { accessToken: async () => { throw Object.assign(new Error("PayPal OAuth failed"), { status: 401 }); } };
   };
   const photo = await testPhoto(42);
   const db = openDb(":memory:");
@@ -77,7 +80,7 @@ async function platform(orders = {}, { assess = fakeAssess(), parseRules = null 
     return out;
   };
   const api = (key, method, path, body) => call(method, path, { body, as: "server", headers: key ? { Authorization: `Bearer ${key}` } : {} });
-  return { db, demo, shop, credentials, call, api, base, close: () => server.close() };
+  return { db, demo, shop, other, credentials, call, api, base, close: () => server.close() };
 }
 
 const ORDER = (id = "5O190127TN364715T", extra = {}) => ({
@@ -485,5 +488,60 @@ test("a connected store's own refund agent refunds inside its rules, through its
     assert.equal(agent.recent[0].acted, true);
     // Each store's daily total is its own.
     assert.equal((await p.call("GET", "/api/merchant/agent", { as: "demo" })).body.spentCents, 0);
+  } finally { p.close(); }
+});
+
+test("a store that switched to another PayPal app is told to reconnect the one the order was paid to", async () => {
+  const p = await platform({ "5O190127TN364715T": { total: "37.00" } });
+  try {
+    const { key } = await connectedShop(p);
+    const d = await claimAndOpen(p, (await p.api(key, "POST", "/v1/orders", ORDER())).body);
+    await p.call("PUT", "/api/dashboard/paypal", { body: { clientId: "AcmeSecondAppClientId_0123", clientSecret: OTHER_SECRET } });
+    const r = await p.call("POST", `/api/merchant/claims/${d.claim.id}/approve-refund`, { body: { claimVersion: d.claim.version, proposalId: d.proposal.id, amountCents: 1850 } });
+    assert.equal(r.status, 409);
+    assert.equal(r.body.error, "ORDER_NOT_ON_ACCOUNT");
+    assert.match(r.body.message, /Reconnect the PayPal account the order was paid to/);
+    assert.equal(p.shop.calls.refunds.length + p.other.calls.refunds.length, 0);
+  } finally { p.close(); }
+});
+
+test("a refund left open when the store disconnected PayPal waits quietly, then settles on reconnect", async () => {
+  const p = await platform({ "5O190127TN364715T": { total: "37.00" } });
+  try {
+    const { key } = await connectedShop(p);
+    const d = await claimAndOpen(p, (await p.api(key, "POST", "/v1/orders", ORDER())).body);
+    // The refund call times out: the operation is open with no PayPal refund ID.
+    const real = p.shop.refundCapture;
+    p.shop.refundCapture = async () => { throw new Error("socket hang up"); };
+    await p.call("POST", `/api/merchant/claims/${d.claim.id}/approve-refund`, { body: { claimVersion: d.claim.version, proposalId: d.proposal.id, amountCents: 1850 } });
+    p.shop.refundCapture = real;
+    await p.call("DELETE", "/api/dashboard/paypal");
+    const errors = () => p.db.prepare("SELECT COUNT(*) n FROM audit WHERE claim_id = ? AND type = 'refund.network_error'").get(d.claim.id).n;
+    const before = errors();
+    const op = p.db.prepare("SELECT * FROM refund_ops WHERE claim_id = ?").get(d.claim.id);
+    const reconcile = await p.call("POST", `/api/merchant/refunds/${op.id}/reconcile`);
+    assert.equal(reconcile.status, 409);
+    assert.equal(reconcile.body.error, "PAYPAL_NOT_CONNECTED");
+    assert.equal(errors(), before, "no failure logged for a call that was never sent");
+    assert.equal(p.db.prepare("SELECT status FROM refund_ops WHERE id = ?").get(op.id).status, "UNKNOWN");
+
+    await p.call("PUT", "/api/dashboard/paypal", { body: { clientId: CLIENT_ID, clientSecret: SECRET } });
+    const settled = await p.call("POST", `/api/merchant/refunds/${op.id}/reconcile`);
+    assert.equal(settled.body.claim.status, "refunded");
+    assert.equal(p.shop.calls.refunds.at(-1).requestId, op.request_id, "the same request, so PayPal cannot refund twice");
+  } finally { p.close(); }
+});
+
+test("the policy page shows only the damage types the store's products can have, and saving keeps the rest", async () => {
+  const p = await platform({ "5O190127TN364715T": { total: "37.00" } });
+  try {
+    const { key } = await connectedShop(p);
+    await p.api(key, "POST", "/v1/orders", ORDER());
+    const v = (await p.call("GET", "/api/merchant/policy")).body;
+    assert.deepEqual(v.severity.filter((r) => r.sold).map((r) => r.kind), ["shattered", "handle_off", "crack_or_chip"]);
+    const saved = await p.call("PUT", "/api/merchant/policy", { body: { ...v.policy, refundPercent: { ...v.policy.refundPercent, crack_or_chip: 80 } } });
+    assert.equal(saved.status, 200, JSON.stringify(saved.body));
+    assert.equal(saved.body.policy.refundPercent.crack_or_chip, 80);
+    assert.equal(saved.body.policy.refundPercent.stain, v.policy.refundPercent.stain);
   } finally { p.close(); }
 });

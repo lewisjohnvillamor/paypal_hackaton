@@ -17,8 +17,8 @@ import { caseDetail, inbox, buyerStatus } from "./views.js";
 import { acceptOffer, sendOffer, withdrawOffer } from "./offers.js";
 import { createRemedy, remedyLibrary, seedRemedies, updateRemedy } from "./remedies.js";
 import { defaultMatcher, defaultRuleParser, defaultSuggester } from "./ai/haiku.js";
-import { activeMandate, agentSpent, replay, runAgent, saveMandate, stopMandate, storeCatalog } from "./agent/autopilot.js";
-import { RuleError, checkRules, describeRules, ruleVocabulary } from "./agent/rules.js";
+import { activeMandate, agentSpent, replay, runAgent, saveMandate, stopMandate, storeCatalog, unseenByAgent } from "./agent/autopilot.js";
+import { RuleError, checkRules, damageChoices, describeRules, ruleVocabulary } from "./agent/rules.js";
 import { decideSuggestion } from "./suggest/suggestions.js";
 import { assessmentQueue } from "./queue.js";
 import { PRODUCTS } from "./catalog.js";
@@ -196,9 +196,19 @@ export function createApp({ db = openDb(), pp = paypal, paypalFor = paypal.paypa
     // PayPal is asked first only when the pick moves money; a replacement settles without it.
     const open = db.prepare("SELECT options_json FROM offers WHERE id = ? AND claim_id = ? AND status = 'open' AND decided_at IS NULL").get(String(req.body.offerId || ""), claim.id);
     const picked = open && JSON.parse(open.options_json).find((o) => o.id === String(req.body.optionId || ""));
-    if (!picked || picked.refundCents > 0) await checkPayPalLedger(db, pay, claim.id);
-    const { op, duplicate } = acceptOffer(db, { claimId: claim.id, offerId: String(req.body.offerId || ""), optionId: String(req.body.optionId || "") });
-    if (op && !duplicate) await submit(db, pay, op, "buyer");
+    // The refund gate's messages are written for the merchant ("Reconnect PayPal", "Reconcile it");
+    // the buyer is told what it means for them, and the code stays the same.
+    const forBuyer = (err) => {
+      if (err instanceof GateError && BUYER_GATE[err.code]) throw Object.assign(new GateError(err.code, BUYER_GATE[err.code]), { status: err.status });
+      throw err;
+    };
+    if (!picked || picked.refundCents > 0) await checkPayPalLedger(db, pay, claim.id).catch(forBuyer);
+    let accepted;
+    try {
+      accepted = acceptOffer(db, { claimId: claim.id, offerId: String(req.body.offerId || ""), optionId: String(req.body.optionId || "") });
+    } catch (err) { forBuyer(err); }
+    const { op, duplicate } = accepted;
+    if (op && !duplicate) await submit(db, pay, op, "buyer").catch((err) => { if (err.code !== "PAYPAL_NOT_CONNECTED") throw err; });
     res.json(buyerStatus(db, db.prepare("SELECT * FROM claims WHERE id = ?").get(claim.id)));
   }));
 
@@ -296,7 +306,11 @@ export function createApp({ db = openDb(), pp = paypal, paypalFor = paypal.paypa
   // ---- The refund policy: severity table, limits and how sure the photo check must be ----
   const policyView = (merchantId) => {
     const policy = currentPolicy(db, merchantId);
-    return { version: POLICY_VERSION, policy, defaults: DEFAULT_POLICY, severity: severityTable(policy), spentCents: agentSpent(db, merchantId) };
+    // Only the damage types the store's products can have are shown (a mug shop has no torn ear
+    // cushions); the others keep their values and are saved unchanged.
+    const sold = damageChoices(undefined, storeCatalog(db, merchantId));
+    const severity = severityTable(policy).map((r) => ({ ...r, sold: r.kind in sold }));
+    return { version: POLICY_VERSION, policy, defaults: DEFAULT_POLICY, severity, spentCents: agentSpent(db, merchantId) };
   };
   m.get("/policy", (req, res) => res.json(policyView(req.merchantId)));
   // New settings apply to reviews from now on; cases already reviewed keep the decision they got.
@@ -360,6 +374,15 @@ export function createApp({ db = openDb(), pp = paypal, paypalFor = paypal.paypa
   return { app, db, queue, pay };
 }
 
+// What a buyer reads when the refund gate stops their pick. Nothing was refunded in any of these.
+const SHOP_FIXING = "The shop needs to sort something out with PayPal before this refund can go out. Nothing was refunded yet; your choice is still open, so try again later.";
+const BUYER_GATE = {
+  PAYPAL_NOT_CONNECTED: SHOP_FIXING, ORDER_NOT_ON_ACCOUNT: SHOP_FIXING, EXTERNAL_REFUND_DETECTED: SHOP_FIXING, CAPTURE_NOT_FOUND: SHOP_FIXING,
+  REFUND_IN_PROGRESS: "A refund on this order is still being processed. Nothing more was refunded; try again in a few minutes.",
+  CAPTURE_NOT_REFUNDABLE: "PayPal no longer lets this payment be refunded here. Contact the shop about your order.",
+  INSUFFICIENT_REFUNDABLE_BALANCE: "This order doesn't have enough left to refund for that choice. Contact the shop about your order.",
+};
+
 // A hosted demo for judges can print its sandbox sign-ins on the store and merchant pages. Off
 // unless PUBLIC_DEMO=1, and only ever for the sandbox (the PayPal client refuses live mode).
 export function publicDemo(env = process.env) {
@@ -387,6 +410,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   reconcileOpen(db, pay, { atStartup: true }).then((n) => n && console.log(`Reconciled ${n} open refund operation(s)`));
   const waiting = queue.resume();
   if (waiting) console.log(`Resumed assessment of ${waiting} claim(s)`);
+  // Reviews that finished just before the server stopped still get the refund agent's look.
+  (async () => {
+    for (const id of unseenByAgent(db)) await runAgent(db, pay, id).catch((err) => console.error("agent", id, err.message));
+  })();
   setInterval(() => reconcileOpen(db, pay).catch(() => {}), 60_000).unref();
   // Hosts like Render cannot attach a web service's disk to a separate cron job, so the server
   // backs itself up when asked to.

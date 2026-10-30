@@ -141,8 +141,21 @@ export async function runAgent(db, paypal, claimId) {
   } catch (err) {
     return leave(db, claimId, mandate.id, err.code ?? "AGENT_ERROR", err.message);
   }
-  if (op) await submit(db, paypal, op, "agent");
+  // A store that disconnected PayPal mid-way: the refund stays reserved and goes out once it reconnects.
+  if (op) await submit(db, paypal, op, "agent").catch((err) => { if (err.code !== "PAYPAL_NOT_CONNECTED") throw err; });
   return d;
+}
+
+// After a restart: cases whose review finished but which the agent never looked at (the server
+// stopped in between). Only reviews drafted while the store's current rules were on, so turning
+// rules on never reaches back to older cases. Returns the claim ids, oldest first.
+export function unseenByAgent(db) {
+  return db.prepare(`SELECT c.id FROM claims c JOIN orders o ON o.id = c.order_id
+    JOIN mandates m ON m.merchant_id = o.merchant_id AND m.ended_at IS NULL
+    JOIN proposals p ON p.id = (SELECT id FROM proposals x WHERE x.claim_id = c.id ORDER BY x.created_at DESC, x.rowid DESC LIMIT 1)
+    WHERE c.status = 'ready' AND p.claim_version = c.version AND p.created_at >= m.created_at
+      AND NOT EXISTS (SELECT 1 FROM audit a WHERE a.claim_id = c.id AND a.type IN ('agent.acted', 'agent.left_for_merchant') AND a.at >= p.created_at)
+    ORDER BY c.created_at`).all().map((r) => r.id);
 }
 
 // What the rules would have done on the most recent reviewed requests, as if each were new and the

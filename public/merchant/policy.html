@@ -103,7 +103,9 @@
 
     function draw(p) {
       $("example-price").textContent = usd(EXAMPLE);
-      $("sev").innerHTML = state.severity.map((r) => `<tr>
+      $("sev").innerHTML = state.severity.map((r) => r.sold === false
+        ? `<tr hidden><td colspan="4"><input type="hidden" data-kind="${r.kind}" value="${p.refundPercent[r.kind]}"></td></tr>`
+        : `<tr>
           <td>${esc(r.label.charAt(0).toUpperCase() + r.label.slice(1))}</td>
           <td class="lvl muted">${esc(r.levelLabel)}</td>
           <td class="amount" data-example="${r.kind}">${usd(Math.floor((EXAMPLE * p.refundPercent[r.kind]) / 100))}</td>

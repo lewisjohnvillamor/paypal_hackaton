@@ -49,6 +49,11 @@ export async function checkPayPalLedger(db, paypal, claimId) {
     }
     res = null;
   }
+  // The connected PayPal account cannot see the order: the store switched to a different PayPal app
+  // since the order was paid. Retrying will not help; reconnecting the account it was paid to will.
+  if (res && (res.status === 404 || res.status === 403)) {
+    throw new GateError("ORDER_NOT_ON_ACCOUNT", "The PayPal account connected now does not show this order, so nothing was refunded. Reconnect the PayPal account the order was paid to, then try again.", { status: 409 });
+  }
   if (!res || res.status !== 200) {
     throw new GateError("PAYPAL_UNAVAILABLE", "Could not confirm the payment with PayPal. Nothing was refunded; try again shortly.", { status: 503 });
   }
@@ -191,6 +196,11 @@ export async function submit(db, paypal, op, actor = "system") {
   try {
     res = await paypal.refundCapture(op.capture_id, JSON.parse(op.request_body), op.request_id);
   } catch (err) {
+    // The store disconnected PayPal: nothing was sent, so the operation stays as it was (funds
+    // reserved) until the store reconnects, and the minute sweep does not log a failure each time.
+    if (err?.code === "PAYPAL_NOT_CONNECTED") {
+      throw new GateError("PAYPAL_NOT_CONNECTED", "The store's PayPal account is not connected, so the refund could not be sent or checked. Reconnect PayPal on the Setup page, then try again.", { status: 409 });
+    }
     // Timeout or network failure: outcome unknown. Funds stay reserved; same request ID on retry.
     res = { status: 599, body: null, debugId: null };
     audit(db, { claimId: op.claim_id, opId: op.id, actor, type: "refund.network_error", payload: { message: String(err.message) } });
