@@ -15,7 +15,7 @@ import { toCents, toDecimal } from "../money.js";
 import { KINDS } from "../kinds.js";
 import { normalizeImage } from "../images.js";
 import { uploadDir } from "../claims.js";
-import { expectedPayee, learnPayee } from "./accounts.js";
+import { DEMO, expectedPayee, learnPayee, payeeOwner } from "./accounts.js";
 
 export const CLAIM_LINK_DAYS = 14;
 const MAX_LINES = 50;
@@ -165,6 +165,7 @@ export async function registerOrder(db, { merchantId, client, body, fetchImage =
   const payee = unit.payee?.merchant_id ?? null;
   const expected = expectedPayee(db, merchantId);
   if (expected && payee !== expected) problems.push("the order was paid to a different PayPal account than the one you connected");
+  else if (payee && merchantId !== DEMO && payeeOwner(db, payee, merchantId)) problems.push("the order was paid to a PayPal account another Refund Relay store has connected");
   if (problems.length) throw new RegisterError("ORDER_NOT_VERIFIED", `Refund Relay could not verify this order: ${problems.join("; ")}.`, 422);
 
   // Registering the same order again (a retried request) returns it with a fresh claim link.
@@ -186,6 +187,10 @@ export async function registerOrder(db, { merchantId, client, body, fetchImage =
     const prior = db.prepare("SELECT * FROM orders WHERE paypal_order_id = ?").get(paypalOrderId);
     if (prior && prior.merchant_id !== merchantId) throw new RegisterError("ORDER_TAKEN", "Another store already registered this PayPal order.", 409);
     if (prior && prior.capture_id !== cap.id) throw new RegisterError("ORDER_TAKEN", "This PayPal order was registered with a different capture.", 409);
+    // And the payee: another store's first order may have claimed this PayPal account meanwhile.
+    if (!prior && payee && merchantId !== DEMO && payeeOwner(db, payee, merchantId)) {
+      throw new RegisterError("ORDER_NOT_VERIFIED", "Refund Relay could not verify this order: the order was paid to a PayPal account another Refund Relay store has connected.", 422);
+    }
     const id = prior?.id ?? randomUUID();
     if (!prior) {
       db.prepare(`INSERT INTO orders (id, merchant_id, paypal_order_id, capture_id, amount_cents, currency, payee_merchant_id, capture_status,

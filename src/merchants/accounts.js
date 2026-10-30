@@ -117,6 +117,17 @@ export async function saveConnection(db, merchantId, { clientId, clientSecret, p
       ? "PayPal did not accept that Client ID and Secret. Check they are from a sandbox app."
       : "Could not reach PayPal to check those credentials. Try again.", err.status === 401 ? 400 : 503);
   }
+  // One PayPal app, and one PayPal account, per store: otherwise two stores could each register
+  // and refund orders paid to the same account. Checked after PayPal answers and right before the
+  // write, with no await in between, so two stores racing to connect the same app cannot both pass.
+  // The demo store's app comes from .env and is not in this table: a sandbox can share it, since
+  // the demo store's orders are registered by its own checkout and no other store can claim them.
+  if (db.prepare("SELECT 1 FROM paypal_connections WHERE client_id = ? AND merchant_id != ?").get(id, merchantId)) {
+    throw new AccountError("APP_IN_USE", "This PayPal app is already connected to another Refund Relay store. Each store connects its own PayPal app.", 409);
+  }
+  if (payee && payeeOwner(db, payee, merchantId)) {
+    throw new AccountError("PAYEE_IN_USE", "That PayPal merchant ID is already connected to another Refund Relay store.", 409);
+  }
   const ts = now();
   // Pasting the same app again (a rotated secret) keeps the payee its orders were paid to; a
   // different app starts over and learns its payee from its next order.
@@ -134,6 +145,10 @@ export function removeConnection(db, merchantId) {
   db.prepare("DELETE FROM paypal_connections WHERE merchant_id = ?").run(merchantId);
   audit(db, { actor: merchantId, type: "paypal.disconnected" });
 }
+
+// Another connected store that already gets paid into this PayPal account, if any.
+export const payeeOwner = (db, payee, merchantId) =>
+  db.prepare("SELECT merchant_id FROM paypal_connections WHERE payee_merchant_id = ? AND merchant_id != ?").get(payee, merchantId)?.merchant_id ?? null;
 
 // The first verified order teaches a connection its payee when the merchant did not give one;
 // every later order must be paid to the same account.

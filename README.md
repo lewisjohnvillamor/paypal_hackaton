@@ -97,7 +97,7 @@ The store keeps each buyer's private claim and tracking links in the browser, so
 ### Tests and checks
 
 ```sh
-npm test                                     # 143 tests: money, policy, duplicate/concurrent approvals, tampering,
+npm test                                     # 144 tests: money, policy, duplicate/concurrent approvals, tampering,
                                              # stale approvals, timeouts, restart recovery, access control, edge cases
 npm run probe                                # live Jev run over 19 labelled photos (uses your API key)
 npm run probe:stability -- 5                 # each photo 5 times: does the refund route ever change between runs?
