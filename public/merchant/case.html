@@ -26,6 +26,21 @@
     const $ = (x) => document.getElementById(x);
     const fail = (msg) => { $("error").textContent = msg; $("error").classList.toggle("hidden", !msg); };
     let d;
+    // PayPal disputes on this payment, read once per visit (null until PayPal answers).
+    let disputes = null;
+    const disputesRow = () => {
+      const label = `<span>PayPal disputes</span>`;
+      if (!disputes) return `<div class="kv-row">${label}<span class="small muted">Checking with PayPal…</span></div>`;
+      if (disputes.error) return `<div class="kv-row">${label}<span class="small muted">${esc(disputes.error)}</span></div>`;
+      if (!disputes.disputes.length) return `<div class="kv-row">${label}<span class="pill ok">None on this payment</span></div>`;
+      return disputes.disputes.map((x) => `<div class="kv-row">${label}<span><span class="pill ${x.open ? "bad" : ""}">${x.open ? "Open" : "Closed"}</span> ${esc(x.reason)}${x.amount ? ` · $${esc(x.amount)}` : ""}
+        <div class="footnote mono">${esc(x.id)}${x.stage ? ` · ${esc(x.stage)}` : ""}</div></span></div>`).join("");
+    };
+    // An open dispute means PayPal may pay the buyer too: say so above the refund button.
+    const disputeWarning = () => {
+      const open = disputes?.disputes?.find((x) => x.open);
+      return open ? `<div class="notice bad" style="margin:0 0 16px">${ICON.info}<span><b>The buyer opened a PayPal dispute on this payment (${esc(open.reason)}).</b> A refund here and PayPal settling the dispute could pay them twice. Settle it in one place: resolve the dispute in PayPal, or refund here and ask the buyer to close it.</span></div>` : "";
+    };
 
     const FINDING = {
       evidence_usable: ["Photos usable for review", { yes: "Yes", no: "No", uncertain: "Unsure" }],
@@ -311,10 +326,12 @@
               <div class="kv-row tech"><span>Capture ID</span><span class="mono">${esc(payment.captureId)}</span></div>
               <div class="kv-row"><span>Order ID</span><span class="mono">${esc(payment.paypalOrderId)}</span></div>
               <div class="kv-row"><span>Delivered</span><span>${when(payment.deliveredAt)}<div class="footnote">${esc(payment.deliverySource)}</div></span></div>
+              ${disputesRow()}
             </div>
           </div>
           <div class="sticky-col">
             ${refundsHtml()}
+            ${["ready", "offer_sent", "needs_info"].includes(claim.status) ? disputeWarning() : ""}
             ${actionsHtml()}
             ${timelineHtml(d.timeline)}
             <p class="footnote center" style="margin-top:12px">Case version ${claim.version}. Approvals are tied to this version.</p>
@@ -396,6 +413,8 @@
       catch (e) { if (e.status === 401) location.href = "/merchant"; else { fail(e.message); poll(); } }
     }
     await refresh();
+    api(`/api/merchant/claims/${encodeURIComponent(id)}/disputes`).then((r) => r, () => ({ disputes: null, error: "PayPal did not answer just now." }))
+      .then((r) => { disputes = r; if (d && !document.activeElement?.matches("input, textarea")) render(); });
   </script>
 </body>
 </html>

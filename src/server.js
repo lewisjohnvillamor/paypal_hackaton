@@ -15,10 +15,11 @@ import { ClaimError, addEvidence, assessClaim, closeClaim, createClaim, requestI
 import { GateError, approveAndReserve, checkPayPalLedger, reconcile, reconcileOpen, submit } from "./refunds/execute.js";
 import { caseDetail, inbox, buyerStatus } from "./views.js";
 import { storeStats } from "./stats.js";
+import { paymentDisputes } from "./disputes.js";
 import { acceptOffer, sendOffer, withdrawOffer } from "./offers.js";
 import { createRemedy, remedyLibrary, seedRemedies, updateRemedy } from "./remedies.js";
 import { defaultMatcher, defaultRuleParser, defaultSuggester } from "./ai/haiku.js";
-import { activeMandate, agentSpent, replay, runAgent, saveMandate, stopMandate, storeCatalog, unseenByAgent } from "./agent/autopilot.js";
+import { activeMandate, agentSpent, replay, runAgent, saveMandate, seedDemoMandate, stopMandate, storeCatalog, unseenByAgent } from "./agent/autopilot.js";
 import { RuleError, checkRules, damageChoices, describeRules, ruleVocabulary } from "./agent/rules.js";
 import { decideSuggestion } from "./suggest/suggestions.js";
 import { assessmentQueue } from "./queue.js";
@@ -259,6 +260,16 @@ export function createApp({ db = openDb(), pp = paypal, paypalFor = paypal.paypa
     if (!detail) throw new ClaimError("NOT_FOUND", "No such request.", 404);
     res.json(detail);
   }));
+  // Disputes the buyer opened in PayPal on this payment, read live. Shown next to the payment; a
+  // failure to ask PayPal is reported as such, never as "no disputes".
+  m.get("/claims/:id/disputes", wrap(async (req, res) => {
+    const { capture_id: captureId } = db.prepare("SELECT o.capture_id FROM claims c JOIN orders o ON o.id = c.order_id WHERE c.id = ?").get(req.params.id);
+    try {
+      res.json({ disputes: await paymentDisputes(pay, captureId), checkedAt: new Date().toISOString() });
+    } catch (err) {
+      res.json({ disputes: null, error: err.code === "PAYPAL_NOT_CONNECTED" ? "PayPal is not connected." : "PayPal did not answer just now." });
+    }
+  }));
   m.get("/evidence/:id", wrap(async (req, res) => {
     const e = db.prepare("SELECT * FROM evidence WHERE id = ?").get(req.params.id);
     if (!e) throw new ClaimError("NOT_FOUND", "No such photo.", 404);
@@ -407,6 +418,7 @@ export function checkConfig(env = process.env) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   checkConfig();
   const { app, db, queue, pay } = createApp();
+  if (publicDemo() && seedDemoMandate(db)) console.log("Hosted demo: the refund agent's starter rules are on");
   // Resume reconciliation of refunds that were in flight when the server last stopped, and any
   // claims that were waiting for assessment.
   reconcileOpen(db, pay, { atStartup: true }).then((n) => n && console.log(`Reconciled ${n} open refund operation(s)`));

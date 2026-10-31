@@ -11,7 +11,7 @@ process.env.UPLOAD_DIR = mkdtempSync(join(tmpdir(), "rr-uploads-"));
 process.env.PAYPAL_MERCHANT_ID = "MERCHANT123";
 process.env.LOG_REQUESTS ??= "0";
 
-export function fakePayPal({ refundBehavior, ledger, payerEmail = () => "buyer@example.com" } = {}) {
+export function fakePayPal({ refundBehavior, ledger, disputes = () => [], payerEmail = () => "buyer@example.com" } = {}) {
   const calls = { refunds: [], orders: 0 };
   const refunds = new Map(); // requestId -> refund (PayPal idempotency)
   let seq = 0;
@@ -56,6 +56,11 @@ export function fakePayPal({ refundBehavior, ledger, payerEmail = () => "buyer@e
           } }],
         },
       };
+    },
+    // Disputes v1: the disputes a test opened on a capture.
+    async listDisputes(captureId) {
+      const items = disputes(captureId);
+      return items === null ? { status: 403, body: { name: "NOT_AUTHORIZED" } } : { status: 200, body: { items } };
     },
     async getRefund(id) {
       const r = [...refunds.values()].find((x) => x.id === id);

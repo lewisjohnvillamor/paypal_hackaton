@@ -18,6 +18,7 @@ import { currentPolicy } from "../policy/settings.js";
 import { BUYER_DECLINE } from "../reasons.js";
 import { PRODUCTS } from "../catalog.js";
 import { DEMO } from "../merchants/accounts.js";
+import { openDispute, paymentDisputes } from "../disputes.js";
 
 export { agentSpent };
 
@@ -54,6 +55,18 @@ export function saveMandate(db, { text, rules, model = null, actor, merchantId =
       .run(id, merchantId, words, JSON.stringify(checked), model, actor, ts);
     audit(db, { actor, type: "agent.rules_on", payload: { mandateId: id, merchantId, ...checked } });
     return activeMandate(db, merchantId);
+  });
+}
+
+// A hosted demo for judges starts with rules on, so the agent can be seen acting on the first
+// request: a chipped or handle-off mug is refunded with no click, anything else waits with a reason.
+// Only on a store that has never had rules, so a judge who turns them off finds them off.
+export const DEMO_RULES_TEXT = "Refund mugs with a chip, crack or snapped handle under $25 on your own. Ask me about anything else.";
+export function seedDemoMandate(db) {
+  if (db.prepare("SELECT 1 FROM mandates WHERE merchant_id = ?").get(DEMO)) return null;
+  return saveMandate(db, {
+    text: DEMO_RULES_TEXT, actor: "demo-setup", merchantId: DEMO,
+    rules: { rules: [{ skus: ["MUG-CLASSIC"], damage: ["crack_or_chip", "handle_off"], maxRefundCents: 2500, action: "refund" }], dailyLimitCents: null },
   });
 }
 
@@ -102,6 +115,17 @@ export async function runAgent(db, paypal, claimId) {
   const d = decide(mandate, first.ctx);
   if (!d.act) return leave(db, claimId, mandate.id, d.code, d.why);
 
+  // A buyer who also opened a PayPal dispute could be paid twice (here and when PayPal settles the
+  // dispute), so a person decides. Asking PayPal can fail (an app without the disputes permission);
+  // the refund gate's own checks still apply then.
+  if (d.act === "refund" || d.act === "offer") {
+    const order = db.prepare("SELECT o.capture_id FROM claims c JOIN orders o ON o.id = c.order_id WHERE c.id = ?").get(claimId);
+    const dispute = await paymentDisputes(paypal, order.capture_id).then(openDispute, () => null);
+    if (dispute) {
+      return leave(db, claimId, mandate.id, "PAYPAL_DISPUTE_OPEN",
+        `The buyer has an open PayPal dispute on this payment (${dispute.reason}), so a refund here could pay them twice. The agent did not act.`);
+    }
+  }
   // Same order as a merchant's click: PayPal's own record first (network, outside any transaction).
   if (d.act === "refund") {
     try {
