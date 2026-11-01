@@ -30,6 +30,22 @@ On the hosted demo (link on the Devpost page), every sign-in you need is printed
 
 The top of the merchant inbox shows the last 30 days at a glance: how many requests came in, how many the refund agent settled with no click, the median wait from report to PayPal refund, and what partial refunds and remedies kept compared with refunding every item in full (`src/stats.js`).
 
+## User journeys
+
+Who does what, end to end. Every scenario, including each rejection reason, review outcome and PayPal surprise, is in [hackathon/USER_JOURNEYS.md](hackathon/USER_JOURNEYS.md).
+
+| Journey | What happens |
+| --- | --- |
+| **Refunded automatically** | Buyer reports a chipped mug with a photo. The photo check confirms the damage, the policy prices it, the refund agent refunds $20.00 through PayPal under the merchant's rule. Nobody clicks. |
+| **Partial refund** | A stained T-shirt gets 30% back from the merchant's severity table; the buyer keeps it. |
+| **Buyer chooses** | The merchant (or the agent) offers approved options: a refund, a repair kit with a smaller refund, or a free replacement. The buyer picks one. |
+| **Asked for clearer photos** | Blurry photo: the buyer is asked for another, adds it from the same link, and it is reviewed again. No money moves. |
+| **Closed by the shop's records** | Too late, more items than bought, already refunded, or the shop's own catalog photo: closed with a reason the buyer reads. |
+| **Merchant decides** | No rule covers it, it is over a limit, the photo check is unsure, the item may not match, a risk flag is up, or the AI was down: the case waits with a one-line why, and the merchant approves, offers choices, asks for photos or closes it. A photo-based decline always waits for the merchant. |
+| **PayPal dispute** | The buyer also opened a PayPal dispute: the agent stays out, and the case page shows the dispute and warns about paying twice. |
+| **A new store joins** | Signs up at `/dashboard`, connects its own PayPal, sends orders to `/v1/orders`, adds the button, and handles requests under its own policy and rules. |
+| **Agent to agent** | The shopper's assistant files and follows the claim over MCP with only the claim link; the merchant's assistant checks each refund against PayPal's own records. |
+
 ## How merchants use it
 
 Refund Relay is a hosted service, not a single shop. Juniper Market, the store in this repo, is one merchant on it. Any other store that takes PayPal can plug in, in one of three ways.
