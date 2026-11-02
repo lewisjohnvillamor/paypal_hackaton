@@ -3,21 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f5f7">
+  <meta name="theme-color" content="#f3f2ef">
   <title>Refund agent · Refund Relay</title>
   <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
   <header class="top app">
-    <a class="brand" href="/merchant" aria-label="Refund Relay merchant home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span><span class="brand-name">Refund Relay</span> <span class="ctx">Merchant</span></a>
+    <a class="brand" href="/merchant" aria-label="Refund Relay merchant home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span><span class="brand-name">Refund Relay</span> <span class="ctx" data-store></span></a>
     <nav aria-label="Merchant"><a href="/merchant">Requests</a><a href="/merchant/agent" aria-current="page">Refund agent</a><a data-demo-only href="/merchant/remedies">Remedies</a><a href="/merchant/policy">Policy</a><a href="/dashboard">Setup</a><a data-demo-only href="/" class="wide-only">Store</a><a href="#" id="logout" data-logout>Sign out</a></nav>
   </header>
   <main>
     <section id="page" class="hidden">
-      <p class="eyebrow" data-store>&nbsp;</p>
       <h1>Refund agent</h1>
       <p class="lede">Tell your agent, in your own words, which damage reports it may settle without you. It reads every report after the photo check, refunds through PayPal when a report fits your rules and your <a href="/merchant/policy">refund policy</a> marks it safe, and leaves everything else for you with a note on why.</p>
       <div id="notice" class="notice hidden" role="status"></div>

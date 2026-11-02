@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f5f7">
+  <meta name="theme-color" content="#f3f2ef">
   <title>Your request · Juniper Market</title>
   <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
@@ -69,9 +69,9 @@
       $("card").innerHTML = `
         <div class="card hero">
           ${refunded || s.status === "resolved" ? checkBadge() : ""}
-          <p class="eyebrow" style="margin:0">Request ${esc(s.ref)}</p>
           ${refunded ? `<div class="big amount">${usd(s.refund.amountCents)}</div>` : ""}
-          <h2 style="font-size:28px;letter-spacing:-0.03em">${esc(chosen(s)?.item && (refunded || s.status === "resolved") ? `${refunded ? "Refund sent." : "All sorted."} ${cap(chosen(s).item)} is on its way.` : s.message)}</h2>
+          <h1 style="font-size:26px">${esc(chosen(s)?.item && (refunded || s.status === "resolved") ? `${refunded ? "Refund sent." : "All sorted."} ${cap(chosen(s).item)} is on its way.` : s.message)}</h1>
+          <p class="muted small" style="margin:0">Request ${esc(s.ref)}</p>
           <ol class="tracker" style="--n:3;margin:28px 0 8px">${steps(s)}</ol>
         </div>
         ${s.offer?.open ? `<div class="card"><h2 style="margin-top:0">Pick one</h2><p class="muted" style="margin-top:-6px">The shop approved every option here. The amount on each is what comes back to your PayPal account.</p>${optionsHtml(s.offer)}

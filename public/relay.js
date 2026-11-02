@@ -14,19 +14,20 @@
 
   const css = `
     :host { all: initial; display: inline-block; }
-    a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 20px; border-radius: 980px;
-        font: 600 15px/1 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif; letter-spacing: -0.01em;
-        text-decoration: none; background: #fff; color: #0060c0; border: 1px solid #d2d2d7; cursor: pointer;
+    a { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 16px 0 8px; border-radius: 8px;
+        font: 600 15px/1 system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: -0.005em;
+        text-decoration: none; background: #fff; color: #171614; border: 1px solid #cdc9c1; cursor: pointer;
         transition: background-color .15s ease, border-color .15s ease; }
-    a:hover { background: #f5f5f7; border-color: #b8b8bd; }
-    a:focus-visible { outline: 3px solid rgb(0 113 227 / .45); outline-offset: 2px; }
-    :host([data-theme="dark"]) a { background: #1c1c1e; color: #4da3ff; border-color: #3a3a3c; }
-    :host([data-theme="dark"]) a:hover { background: #2c2c2e; }
-    svg { width: 18px; height: 18px; flex: none; }
-    small { display: block; margin-top: 6px; font: 400 12px/1.4 -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif; color: #636366; }
-    :host([data-theme="dark"]) small { color: #98989d; }
+    a:hover { background: #f3f2ef; border-color: #171614; }
+    a:focus-visible { outline: 2px solid #171614; outline-offset: 2px; }
+    :host([data-theme="dark"]) a { background: #1b1a19; color: #f1efea; border-color: #44413c; }
+    :host([data-theme="dark"]) a:hover { background: #252422; border-color: #f1efea; }
+    i { width: 28px; height: 28px; border-radius: 6px; background: #ffd21f; color: #1f1a00; display: grid; place-items: center; flex: none; }
+    svg { width: 16px; height: 16px; }
+    small { display: block; margin-top: 6px; font: 400 12px/1.4 system-ui, -apple-system, sans-serif; color: #5f5b54; }
+    :host([data-theme="dark"]) small { color: #a7a29a; }
   `;
-  const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg>';
+  const icon = '<i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></i>';
 
   function mount(el, { claimUrl, label, theme } = {}) {
     let url;

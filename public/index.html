@@ -3,31 +3,35 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f5f7">
+  <meta name="theme-color" content="#f3f2ef">
   <title>Juniper Market</title>
   <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/app.css">
   <style>
     .shop { display: grid; gap: 24px; }
     @media (min-width: 900px) { .shop { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; } .bag { position: sticky; top: 76px; } }
     .products { display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
-    .tile { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+    .tile { display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 10px; }
     .tile + .tile { margin-top: 0; }
     .tile img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--surface-2); }
-    .tile .body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
-    .tile h3 { font-size: 17px; font-weight: 600; letter-spacing: -0.02em; margin: 0; }
+    .tile .body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 2px; flex: 1; }
+    .tile h3 { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
     .tile .foot-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 12px; }
-    .tile .cost { font-size: 19px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-    .cat { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-2); }
+    .tile .cost { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: lining-nums; }
+    .cat { font-size: 13px; color: var(--text-2); }
+    .shop-head { display: grid; gap: 8px 48px; align-items: end; margin-bottom: 28px; }
+    @media (min-width: 900px) { .shop-head { grid-template-columns: minmax(0, 1fr) 320px; } }
+    .shop-head h1 { font-size: clamp(34px, 5vw, 52px); line-height: 1.02; letter-spacing: -0.035em; margin: 0; }
+    .shop-head p { margin: 0; color: var(--text-2); font-size: 15px; line-height: 1.5; }
     .tile .buy { display: inline-flex; justify-content: flex-end; min-width: 132px; height: 44px; align-items: center; }
     .tile .buy > button { min-width: 132px; }
     .tile .stepper button { width: 36px; height: 34px; font-size: 20px; }
     .tile .stepper output { min-width: 28px; font-size: 15px; }
-    .bag-row { display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 0.5px solid var(--separator); font-size: 15px; overflow: hidden; }
+    .bag-row { display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--separator); font-size: 15px; overflow: hidden; }
     .bag-row:last-child { border-bottom: 0; }
-    .bag-row img { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; }
+    .bag-row img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; }
     .bag-row .name { min-width: 0; line-height: 1.3; }
     .bag-row .qty { display: block; }
     .bag-row .amount { font-weight: 600; }
@@ -42,24 +46,24 @@
     .checkout.locked #paypal-buttons { opacity: 0.35; pointer-events: none; filter: grayscale(1); transition: opacity 0.3s var(--ease), filter 0.3s var(--ease); }
     .checkout-hint { margin: 6px 0 0; text-align: center; transition: opacity 0.3s var(--ease); }
     .checkout:not(.locked) .checkout-hint { opacity: 0; height: 0; margin: 0; overflow: hidden; }
-    .tile img { transition: transform 0.5s var(--ease); }
+    .tile img { transition: transform 0.6s var(--ease); }
     .tile:hover img { transform: scale(1.03); }
-    .tile { transition: box-shadow 0.3s var(--ease); }
-    .tile:hover { box-shadow: var(--shadow-lift); }
+    .tile { transition: border-color 0.2s var(--ease); }
+    .tile:hover { border-color: var(--control); }
     .bag .kv-row { min-height: 0; padding: 8px 0; font-size: 15px; }
     .bag .kv-row > :first-child { flex: 1; min-width: 0; }
     .bag .kv-row > :last-child { flex: none; }
     .bag .total { font-size: 22px; font-weight: 700; letter-spacing: -0.03em; }
     .bag-bar { position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px;
-      padding: 12px 12px 12px 20px; border-radius: 999px; background: var(--nav-bg); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
-      box-shadow: 0 8px 30px rgb(0 0 0 / 0.18); color: var(--text); font-weight: 600; font-size: 15px; animation: bar-in 0.3s var(--ease) both; }
+      padding: 10px 10px 10px 18px; border-radius: 10px; background: var(--text); text-decoration: none;
+      box-shadow: var(--shadow-lift); color: var(--bg); font-weight: 600; font-size: 15px; animation: bar-in 0.3s var(--ease) both; }
     @keyframes bar-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
     .bag-bar:hover { text-decoration: none; }
-    .bag-bar .go { background: var(--blue); color: #fff; border-radius: 999px; padding: 8px 16px; }
+    .bag-bar .go { background: var(--mark); color: var(--mark-ink); border-radius: 6px; padding: 8px 14px; }
     @media (min-width: 900px) { .bag-bar { display: none; } }
-    .order-lines li { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 0.5px solid var(--separator); }
+    .order-lines li { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--separator); }
     .order-lines li:last-child { border-bottom: 0; }
-    .order-lines img { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; flex: none; }
+    .order-lines img { width: 56px; height: 56px; border-radius: 6px; object-fit: cover; flex: none; }
     .order-lines .grow { flex: 1; min-width: 0; text-align: left; }
     .order-lines a.button { white-space: nowrap; }
   </style>
@@ -71,13 +75,15 @@
   </header>
   <main>
     <section id="shop-view">
-      <h1>Home, clothing and tech.</h1>
-      <p class="lede">Everyday things, made to last. Pay with PayPal, and if anything arrives damaged, report it from your receipt and we’ll put it right. Returns by Refund Relay.</p>
+      <div class="shop-head">
+        <h1>Home, clothing and tech, made to last.</h1>
+        <p>Pay with PayPal. If something arrives damaged, report it from your receipt with a photo and we’ll put it right. Returns handled by Refund Relay.</p>
+      </div>
 
       <div class="shop">
         <div class="products" id="products" aria-live="polite"></div>
         <aside class="card bag" id="bag" aria-labelledby="bag-title">
-          <div class="card-head" style="margin-bottom:8px"><h2 id="bag-title">Your bag</h2><span id="bag-count" class="small muted"></span></div>
+          <div class="card-head" style="margin-bottom:8px"><h2 id="bag-title" style="margin:0">Your bag</h2><span id="bag-count" class="small muted"></span></div>
           <p id="bag-empty" class="small muted" style="margin:0 0 8px">Add something to get started.</p>
           <div id="bag-lines"></div>
           <div class="kv-row" style="margin-top:8px"><span>Total</span><span class="total amount" id="bag-total">$0.00</span></div>
@@ -87,7 +93,7 @@
             <p class="checkout-hint small muted">Add an item to check out with PayPal.</p>
           </div>
           <div class="notice demo-note" style="margin-bottom:0">
-            <span aria-hidden="true" style="color:var(--blue)" data-icon="lock"></span>
+            <span aria-hidden="true" data-icon="lock"></span>
             <span id="sandbox-note">This is the PayPal <b>sandbox</b>. Sign in with the sandbox Personal account; no real money moves.</span>
           </div>
         </aside>
@@ -150,8 +156,8 @@
     $("products").innerHTML = products.map((p) => `<article class="card tile" data-tile="${esc(p.sku)}">
         <img src="${esc(p.image)}" alt="${esc(p.title)}">
         <div class="body">
-          <span class="cat">${esc(CATEGORY[p.category] ?? "")}</span>
           <h3>${esc(p.title)}</h3>
+          <span class="cat">${esc(CATEGORY[p.category] ?? "")}</span>
           <span class="small muted">${esc(p.blurb)}</span>
           <div class="foot-row"><span class="cost">${usd(p.unitCents)}</span><span class="buy">${control(p, 0)}</span></div>
         </div>

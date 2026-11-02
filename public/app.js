@@ -98,9 +98,12 @@ document.querySelectorAll("[data-logout]").forEach((a) => (a.onclick = async (e)
 }));
 
 // Merchant pages: the signed-in store's name, and the pages only the demo store has so far.
-if (document.querySelector("[data-store], [data-demo-only]")) {
+// Called again after a sign-in on the same page, so the header names the store straight away.
+export function loadStore() {
+  if (!document.querySelector("[data-store], [data-demo-only]")) return;
   api("/api/merchant/me").then((me) => {
     if (me.merchant?.name) document.querySelectorAll("[data-store]").forEach((el) => (el.textContent = me.merchant.name));
     if (!me.demo) document.querySelectorAll("[data-demo-only]").forEach((el) => el.classList.add("hidden"));
   }).catch(() => {});
 }
+loadStore();

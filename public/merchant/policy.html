@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f5f7">
+  <meta name="theme-color" content="#f3f2ef">
   <title>Refund policy · Refund Relay</title>
   <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/app.css">
   <style>
     .outcomes { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
@@ -30,12 +30,11 @@
 </head>
 <body>
   <header class="top app">
-    <a class="brand" href="/merchant" aria-label="Refund Relay merchant home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span><span class="brand-name">Refund Relay</span> <span class="ctx">Merchant</span></a>
+    <a class="brand" href="/merchant" aria-label="Refund Relay merchant home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span><span class="brand-name">Refund Relay</span> <span class="ctx" data-store></span></a>
     <nav aria-label="Merchant"><a href="/merchant">Requests</a><a href="/merchant/agent">Refund agent</a><a data-demo-only href="/merchant/remedies">Remedies</a><a href="/merchant/policy" aria-current="page">Policy</a><a href="/dashboard">Setup</a><a data-demo-only href="/" class="wide-only">Store</a><a href="#" id="logout" data-logout>Sign out</a></nav>
   </header>
   <main>
-    <section id="page" class="hidden">
-      <p class="eyebrow" data-store>&nbsp;</p>
+    <section id="page" class="hidden settings">
       <h1>Refund policy</h1>
       <p class="lede">How every damage report is decided. The AI photo check only reports what it sees and how sure it is. These rules make the decision, the same way every time, and each case shows you the rule that settled it.</p>
       <div id="notice" class="notice hidden" role="status"></div>
@@ -47,8 +46,7 @@
 
       <form id="form">
         <section class="card" aria-labelledby="h-sev">
-          <div class="card-head"><h2 id="h-sev">What each kind of damage is worth</h2></div>
-          <p class="small muted" style="margin:-6px 0 14px">A percentage of the price paid, rounded down to the cent. Set one to 0% and that damage is declined.</p>
+          <div class="card-head" style="display:block"><h2 id="h-sev">What each kind of damage is worth</h2><p class="small muted" style="margin:6px 0 14px">A percentage of the price paid, rounded down to the cent. Set one to 0% and that damage is declined.</p></div>
           <table class="sev">
             <thead><tr><th scope="col">Damage</th><th scope="col" class="lvl">Severity</th><th scope="col">On a <span id="example-price"></span> item</th><th scope="col">Refund</th></tr></thead>
             <tbody id="sev"></tbody>
