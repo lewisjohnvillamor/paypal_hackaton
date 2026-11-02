@@ -65,7 +65,7 @@
           <button class="primary lg" type="submit">Sign in</button>
         </form>
         <div id="auth-error" class="notice bad hidden" role="alert" style="text-align:left"></div>
-        <p class="small muted" style="margin:18px 0 0">Running the demo store? <a href="/merchant">Sign in with its password</a>.</p>
+        <p class="small muted demo-note" style="margin:18px 0 0">Running the demo store? <a href="/merchant">Sign in with its password</a>.</p>
       </div>
     </section>
 
@@ -83,7 +83,7 @@
         <h2 id="h-paypal"><span class="step-n">1</span>Connect your PayPal account</h2>
         <div id="pp-connected" class="hidden"></div>
         <form id="pp-form" class="hidden">
-          <p class="small muted" style="margin:0 0 14px">In the <a href="https://developer.paypal.com/dashboard/applications/sandbox" target="_blank" rel="noopener">PayPal Developer Dashboard</a>, open Apps &amp; Credentials, pick the sandbox app your checkout uses, and paste its Client ID and Secret. Refund Relay checks them with PayPal before saving. The secret is stored encrypted and is never shown again. One-click <i>Connect with PayPal</i> arrives once PayPal approves Refund Relay as a partner.</p>
+          <p class="small muted" style="margin:0 0 14px">In your <a href="https://developer.paypal.com/dashboard/applications/sandbox" target="_blank" rel="noopener">PayPal developer account</a>, open Apps &amp; Credentials, pick the app your checkout uses, and paste its Client ID and Secret. Refund Relay checks them with PayPal before saving. The secret is stored encrypted and is never shown again. One-click <i>Connect with PayPal</i> arrives once PayPal approves Refund Relay as a partner.</p>
           <div class="fields">
             <div><label for="pp-id">Client ID</label><input id="pp-id" autocomplete="off" spellcheck="false" required></div>
             <div><label for="pp-secret">Secret</label><input id="pp-secret" type="password" autocomplete="off" required></div>

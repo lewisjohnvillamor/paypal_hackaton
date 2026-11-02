@@ -27,10 +27,22 @@ const pairs = [];
 for (let n = 0, j = 0; n < t.marks.length && j < flips.length; n++) {
   if (flips[j][1] === n % 3) pairs.push([t.marks[n], flips[j++][0]]);
 }
+// A flip that belongs to a later mark (the earlier one left no trace and the colours happen to line up)
+// shows as a pair whose clock-to-video offset jumps away from both neighbours; drop it.
+{
+  const off = (p) => p[1] - p[0];
+  for (let i = pairs.length - 1; i >= 0; i--) {
+    const prev = pairs[i - 1], next = pairs[i + 1];
+    const far = (q) => !q || Math.abs(off(pairs[i]) - off(q)) > 2.5;
+    if (far(prev) && far(next) && (prev || next)) pairs.splice(i, 1);
+  }
+}
+if (process.env.DEBUG_MARKS) console.log(JSON.stringify(pairs.slice(0, 6)));
 if (pairs.length !== t.marks.length) console.warn(`matched ${pairs.length} of ${t.marks.length} marks (${flips.length} flips seen)`);
 function raw(at) {
   if (!pairs.length) return at;
   let i = pairs.findIndex(([m]) => m > at);
+  if (i === 0) return pairs[0][1] + (at - pairs[0][0]); // before the first matched mark: same pace as the clock
   if (i === -1) i = pairs.length;
   const [m0, v0] = pairs[Math.max(0, i - 1)];
   const [m1, v1] = pairs[Math.min(pairs.length - 1, i)];
@@ -81,7 +93,7 @@ const total = segs.reduce((n, [, a, b]) => n + (b - a), 0);
 // One seeked input per kept span: trimming one long input many times makes ffmpeg buffer every
 // frame between spans, which runs out of memory on a long take.
 const inputs = segs.flatMap(([i, a, b]) => ["-ss", a.toFixed(3), "-to", b.toFixed(3), "-i", i === 1 ? t.popup.file : t.main.file]);
-const fit = "fps=30,scale=1280:800:force_original_aspect_ratio=decrease,pad=1280:800:(ow-iw)/2:(oh-ih)/2:color=0x05070d,setsar=1";
+const fit = "fps=30,scale=1280:800:force_original_aspect_ratio=decrease,pad=1280:800:(ow-iw)/2:(oh-ih)/2:color=0xf3f2ef,setsar=1";
 const graph = [
   ...segs.map((_, n) => `[${n}:v]setpts=PTS-STARTPTS,${fit}[s${n}]`),
   `${segs.map((_, n) => `[s${n}]`).join("")}concat=n=${segs.length}:v=1:a=0,split[base][patch]`,
@@ -102,7 +114,7 @@ if (music) {
     "[voice][ducked]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[a]");
 } else graph.push("[voice]loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[a]", "[key]anullsink");
 
-const outFile = `${dir}/refund-relay-agents.mp4`;
+const outFile = `${dir}/${process.env.OUT_NAME || "refund-relay-agents.mp4"}`;
 execFileSync("ffmpeg", ["-y", "-v", "error", ...inputs, "-filter_complex", graph.join(";"), "-map", "[v]", "-map", "[a]",
   "-c:v", "libx264", "-crf", "20", "-preset", "medium", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", outFile], { stdio: "inherit" });
 console.log(outFile, `${total.toFixed(1)} s`);

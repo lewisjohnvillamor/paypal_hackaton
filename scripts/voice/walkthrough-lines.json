@@ -1,0 +1,23 @@
+{
+  "hook": "I run Juniper Market. When an order arrived broken, I used to lose an afternoon to emails and photos. Now Refund Relay handles it.",
+  "setup1": "Setting it up took me about five minutes. I made an account,",
+  "setup2": "connected my own PayPal account, so refunds come straight from my store, not from a middleman,",
+  "setup3": "and made a private key for my store's server.",
+  "plug1": "Plugging it in is one step after checkout. My store tells Refund Relay about each paid order, and it checks that order with PayPal before accepting it.",
+  "plug2": "Then every order page gets a Report a problem button.",
+  "rule1": "Last, I told my refund agent, in plain English, what it may settle on its own.",
+  "rule2": "It reads my rules back, with a daily limit, so there are no surprises.",
+  "store": "Here's what my customers see. They pay with PayPal, like always.",
+  "chip1": "A mug arrives chipped. They say what happened, add a photo, and send.",
+  "refunded": "Moments later, twenty dollars is back in their PayPal. Nobody at my shop lifted a finger.",
+  "case": "My case page shows why: the photo matched the mug we sold, the damage fit my rule, and PayPal confirmed the refund.",
+  "asst1": "Customers who use their own assistant can file through it too.",
+  "asst2": "Agent to agent, no forms.",
+  "vase1": "A cracked vase is above my limit, so the agent hands it to me, already checked, with ideas: a repair kit, or something else in stock.",
+  "vase2": "One click sends the choices, and the customer picks one. A refund just became the next sale.",
+  "wrong1": "When a photo shows a different mug from the one we sold, nothing is paid.",
+  "wrong2": "The agent holds it, and I ask for a photo of the label in one click.",
+  "inbox": "Everything lands in one inbox.",
+  "log": "I can see every decision the agent made, and why, and switch it off any time.",
+  "end": "Refund Relay. Turn a broken order into the next sale."
+}
