@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f5f7">
+  <meta name="theme-color" content="#f3f2ef">
   <title>Refund request · Refund Relay</title>
   <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
   <header class="top">
-    <a class="brand" href="/merchant" aria-label="Refund Relay merchant home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span><span class="brand-name">Refund Relay</span> <span class="ctx">Merchant</span></a>
+    <a class="brand" href="/merchant" aria-label="Refund Relay merchant home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span><span class="brand-name">Refund Relay</span> <span class="ctx" data-store></span></a>
     <nav><a href="/merchant">‹ All requests</a></nav>
   </header>
   <main>
@@ -297,8 +297,10 @@
     function render() {
       const { claim, payment, line, evidence, assessment, history } = d;
       $("page").innerHTML = `
-        <p class="eyebrow">${esc(line.title)} × ${claim.quantity} · ${when(claim.createdAt)}</p>
-        <div class="row" style="gap:14px;margin-bottom:28px"><h1 style="margin:0">${esc(claim.ref)}</h1>${pill(claim.status)}</div>
+        <div class="case-head">
+          <h1 style="margin:0">${esc(line.title)}${claim.quantity > 1 ? ` × ${claim.quantity}` : ""}</h1>
+          <div class="row" style="gap:10px;margin-top:6px">${pill(claim.status)}<span class="mono" style="word-break:normal">${esc(claim.ref)}</span><span class="small muted">Reported ${when(claim.createdAt)}</span></div>
+        </div>
         <div class="grid case">
           <div>
             <div class="card">

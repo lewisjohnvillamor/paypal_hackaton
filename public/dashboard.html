@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f5f7">
+  <meta name="theme-color" content="#f3f2ef">
   <title>Set up · Refund Relay</title>
   <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/app.css">
   <style>
     .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
@@ -17,7 +17,7 @@
     .steps .done .dot { background: var(--green-fill); color: #fff; }
     .steps .done .dot svg { width: 14px; height: 14px; }
     .steps a { font-size: 14px; }
-    .step-n { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--tint-blue); color: var(--blue-text); font-size: 14px; font-weight: 700; margin-right: 10px; flex: none; }
+    .step-n { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--raised); color: var(--text); font-size: 13px; font-weight: 700; margin-right: 10px; flex: none; }
     .card h2 { display: flex; align-items: center; }
     .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
     pre.code { margin: 0; padding: 16px; border-radius: 14px; background: #1d1d1f; color: #f5f5f7; font: 13px/1.55 var(--mono); overflow-x: auto; white-space: pre; tab-size: 2; }
@@ -41,7 +41,7 @@
 </head>
 <body>
   <header class="top app">
-    <a class="brand" href="/dashboard" aria-label="Refund Relay setup"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span><span class="brand-name">Refund Relay</span> <span class="ctx">For merchants</span></a>
+    <a class="brand" href="/dashboard" aria-label="Refund Relay setup"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></span><span class="brand-name">Refund Relay</span> <span class="ctx" id="store-name">For merchants</span></a>
     <nav aria-label="Merchant"><a href="/merchant" id="nav-requests" class="hidden">Requests</a><a href="/dashboard" aria-current="page">Setup</a><a href="#" data-logout id="nav-logout" class="hidden">Sign out</a></nav>
   </header>
   <main>
@@ -69,8 +69,7 @@
       </div>
     </section>
 
-    <section id="page" class="hidden">
-      <p class="eyebrow" id="store-name"></p>
+    <section id="page" class="hidden settings">
       <h1>Set up Refund Relay</h1>
       <p class="lede">Four steps. When they are done, buyers can report damaged items from your order page, and you approve each refund from <a href="/merchant">your requests</a>. Refunds go out through your own PayPal account.</p>
       <div id="notice" class="notice hidden" role="status"></div>
