@@ -50,7 +50,7 @@
         { headerName: "On", field: "active", width: narrow ? 56 : 72, cellDataType: "boolean", editable: true },
         // The offer and its refund come first, so a phone shows them without scrolling sideways.
         { headerName: "Offer to the buyer", field: "title", width: narrow ? 150 : 240, editable: true, wrapText: true, autoHeight: true },
-        { headerName: "Refund per item", field: "refundUnitCents", width: narrow ? 100 : 140, type: "rightAligned", editable: true,
+        { headerName: narrow ? "Refund" : "Refund per item", field: "refundUnitCents", width: narrow ? 100 : 140, type: "rightAligned", editable: true,
           valueFormatter: (x) => usd(x.value), valueParser: (x) => Math.round(Number(String(x.newValue).replace(/[$,]/g, "")) * 100) },
         { headerName: "What you send", field: "item", flex: 1, minWidth: 220, editable: true, wrapText: true, autoHeight: true },
         { headerName: "When it fits (the AI reads this)", field: "fits", flex: 1.4, minWidth: 260, editable: true, wrapText: true, autoHeight: true,

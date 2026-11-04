@@ -286,7 +286,7 @@
     // The agent timeline: who did what, in order, with what each one saw.
     function timelineHtml(steps) {
       const time = (iso) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" });
-      return `<div class="card"><h2>How this case was handled</h2><ol class="timeline agent">${steps.map((t) => `
+      return `<div class="card case-late"><h2>How this case was handled</h2><ol class="timeline agent">${steps.map((t) => `
         <li class="${esc(t.actor)}"><div class="who">${esc(ACTOR[t.actor] || t.actor)} <span class="when">${time(t.at)}</span></div>
           <div class="what">${esc(t.title)}</div>
           ${t.detail ? `<div class="small muted">${esc(t.detail)}</div>` : ""}
@@ -302,8 +302,8 @@
           <div class="row" style="gap:10px;margin-top:6px">${pill(claim.status)}<span class="mono" style="word-break:normal">${esc(claim.ref)}</span><span class="small muted">Reported ${when(claim.createdAt)}</span></div>
         </div>
         <div class="grid case">
-          <div>
-            <div class="card">
+          <div class="case-main">
+            <div class="card case-evidence">
               <div class="voice buyer"><span class="avatar">${ICON.person}</span><div style="flex:1">
                 <div class="tag">Customer says</div>
                 <div class="bubble">${esc(claim.statement)}</div>
@@ -313,14 +313,14 @@
                 <figure class="figure thumbs" style="margin:0"><button type="button" data-zoom="${line.refImage}" aria-label="Enlarge your catalog photo"><img src="${line.refImage}" alt="Your catalog photo"></button><figcaption>Your catalog photo</figcaption></figure>
               </div>
             </div>
-            <div class="card">
+            <div class="card case-evidence">
               <div class="voice model"><span class="avatar">${ICON.sparkle}</span><div style="flex:1">
                 <div class="tag">What the AI saw in the photos</div>
                 ${assessment && !assessment.error ? damageHeroHtml() : ""}
                 ${findingsHtml(assessment)}
               </div></div>
             </div>
-            <div class="card">
+            <div class="card case-payment">
               <div class="card-head"><h2>PayPal payment</h2><span class="pill ${payment.captureStatus === "COMPLETED" ? "ok" : "bad"}">${esc(payment.captureStatus === "COMPLETED" ? "Captured" : payment.captureStatus)}</span></div>
               <div class="kv-row"><span>Amount</span><span class="amount">${usd(payment.amountCents)} ${esc(payment.currency)}</span></div>
               <div class="kv-row"><span>Refundable now</span><span class="amount"><b>${usd(payment.refundableCents)}</b></span></div>
@@ -336,7 +336,7 @@
             ${["ready", "offer_sent", "needs_info"].includes(claim.status) ? disputeWarning() : ""}
             ${actionsHtml()}
             ${timelineHtml(d.timeline)}
-            <p class="footnote center" style="margin-top:12px">Case version ${claim.version}. Approvals are tied to this version.</p>
+            <p class="footnote center case-late" style="margin-top:12px">Case version ${claim.version}. Approvals are tied to this version.</p>
           </div>
         </div>`;
       wire();

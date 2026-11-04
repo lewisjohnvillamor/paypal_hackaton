@@ -24,7 +24,7 @@
       <p class="muted small" style="margin:0 0 24px">The merchant console for your Refund Relay store.</p>
       <label for="password">Password</label>
       <input id="password" type="password" autocomplete="current-password" required>
-      <div id="demo-hint" class="notice hidden" style="text-align:left"></div>
+      <div id="demo-hint" class="notice demo-pass hidden" style="text-align:left"></div>
       <div id="login-error" class="notice bad hidden" role="alert" style="text-align:left"></div>
       <button class="primary lg" type="submit" style="margin-top:16px">Sign in</button>
       <p class="small muted" style="margin:16px 0 0">Connected your own store? <a href="/dashboard">Sign in with your email</a>.</p>
@@ -74,15 +74,17 @@
     }
     const html = (fn) => (p) => { const el = document.createElement("span"); el.innerHTML = fn(p.data, p.value); return el; };
 
+    // Small laptops and landscape tablets: two quieter columns step aside so the grid fits without scrolling.
+    const mid = matchMedia("(max-width: 1400px)").matches;
     const columns = [
       { headerName: "", field: "thumb", cellRenderer: thumbCell, width: 76, sortable: false, filter: false, resizable: false, pinned: "left", getQuickFilterText: () => "" },
       { headerName: "Request", field: "ref", width: 112, pinned: "left", cellClass: "mono-cell" },
       { headerName: "Status", field: "status", width: 172, cellRenderer: html((r) => pill(r.status)), getQuickFilterText: (p) => STATUS[p.value]?.[0] ?? p.value },
       { headerName: "Item", field: "title", flex: 1, minWidth: 170, tooltipValueGetter: (p) => p.data.title, valueGetter: (p) => `${p.data.title} × ${p.data.quantity}` },
-      { headerName: "AI saw", field: "damage_kind", width: 120, valueFormatter: (p) => DAMAGE[p.value] ?? "—" },
+      { headerName: "AI saw", field: "damage_kind", width: 120, hide: mid, valueFormatter: (p) => DAMAGE[p.value] ?? "—" },
       { headerName: "Breakage", field: "breakage", width: 128, type: "rightAligned",
         cellRenderer: html((r) => r.breakage == null ? "—" : `<span class="meter" style="color:var(--${r.breakage >= 0.8 ? "green-fill" : r.breakage <= 0.2 ? "red" : "orange"})"><i style="width:${Math.round(r.breakage * 100)}%"></i></span> ${Math.round(r.breakage * 100)}%`) },
-      { headerName: "Flags", field: "concerns", width: 84, headerTooltip: "Concerns the refund policy raised", type: "rightAligned", valueFormatter: (p) => p.value == null ? "—" : p.value === 0 ? "None" : String(p.value) },
+      { headerName: "Flags", field: "concerns", width: 84, hide: mid, headerTooltip: "Concerns the refund policy raised", type: "rightAligned", valueFormatter: (p) => p.value == null ? "—" : p.value === 0 ? "None" : String(p.value) },
       { headerName: "Remedies", field: "remedies", width: 140, sortable: true, comparator: (a, b, x, y) => (a + x.data.ai_suggestions) - (b + y.data.ai_suggestions),
         cellRenderer: html((r) => `${r.remedies ? `<span class="pill gold" title="Library remedies the AI matched">${r.remedies} fit</span>` : ""}${r.ai_suggestions ? ` <span class="pill claude" title="AI suggestions from your store, open or added">${r.ai_suggestions} AI</span>` : ""}`) },
       { headerName: "Drafted", field: "proposed_cents", width: 100, hide: true, type: "rightAligned", valueFormatter: (p) => p.value ? usd(p.value) : "—" },
@@ -92,7 +94,12 @@
     ];
 
     // Phones get the card list: a grid this wide only shows two columns there.
-    const narrow = matchMedia("(max-width: 819px)");
+    // Tablets too: below about 1200px the grid would scroll sideways.
+    const narrow = matchMedia("(max-width: 1199px)");
+    narrow.addEventListener?.("change", () => {
+      if (narrow.matches && grid) { grid.destroy(); grid = null; $("grid").innerHTML = ""; $("grid").classList.add("hidden"); $("export").classList.add("hidden"); }
+      if (rows.length || !$("inbox").classList.contains("hidden")) draw();
+    });
     function makeGrid() {
       if (grid || !window.agGrid || narrow.matches) return;
       const dark = matchMedia("(prefers-color-scheme: dark)");
@@ -167,17 +174,22 @@
         const next = await api("/api/merchant/claims");
         if (JSON.stringify(next) === JSON.stringify(rows) && !$("inbox").classList.contains("hidden")) return;
         rows = next;
-        $("inbox").classList.remove("hidden"); $("logout").classList.remove("hidden"); $("login").classList.add("hidden");
+        document.body.classList.remove("signed-out"); $("inbox").classList.remove("hidden"); $("logout").classList.remove("hidden"); $("login").classList.add("hidden");
         draw(); settle();
       } catch (e) {
-        if (e.status === 401) { $("login").classList.remove("hidden"); $("inbox").classList.add("hidden"); $("password").focus(); }
+        if (e.status === 401) { document.body.classList.add("signed-out"); $("login").classList.remove("hidden"); $("inbox").classList.add("hidden"); $("password").focus(); }
       }
     }
     // Hosted demo: show judges the sandbox merchant password.
     api("/api/config").then(({ demo }) => {
       if (!demo?.merchantPassword) return;
-      $("demo-hint").innerHTML = `<span>Demo sign-in: <b class="mono">${esc(demo.merchantPassword)}</b></span>`;
+      $("demo-hint").innerHTML = `<span class="grow">Copy and paste this password:<br><b class="mono" id="demo-pw">${esc(demo.merchantPassword)}</b></span>
+        <button type="button" id="copy-pw" class="copy-pw">Copy</button>`;
       $("demo-hint").classList.remove("hidden");
+      $("copy-pw").onclick = async () => {
+        try { await navigator.clipboard.writeText(demo.merchantPassword); $("copy-pw").textContent = "Copied"; }
+        catch { getSelection().selectAllChildren($("demo-pw")); }
+      };
     }).catch(() => {});
     $("login").onsubmit = async (e) => {
       e.preventDefault();

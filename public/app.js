@@ -107,3 +107,20 @@ export function loadStore() {
   }).catch(() => {});
 }
 loadStore();
+
+// Merchant header on phones and tablets: the tabs fold into one button named after the current page.
+for (const head of document.querySelectorAll("header.top.app")) {
+  const nav = head.querySelector("nav");
+  if (!nav) continue;
+  nav.id ||= "merchant-nav";
+  const btn = document.createElement("button");
+  btn.type = "button"; btn.className = "nav-toggle";
+  btn.setAttribute("aria-controls", nav.id); btn.setAttribute("aria-expanded", "false");
+  btn.innerHTML = `<span>${esc(nav.querySelector("[aria-current]")?.textContent ?? "Menu")}</span>${svg('<path d="M6 9l6 6 6-6"/>', 2)}`;
+  const set = (open) => { head.classList.toggle("open", open); btn.setAttribute("aria-expanded", String(open)); };
+  btn.onclick = (e) => { e.stopPropagation(); set(!head.classList.contains("open")); };
+  document.addEventListener("click", (e) => { if (!head.contains(e.target)) set(false); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && head.classList.contains("open")) { set(false); btn.focus(); } });
+  nav.addEventListener("click", (e) => { if (e.target.closest("a")) set(false); });
+  head.insertBefore(btn, nav);
+}
