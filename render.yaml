@@ -47,8 +47,8 @@ services:
         generateValue: true
       - key: CREDENTIALS_KEY
         generateValue: true
-      - key: APP_BASE_URL
-        sync: false
+      # APP_BASE_URL defaults to RENDER_EXTERNAL_URL (https://<name>.onrender.com). Add it only for a
+      # custom domain.
       - key: REPEAT_CLAIM_LIMIT
         value: "0"
       # Judges see the sandbox sign-ins on the pages; set the buyer pair to a sandbox Personal account.

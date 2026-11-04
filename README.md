@@ -103,6 +103,10 @@ npm start               # http://localhost:8888
 
 ### Hosted demo for judges
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/lewisjohnvillamor/paypal_hackaton)
+
+The hosted demo runs on [Render](https://render.com) from `render.yaml`; [DEPLOY.md](DEPLOY.md) has the steps, the secrets to fill in and the cost.
+
 Set `PUBLIC_DEMO=1` to print the sandbox sign-ins on the pages themselves (`render.yaml` does this; also fill in `ANTHROPIC_API_KEY` there so judges can try the refund agent): the merchant password on the merchant sign-in screen, and `DEMO_BUYER_EMAIL` / `DEMO_BUYER_PASSWORD` (a sandbox **Personal** account) under the PayPal button. It is off by default and the app refuses to run outside the PayPal sandbox, so nothing real can be refunded. Judges can also skip the PayPal sign-in and use **Debit or Credit Card** with a test card from PayPal's [card generator](https://developer.paypal.com/tools/sandbox/card-testing/).
 
 With `PUBLIC_DEMO=1` the demo store's refund agent also starts with one rule on ("Refund mugs with a chip, crack or snapped handle under $25 on your own"), so a judge sees it act on the first chipped mug. That happens only on a store that has never had rules, so a judge who turns them off finds them off after a restart. Set `REPEAT_CLAIM_LIMIT=0` as well: every judge pays as the same sandbox buyer, which would otherwise flag each request after the first as a repeat claimant and keep the agent's hands off.
