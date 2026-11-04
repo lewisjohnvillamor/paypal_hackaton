@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fernway Glass</title>
+  <link rel="stylesheet" href="/store.css">
+</head>
+<body>
+  <header class="bar"><a class="logo" href="/">Fernway Glass</a></header>
+  <main class="product">
+    <img src="{{IMAGE}}" alt="A clear glass bud vase">
+    <section>
+      <h1>Clear glass bud vase</h1>
+      <p class="price">${{PRICE}}</p>
+      <p>Mouth-blown in our studio, one at a time. About 20 cm tall, for a single stem or a small bunch.</p>
+      <p class="muted">Flat-rate shipping ${{SHIPPING}}. Sales tax added at checkout.</p>
+      <label for="qty">Quantity</label>
+      <select id="qty"><option>1</option><option>2</option><option>3</option></select>
+      <div id="paypal-buttons"></div>
+      <p id="msg" class="muted" role="status"></p>
+    </section>
+  </main>
+  <script>
+    const msg = (t) => (document.getElementById("msg").textContent = t);
+    const sdk = document.createElement("script");
+    sdk.src = "https://www.paypal.com/sdk/js?client-id={{CLIENT_ID}}&currency=USD&intent=capture";
+    sdk.onerror = () => msg("PayPal could not load. Check your connection and reload the page.");
+    sdk.onload = () => paypal.Buttons({
+      style: { layout: "vertical", shape: "rect" },
+      createOrder: async () => {
+        const r = await fetch("/api/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ quantity: document.getElementById("qty").value }) });
+        const o = await r.json();
+        if (!r.ok) throw new Error(o.message);
+        return o.id;
+      },
+      onApprove: async ({ orderID }) => {
+        msg("Confirming your payment…");
+        const r = await fetch(`/api/orders/${orderID}/capture`, { method: "POST" });
+        const o = await r.json();
+        if (!r.ok) return msg(o.message || "Payment failed. You have not been charged.");
+        location.href = o.confirmation;
+      },
+      onError: () => msg("PayPal could not start. Try again in a moment."),
+    }).render("#paypal-buttons");
+    document.head.appendChild(sdk);
+  </script>
+</body>
+</html>

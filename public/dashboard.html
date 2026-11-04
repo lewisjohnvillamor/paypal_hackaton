@@ -116,7 +116,8 @@
         <div class="code-wrap"><pre class="code" id="snippet"></pre><button type="button" class="copy" data-copy="snippet">Copy</button></div>
         <p class="small muted" style="margin:12px 0 0"><code>category</code> sets what the photo check looks for. One of:</p>
         <div class="cats" id="cats"></div>
-        <p class="small muted" style="margin:10px 0 0"><code>image_url</code> is the product's catalog photo; the buyer's photos are compared with it.</p>
+        <p class="small muted" style="margin:10px 0 0"><code>image_url</code> is the product's catalog photo; the buyer's photos are compared with it. It must be a public https JPEG, PNG or WebP of at least 280 px.</p>
+        <p class="small muted" style="margin:10px 0 0">Retrying after a timeout is safe: the same order comes back with <code>already_registered: true</code> and a new <code>claim_url</code>, and the earlier link stops working, so always show the newest one.</p>
       </section>
 
       <section class="card" id="step-button" aria-labelledby="h-button">
