@@ -231,6 +231,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 .notice.warn { background: var(--warn-bg); }
 .notice.bad { background: var(--bad-bg); color: var(--bad); }
 .notice.ok { background: var(--ok-bg); }
+.notice .mono { word-break: normal; overflow-wrap: anywhere; }
 .notice > svg { flex: none; width: 18px; height: 18px; margin-top: 2px; }
 
 /* Product */
@@ -392,6 +393,33 @@ dialog img { max-width: 92vw; max-height: 86vh; border-radius: 8px; }
 dialog::backdrop { background: rgb(18 18 17 / 0.82); }
 dialog[open] { animation: pop 0.25s var(--ease) both; }
 
+/* Prototype notice: one slim line above the header, tone step on the ground, never yellow. */
+.proto-banner { margin: 0; padding: 7px 16px; background: var(--raised); color: var(--text-2); font-size: 12.5px; line-height: 1.4; text-align: center; text-wrap: balance; }
+.proto-banner a { color: var(--text-2); text-decoration-color: currentColor; }
+.proto-banner .narrow-text { display: none; }
+@media (max-width: 620px) { .proto-banner { padding: 6px 12px; font-size: 12px; } .proto-banner .wide-text { display: none; } .proto-banner .narrow-text { display: inline; } }
+
+body.signed-out header.top.app nav, body.signed-out .nav-toggle { display: none !important; }
+body.signed-out header.top.app .brand-name { display: inline; }
+.demo-pass { align-items: center; }
+.demo-pass .grow { flex: 1; min-width: 0; }
+.demo-pass .mono { font-size: 15px; user-select: all; }
+.demo-pass .copy-pw { flex: none; min-height: 36px; padding: 6px 14px; font-size: 14px; }
+
+/* Merchant menu: below tablet width the tabs fold into one button and drop down as a list. */
+.nav-toggle { display: none; }
+@media (max-width: 1023px) {
+  header.top.app { position: sticky; }
+  header.top.app .nav-toggle { display: inline-flex; min-height: 38px; padding: 6px 12px; font-size: 14px; gap: 8px; }
+  .nav-toggle svg { width: 16px; height: 16px; }
+  header.top.app nav { display: none; position: absolute; top: 100%; left: 0; right: 0; flex-direction: column; align-items: stretch; gap: 0;
+    padding: 8px 16px 12px; background: var(--bg); border-bottom: 1px solid var(--border); box-shadow: var(--shadow-lift); font-size: 16px; overflow: visible; }
+  header.top.app.open nav { display: flex; }
+  header.top.app nav a { padding: 12px 10px; min-height: 44px; display: flex; align-items: center; }
+  header.top.app nav a.hidden { display: none; }
+  header.top.app .wide-only { display: flex; }
+}
+
 footer.foot { max-width: 1040px; margin: 0 auto; padding: 0 24px 40px; color: var(--text-2); font-size: 12.5px; text-align: center; }
 
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
@@ -412,12 +440,23 @@ footer.foot { max-width: 1040px; margin: 0 auto; padding: 0 24px 40px; color: va
   .product img { width: 84px; height: 84px; }
   .hero .big { font-size: 40px; }
   header.top { padding: 0 16px; }
-  header.top.app nav { gap: 0; font-size: 13px; overflow-x: auto; scrollbar-width: none; }
-  header.top.app nav a { padding: 6px 7px; }
-  header.top.app .brand-name, header.top.app .wide-only { display: none; }
+  header.top.app .brand-name { display: none; }
+  .card.hero { padding: 28px 18px 22px; }
+  .thumbs img { width: 96px; height: 96px; }
+  .option { grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px; padding: 12px; }
+  .option .art { width: 44px; height: 44px; }
+  .calc .total { font-size: 34px; }
+  .tracker li { font-size: 12px; }
+  .card-head { flex-wrap: wrap; }
 }
 @media (max-width: 819px) {
   .sticky-col { position: static; order: -1; }
+  /* Case on phones and small tablets: the photos and what the AI saw, then the decision, then the history. */
+  .grid.case > .case-main, .grid.case > .sticky-col { display: contents; }
+  .grid.case .card + .card { margin-top: 0; }
+  .grid.case .case-evidence { order: -1; }
+  .grid.case .case-late { order: 1; }
+  .grid.case .case-payment { order: 2; }
   .inbox-row .row { flex-wrap: nowrap; }
   .brand .ctx { display: none; }
 }
@@ -444,7 +483,7 @@ footer.foot { max-width: 1040px; margin: 0 auto; padding: 0 24px 40px; color: va
 .inbox-grid .meter { display: inline-block; margin-right: 8px; vertical-align: middle; color: var(--text) !important; }
 .grid-thumb i { position: absolute; border: 2px solid var(--mark); border-radius: 2px; }
 .pill.gold { background: var(--mark-soft); color: var(--mark-text); }
-@media (max-width: 620px) { .grid-tools input[type=search] { width: 100%; } }
+@media (max-width: 620px) { .grid-tools > .row { flex: 1 1 100%; } .grid-tools input[type=search] { width: 100%; flex: 1; } }
 
 /* Remedy library */
 .remedy-product { margin-top: 16px; padding: 24px; }
