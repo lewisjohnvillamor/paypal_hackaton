@@ -170,12 +170,18 @@ test("the merchant edits the remedy library, and Jev is only asked about active 
     const lib = (await t.merchant("GET", "/remedies")).body;
     const mug = lib.find((p) => p.sku === "MUG-CLASSIC");
     assert.deepEqual(mug.remedies.map((r) => r.id), ["kintsugi", "kintsugi_gold", "replacement"]);
-    const bad = (body) => t.merchant("POST", "/remedies", { sku: "MUG-CLASSIC", kind: "spare_part", title: "Spare lid", item: "a matching lid", fits: "The lid is cracked.", refundUnitCents: 500, ...body });
+    const bad = (body) => t.merchant("POST", "/remedies", { sku: "MUG-CLASSIC", kind: "spare_part", title: "Spare lid", item: "a matching lid", fits: "The lid is cracked.", refundUnitCents: 500, damage: ["crack_or_chip"], ...body });
     assert.equal((await bad({ refundUnitCents: 2000 })).status, 400); // a remedy can never refund the full price
     assert.equal((await bad({ refundUnitCents: -1 })).status, 400);
     assert.equal((await bad({ kind: "voucher" })).status, 400);
     assert.equal((await bad({ title: "x" })).status, 400);
     assert.equal((await bad({ sku: "NOPE" })).status, 400);
+    // Every new remedy names the damage it puts right, from the item's own damage types.
+    assert.equal((await bad({ damage: undefined })).status, 400);
+    assert.equal((await bad({ damage: [] })).status, 400);
+    assert.equal((await bad({ damage: ["stain"] })).status, 400);
+    assert.deepEqual(mug.damageOptions.map((o) => o.key), ["shattered", "handle_off", "crack_or_chip"]);
+    assert.deepEqual(mug.remedies.find((r) => r.id === "kintsugi").damage, ["handle_off", "crack_or_chip"]);
     const made = await bad({});
     assert.equal(made.status, 201, JSON.stringify(made.body));
     assert.equal((await t.merchant("PATCH", "/remedies/kintsugi", { active: false })).body.active, false);
@@ -237,5 +243,16 @@ test("a buyer whose pick the refund gate stops reads what it means for them, not
     assert.match(r.body.message, /Nothing was refunded/);
     assert.equal(t.pp.calls.refunds.length, 0);
     assert.equal((await o.status()).status, "offer_sent", "the choice stays open");
+  } finally { t.close(); }
+});
+
+test("one shop's pick per product, set on the Remedies page", async () => {
+  const t = await setup({ pp: uniqueEmails() });
+  try {
+    await t.login();
+    const mug = () => t.merchant("GET", "/remedies").then((r) => r.body.find((p) => p.sku === "MUG-CLASSIC").remedies);
+    assert.deepEqual((await mug()).filter((r) => r.featured).map((r) => r.id), ["kintsugi_gold"]);
+    assert.equal((await t.merchant("PATCH", "/remedies/kintsugi", { featured: true })).body.featured, true);
+    assert.deepEqual((await mug()).filter((r) => r.featured).map((r) => r.id), ["kintsugi"]);
   } finally { t.close(); }
 });

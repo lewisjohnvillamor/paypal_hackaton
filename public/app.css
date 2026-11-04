@@ -315,6 +315,13 @@ details.more[open] summary::after { transform: rotate(-135deg) translateY(-2px);
 .option b { display: block; font-size: 16px; margin-bottom: 2px; }
 .option .detail { display: block; font-size: 13px; color: var(--text-2); line-height: 1.4; }
 .option .amt { font-size: 19px; font-weight: 700; white-space: nowrap; font-variant-numeric: lining-nums; }
+/* The best fit for this damage wears the brand's yellow box, like the damage on the photo. */
+.option.best { border-color: var(--mark); box-shadow: inset 0 0 0 1px var(--mark); }
+.option.best.selected { border-color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
+.best-tag { display: inline-block; background: var(--mark); color: var(--mark-ink); font-size: 12px; font-weight: 700; line-height: 1; padding: 4px 7px; border-radius: 5px; margin-bottom: 6px; }
+.option-list li.best { padding: 8px 10px; border-radius: 8px; box-shadow: inset 0 0 0 2px var(--mark); }
+.option-list li.best .best-tag { margin: 0 4px 0 0; vertical-align: 1px; }
+.option-list .fixes { display: block; font-size: 12px; color: var(--text-2); margin-top: 2px; font-weight: 400; }
 .offer-pitch { margin-top: 18px; padding: 16px; border-radius: var(--r-card); background: var(--surface-2); border: 1px solid var(--border); }
 .offer-pitch .lead { display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: center; }
 .offer-pitch .lead .art { width: 44px; height: 44px; display: grid; place-items: center; color: var(--text-2); }
@@ -490,6 +497,13 @@ footer.foot { max-width: 1040px; margin: 0 auto; padding: 0 24px 40px; color: va
 .remedy-grid.inbox-grid { width: 100%; height: auto; }
 .remedy-add { display: grid; grid-template-columns: 1.2fr 1.2fr 1.6fr 100px 140px auto; gap: 8px; margin-top: 14px; }
 .remedy-add input, .remedy-add select { margin: 0; }
+.remedy-add .fixes-pick { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; border: 0; padding: 0; margin: 0; }
+.remedy-add .fixes-pick legend { float: left; margin-right: 6px; padding: 0; }
+.remedy-add .fixes-pick label { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; font-weight: 500; }
+.remedy-add .fixes-pick input[type="checkbox"] { width: 18px; height: 18px; min-height: 0; padding: 0; margin: 0; flex: none; }
+.fixes-cell { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 0; }
+.fixes-cell .chip { min-height: 26px; padding: 2px 8px; font-size: 12.5px; }
+.fixes-cell .chip.on { background: var(--text); color: var(--surface); border-color: var(--text); }
 @media (max-width: 860px) { .remedy-add { grid-template-columns: 1fr; } }
 
 /* Suggestions from the store's own listings, inside the offer block */

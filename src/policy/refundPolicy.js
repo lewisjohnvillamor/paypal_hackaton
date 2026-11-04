@@ -3,6 +3,7 @@
 // decision below is a fixed rule over those signals, the shop's own records and the merchant's
 // settings (src/policy/settings.js), so the same inputs always give the same outcome and amount.
 import { DEFAULT_POLICY, SEVERITY } from "./settings.js";
+import { DAMAGE_LABELS, damageKindOf, fixesDamage } from "../kinds.js";
 
 export const POLICY_VERSION = "policy-v3";
 export const CLAIM_WINDOW_DAYS = DEFAULT_POLICY.claimWindowDays;
@@ -135,6 +136,10 @@ export function itemConfirmed(findings) {
 // replacement 0.43-0.97 on broken mugs; see hackathon/STATE.md.
 export const REMEDY_FIT = 0.5;
 export const MAX_OFFERED_REMEDIES = 3;
+// The top remedy is highlighted as the best fit when Jev scored it at least this high and this far
+// ahead of the runner-up.
+export const BEST_FIT = 0.7;
+export const BEST_MARGIN = 0.1;
 
 // Resolution options the merchant can put to the buyer instead of deciding alone: the full refund
 // (always first, always available) and up to three remedies from the merchant's library that Jev
@@ -142,20 +147,35 @@ export const MAX_OFFERED_REMEDIES = 3;
 // per-unit amount, capped by the drafted refund; it can be $0 (a replacement). A replacement is
 // only offered when the damage earns a full refund: for damage the policy pays part of the price
 // for (scratches, a stain), a new item would be worth more than the policy allows. Pure: no I/O.
-export function resolutionOptions({ remedies = [], quantity, findings, amountCents, fullRefund = true }) {
+//
+// Eligibility comes first and is the merchant's, not the model's: a remedy is only considered for
+// the damage types it says it puts right (a kintsugi kit for a chip or a snapped handle, never for a
+// mug in pieces). When the photo check is unsure of the damage type, only remedies that put every
+// type right (a replacement) are. Jev's fit score then ranks what is left. The best fit is marked
+// "best" when it is a clear call, so the buyer and the merchant see which one suits this damage.
+export function resolutionOptions({ remedies = [], quantity, findings, amountCents, fullRefund = true, category, minDamageSure }) {
   if (!findings || !(amountCents > 0) || findings.visible_breakage !== "yes" || findings.evidence_usable === "no") return [];
   if (!itemConfirmed(findings)) return [];
   const fit = findings.remedyFit ?? {};
+  const kind = damageKindOf(findings, minDamageSure);
   const picked = remedies
+    .filter((r) => !category || fixesDamage(r.damage ?? null, category, kind))
     .filter((r) => typeof fit[r.id] === "number" && fit[r.id] >= REMEDY_FIT)
     .filter((r) => fullRefund || r.kind !== "replacement")
     .sort((a, b) => fit[b.id] - fit[a.id])
     .slice(0, MAX_OFFERED_REMEDIES)
     .map((r) => ({
       id: r.id, kind: r.kind, title: r.title, item: r.item, fit: fit[r.id],
+      ...(r.damage ? { fixes: r.damage, fixesLabel: r.damage.map((k) => DAMAGE_LABELS[k]).join(", ") } : {}),
       refundCents: Math.min(r.refundUnitCents * quantity, amountCents),
     }))
     .filter((o) => o.refundCents < amountCents); // a remedy worth the full refund adds nothing
+  // One option is highlighted: the shop's pick when it made the list (it is eligible for this damage
+  // and fits the photos), otherwise the best fit when it is confident and clearly ahead of the next.
+  const pick = picked.find((o) => remedies.find((r) => r.id === o.id)?.featured);
+  const [top, next] = picked;
+  if (pick) Object.assign(pick, { best: true, highlight: "shop_pick" });
+  else if (top && top.fit >= BEST_FIT && (!next || top.fit - next.fit >= BEST_MARGIN)) Object.assign(top, { best: true, highlight: "best_fit" });
   return picked.length ? [{ id: "refund", kind: "refund", title: fullRefund ? "Full refund" : "Partial refund", refundCents: amountCents }, ...picked] : [];
 }
 

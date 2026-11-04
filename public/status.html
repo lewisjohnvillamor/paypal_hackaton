@@ -55,8 +55,11 @@
         const t = optionText(o);
         const chosen = offer.chosen === o.id;
         if (!offer.open && !chosen) return "";
-        return `<button type="button" class="option${/gold/i.test(o.title) ? " gold" : ""}${chosen ? " chosen" : ""}" data-option="${esc(o.id)}" ${offer.open ? "" : "disabled"} aria-pressed="${chosen}">
-          ${art(o)}<span><b>${esc(t.title)}</b><span class="detail">${esc(t.detail)}</span></span><span class="amt">${optionAmount(o)}</span></button>`;
+        // The shop's best fit for this damage wears the yellow box, the same mark the photo check
+        // draws around the damage.
+        const best = o.best && offer.open;
+        return `<button type="button" class="option${best ? " best" : ""}${chosen ? " chosen" : ""}" data-option="${esc(o.id)}" ${offer.open ? "" : "disabled"} aria-pressed="${chosen}">
+          ${art(o)}<span>${best ? `<span class="best-tag">${o.highlight === "shop_pick" ? "The shop's pick for this damage" : "Best fit for this damage"}</span>` : ""}<b>${esc(t.title)}</b><span class="detail">${esc(t.detail)}</span></span><span class="amt">${optionAmount(o)}</span></button>`;
       }).join("")}</div>`;
     }
 

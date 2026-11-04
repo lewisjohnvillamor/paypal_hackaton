@@ -5,21 +5,29 @@ import { randomUUID } from "node:crypto";
 import { now, tx } from "./db.js";
 import { PRODUCTS } from "./catalog.js";
 import { ClaimError } from "./claims.js";
+import { damageKeys, damageOptions } from "./kinds.js";
 
 export const MAX_REMEDIES = 8; // per product; each is one more question in the Jev call
 const KINDS = ["repair_kit", "spare_part", "replacement", "other"];
 
+const parse = (v) => { try { return v ? JSON.parse(v) : null; } catch { return null; } };
 const row = (r) => r && {
-  id: r.id, sku: r.sku, kind: r.kind, title: r.title, item: r.item, fits: r.fits,
+  id: r.id, sku: r.sku, kind: r.kind, title: r.title, item: r.item, fits: r.fits, damage: parse(r.damage_kinds), featured: !!r.featured,
   refundUnitCents: r.refund_unit_cents, active: !!r.active, position: r.position, updatedAt: r.updated_at,
 };
 
 export function seedRemedies(db) {
   for (const p of Object.values(PRODUCTS)) {
+    // Libraries seeded before eligibility existed get the starting remedies' damage types once;
+    // a merchant's own remedies stay unset (eligible for any damage) until they pick some.
+    const backfill = db.prepare("UPDATE remedies SET damage_kinds = ?, featured = ? WHERE id = ? AND sku = ? AND damage_kinds IS NULL");
+    const kinds = (r) => r.damage ? JSON.stringify(damageKeys(p.category).filter((k) => r.damage.includes(k))) : null;
+    for (const r of p.remedies ?? []) if (r.id && r.damage) backfill.run(kinds(r), r.featured ? 1 : 0, r.id, p.sku);
     if (db.prepare("SELECT 1 FROM remedies WHERE sku = ?").get(p.sku)) continue;
-    const insert = db.prepare(`INSERT INTO remedies (id, sku, kind, title, item, fits, refund_unit_cents, active, position, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`);
-    (p.remedies ?? []).forEach((r, i) => insert.run(r.id ?? randomUUID(), p.sku, r.kind, r.title, r.item, r.fits, r.refundUnitCents, i, now()));
+    const insert = db.prepare(`INSERT INTO remedies (id, sku, kind, title, item, fits, refund_unit_cents, active, position, updated_at, damage_kinds, featured)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`);
+    (p.remedies ?? []).forEach((r, i) => insert.run(r.id ?? randomUUID(), p.sku, r.kind, r.title, r.item, r.fits, r.refundUnitCents, i, now(),
+      kinds(r), r.featured ? 1 : 0));
   }
 }
 
@@ -28,7 +36,7 @@ export const activeRemedies = (db, sku) =>
 
 export function remedyLibrary(db) {
   return Object.values(PRODUCTS).map((p) => ({
-    sku: p.sku, title: p.title, unitCents: p.unitCents, refImage: `/assets/${p.refImage}`,
+    sku: p.sku, title: p.title, unitCents: p.unitCents, refImage: `/assets/${p.refImage}`, damageOptions: damageOptions(p.category),
     remedies: db.prepare("SELECT * FROM remedies WHERE sku = ? ORDER BY position, updated_at").all(p.sku).map(row),
   }));
 }
@@ -45,8 +53,18 @@ function clean(input, product) {
   if (!Number.isSafeInteger(cents) || cents < 0 || cents >= product.unitCents) {
     throw new ClaimError("INVALID", `The refund must be at least $0 and less than the $${(product.unitCents / 100).toFixed(2)} paid; a full refund is always offered anyway.`);
   }
+  // Which damage it can put right. Required for a new remedy; an unset one (from before) stays unset
+  // until the merchant picks.
+  let damage = input.damage ?? null;
+  if (damage !== null) {
+    const allowed = damageKeys(product.category);
+    if (!Array.isArray(damage) || !damage.length || damage.some((k) => !allowed.includes(k))) {
+      throw new ClaimError("INVALID", "Pick at least one kind of damage this remedy puts right.");
+    }
+    damage = allowed.filter((k) => damage.includes(k));
+  }
   return {
-    kind, title: text(input.title, "The title", 80), item: text(input.item, "What you send", 160),
+    damage, featured: !!input.featured, kind, title: text(input.title, "The title", 80), item: text(input.item, "What you send", 160),
     fits: text(input.fits, "When it fits", 400), refundUnitCents: cents, active: input.active === undefined ? true : !!input.active,
   };
 }
@@ -54,13 +72,14 @@ function clean(input, product) {
 export function createRemedy(db, input) {
   const product = PRODUCTS[input.sku];
   if (!product) throw new ClaimError("INVALID", "Unknown product.");
+  if (input.damage == null) throw new ClaimError("INVALID", "Pick at least one kind of damage this remedy puts right.");
   const r = clean(input, product);
   return tx(db, () => {
     const n = db.prepare("SELECT COUNT(*) n, COALESCE(MAX(position), -1) last FROM remedies WHERE sku = ?").get(product.sku);
     if (n.n >= MAX_REMEDIES) throw new ClaimError("TOO_MANY_REMEDIES", `Up to ${MAX_REMEDIES} remedies per product.`, 409);
     const id = randomUUID();
-    db.prepare(`INSERT INTO remedies (id, sku, kind, title, item, fits, refund_unit_cents, active, position, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, product.sku, r.kind, r.title, r.item, r.fits, r.refundUnitCents, r.active ? 1 : 0, n.last + 1, now());
+    db.prepare(`INSERT INTO remedies (id, sku, kind, title, item, fits, refund_unit_cents, active, position, updated_at, damage_kinds)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, product.sku, r.kind, r.title, r.item, r.fits, r.refundUnitCents, r.active ? 1 : 0, n.last + 1, now(), JSON.stringify(r.damage));
     return row(db.prepare("SELECT * FROM remedies WHERE id = ?").get(id));
   });
 }
@@ -69,7 +88,11 @@ export function updateRemedy(db, id, input) {
   const current = row(db.prepare("SELECT * FROM remedies WHERE id = ?").get(id));
   if (!current) throw new ClaimError("NOT_FOUND", "No such remedy.", 404);
   const r = clean({ ...current, ...input }, PRODUCTS[current.sku]);
-  db.prepare(`UPDATE remedies SET kind = ?, title = ?, item = ?, fits = ?, refund_unit_cents = ?, active = ?, updated_at = ? WHERE id = ?`)
-    .run(r.kind, r.title, r.item, r.fits, r.refundUnitCents, r.active ? 1 : 0, now(), id);
+  tx(db, () => {
+    // One shop's pick per product: picking one clears the others.
+    if (r.featured) db.prepare("UPDATE remedies SET featured = 0 WHERE sku = ? AND id != ?").run(current.sku, id);
+    db.prepare(`UPDATE remedies SET kind = ?, title = ?, item = ?, fits = ?, refund_unit_cents = ?, active = ?, damage_kinds = ?, featured = ?, updated_at = ? WHERE id = ?`)
+      .run(r.kind, r.title, r.item, r.fits, r.refundUnitCents, r.active ? 1 : 0, r.damage ? JSON.stringify(r.damage) : null, r.featured ? 1 : 0, now(), id);
+  });
   return row(db.prepare("SELECT * FROM remedies WHERE id = ?").get(id));
 }

@@ -258,6 +258,10 @@ const MIGRATIONS = [
   "ALTER TABLE order_lines ADD COLUMN category TEXT",
   "ALTER TABLE policy_settings ADD COLUMN merchant_id TEXT NOT NULL DEFAULT 'demo'",
   "ALTER TABLE mandates ADD COLUMN merchant_id TEXT NOT NULL DEFAULT 'demo'",
+  // The damage types a remedy can put right (JSON array of src/kinds.js keys); NULL = not set yet.
+  "ALTER TABLE remedies ADD COLUMN damage_kinds TEXT",
+  // The shop's pick: the one remedy per product highlighted to the buyer whenever it is eligible and fits.
+  "ALTER TABLE remedies ADD COLUMN featured INTEGER NOT NULL DEFAULT 0",
 ];
 
 // Every lookup the app makes by foreign key or by time. Without these, each claim submission and

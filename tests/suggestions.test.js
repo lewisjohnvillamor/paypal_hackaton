@@ -17,7 +17,8 @@ const uniqueEmails = () => fakePayPal({ payerEmail: () => `sugg${++n}@example.co
 
 test("the store's listings are narrowed to this product and this damage before any model sees them", () => {
   const ids = (k) => candidatesFor("MUG-CLASSIC", { damage_kind: k }).map((c) => c.id);
-  assert.deepEqual(ids("shattered").sort(), ["L-MOSAIC", "L-MUG-SECOND", "L-MUG-SPECKLE"]);
+  assert.deepEqual(ids("shattered").sort(), ["L-MOSAIC", "L-MUG-SECOND"]);
+  assert.deepEqual(ids("crack_or_chip").sort(), ["L-CERAMIC-GLUE", "L-GLAZE-PEN", "L-KINTSUGI", "L-KINTSUGI-GOLD", "L-MUG-SECOND"]);
   assert.ok(ids("handle_off").includes("L-CERAMIC-GLUE") && !ids("handle_off").includes("L-MOSAIC"));
   for (const k of ["shattered", "handle_off", "crack_or_chip", "none_visible"]) {
     for (const id of ids(k)) assert.ok(!["L-SAUCER", "L-PLATE", "L-TEA-TOWEL", "L-COASTERS", "L-GIFT-BOX", "L-MUG-CLASSIC"].includes(id), `${k}: ${id}`);
@@ -69,7 +70,7 @@ test("an approved suggestion joins the buyer's choices and its pick is refunded 
     assert.equal(d.proposal.suggestions.length, 1);
     assert.equal(d.proposal.suggestions[0].status, "pending");
     assert.deepEqual(d.proposal.options, []); // pending suggestions are never offered
-    assert.ok(d.timeline.some((s) => s.actor === "claude" && /suggested a remedy from 3 store listings/.test(s.title)));
+    assert.ok(d.timeline.some((s) => s.actor === "claude" && /suggested a remedy from 2 store listings/.test(s.title)));
     const blocked = await t.merchant("POST", `/claims/${c.claimId}/send-offer`, { claimVersion: d.claim.version, proposalId: d.proposal.id });
     assert.equal(blocked.body.error, "NO_OPTIONS");
 
@@ -95,15 +96,15 @@ test("an approved suggestion joins the buyer's choices and its pick is refunded 
 test("approved suggestions sit after the library remedies; dismissed ones never show", async () => {
   const suggest = fakeSuggest([
     { listingId: "L-GLAZE-PEN", title: "Touch up the chip with a glaze pen", why: "A small chip on the rim.", refundUnitCents: 1000 },
-    { listingId: "L-PLANTER", title: "Make it a planter", why: "Still whole.", refundUnitCents: 1200 },
+    { listingId: "L-CERAMIC-GLUE", title: "Glue the chip back on", why: "Still whole.", refundUnitCents: 1200 },
   ]);
   const t = await setup({ pp: uniqueEmails(), assess: fakeAssess(chip), suggest });
   try {
     const c = await claimed(t);
     let d = await c.detail();
-    const [pen, planter] = d.proposal.suggestions;
+    const [pen, glue] = d.proposal.suggestions;
     await t.merchant("POST", `/claims/${c.claimId}/suggestions/${pen.id}`, { approve: true });
-    d = (await t.merchant("POST", `/claims/${c.claimId}/suggestions/${planter.id}`, { approve: false })).body;
+    d = (await t.merchant("POST", `/claims/${c.claimId}/suggestions/${glue.id}`, { approve: false })).body;
     assert.deepEqual(d.proposal.options.map((o) => o.id), ["refund", "replacement", "kintsugi", "kintsugi_gold", `ai_${pen.id}`]);
     assert.equal(d.proposal.suggestions[1].status, "dismissed");
     assert.equal((await t.merchant("POST", `/claims/${c.claimId}/suggestions/nope`, { approve: true })).status, 404);

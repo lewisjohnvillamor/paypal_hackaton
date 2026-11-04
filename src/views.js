@@ -138,7 +138,7 @@ export function buyerStatus(db, claim) {
     // the shop, and the buyer is not shown a choice that came to nothing.
     offer: offer && (offer.status === "open" ? claim.status === "offer_sent" : offer.status === "accepted" && ["refund_processing", "refunded", "resolved"].includes(claim.status))
       ? { id: offer.id, open: offer.status === "open", chosen: offer.chosen,
-          options: offer.options.map(({ id, kind, title, item, refundCents }) => ({ id, kind, title, item, refundCents })) }
+          options: offer.options.map(({ id, kind, title, item, refundCents, best, highlight }) => ({ id, kind, title, item, refundCents, ...(best ? { best, highlight } : {}) })) }
       : null,
     createdAt: claim.created_at,
   };

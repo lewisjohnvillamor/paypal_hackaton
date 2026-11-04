@@ -213,6 +213,7 @@ export async function assessClaim(db, claimId, assess, actor = "system", suggest
     const options = draft.route === "reject" ? [] : resolutionOptions({
       remedies, quantity: draft.calculation.quantity, findings: result?.findings ?? null, amountCents: draft.amountCents,
       fullRefund: draft.amountCents >= draft.calculation.grossCents,
+      category: productOf(line).category, minDamageSure: settings.minDamageTypeSure,
     });
     const proposalId = randomUUID();
     db.prepare(`INSERT INTO proposals (id, claim_id, claim_version, assessment_id, policy_version, route, amount_cents,
