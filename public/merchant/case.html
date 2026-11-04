@@ -257,7 +257,9 @@
     }
 
     function optionListHtml(options) {
-      return `<ul class="option-list">${options.map((o) => `<li><span>${esc(optionText(o).title)}${o.item ? ` <span class="muted">· ${esc(o.item)}</span>` : ""}${typeof o.fit === "number" ? ` <span class="fit" title="How well the AI judged it fits the damage">${Math.round(o.fit * 100)}% fit</span>` : ""}${o.source === "haiku" ? ` <span class="fit ai" title="Suggested by the AI from your listings, approved by you">AI pick</span>` : ""}</span><span>${optionAmount(o)}</span></li>`).join("")}</ul>`;
+      // Each remedy shows what it is eligible for (set on the Remedies page) and how well the photos
+      // fit it; the best fit carries the yellow box the buyer sees too.
+      return `<ul class="option-list">${options.map((o) => `<li${o.best ? ` class="best"` : ""}><span>${o.best ? `<span class="best-tag">${o.highlight === "shop_pick" ? "Your pick" : "Best fit"}</span> ` : ""}${esc(optionText(o).title)}${o.item ? ` <span class="muted">· ${esc(o.item)}</span>` : ""}${typeof o.fit === "number" ? ` <span class="fit" title="How well the AI judged it fits the damage">${Math.round(o.fit * 100)}% fit</span>` : ""}${o.source === "haiku" ? ` <span class="fit ai" title="Suggested by the AI from your listings, approved by you">AI pick</span>` : ""}${o.fixesLabel ? `<span class="fixes">Fixes: ${esc(o.fixesLabel)}</span>` : ""}</span><span>${optionAmount(o)}</span></li>`).join("")}</ul>`;
     }
 
     function refundsHtml() {

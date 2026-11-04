@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PRODUCTS, LISTINGS } from "../src/catalog.js";
-import { KINDS, damageTags } from "../src/kinds.js";
+import { KINDS } from "../src/kinds.js";
 import { buildLocateRequest, buildRequest } from "../src/ai/jev.js";
 import { candidatesFor } from "../src/suggest/candidates.js";
 import { cartLines } from "../src/orders.js";
@@ -36,17 +36,23 @@ test("listings are narrowed by the product's category and the damage Jev saw", (
   assert.ok(ids("HEADPHONES-OVER", "cushion_torn").includes("L-HP-CUSHIONS"));
   assert.ok(!ids("HEADPHONES-OVER", "cosmetic").includes("L-HP-CUSHIONS"));
   assert.ok(ids("VASE-GLASS", "crack_or_chip").includes("L-GLASS-RESIN"));
-  // Never another product's listings, and never the ordered product itself.
+  // Never another product's listings, never the ordered product itself, never a listing for other
+  // damage, and a replacement only when it is the same product.
   for (const [sku, p] of Object.entries(PRODUCTS)) {
     for (const k of Object.keys(KINDS[p.category].kinds)) {
       for (const c of candidatesFor(sku, { damage_kind: k })) {
         const l = LISTINGS.find((x) => x.id === c.id);
-        assert.ok(l.tags.includes(p.category) && l.id !== `L-${sku}`, `${sku} ${k} ${c.id}`);
+        assert.ok(l.categories.includes(p.category) && l.id !== `L-${sku}` && l.damage.includes(k), `${sku} ${k} ${c.id}`);
+        if (l.kind === "replacement") assert.ok(l.replaces.includes(sku), `${sku} ${k} ${c.id}`);
       }
     }
   }
-  // Unsure damage type: any damage tag of the kind.
-  assert.deepEqual(damageTags("headphones", "none_visible").sort(), ["cosmetic", "cushion", "snapped"]);
+  // A look-alike is never offered as a replacement: a green vase for the clear one, another mug.
+  assert.ok(!ids("VASE-GLASS", "shattered").includes("L-VASE-RECYCLED"));
+  assert.ok(!ids("MUG-CLASSIC", "shattered").includes("L-MUG-SPECKLE"));
+  // Unsure of the damage type: only what fixes every type of damage, i.e. the same product again.
+  assert.deepEqual(ids("HEADPHONES-OVER", "none_visible"), ["L-HP-REFURB"]);
+  assert.deepEqual(candidatesFor("HEADPHONES-OVER", { damage_kind: "cushion_torn", signals: { damage_kind: { confidence: 0.4 } } }).map((c) => c.id), ["L-HP-REFURB"]);
 });
 
 test("anything out of stock is never offered to Haiku", () => {

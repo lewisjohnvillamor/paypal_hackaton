@@ -21,7 +21,7 @@
   <main class="wide">
     <section id="library" class="hidden">
       <h1>Remedies</h1>
-      <p class="lede">What you can offer instead of a full refund. When a buyer reports damage, AI compares their photos with each active remedy's "when it fits" description, and only the ones that fit go on the list you approve. A full refund is always one of the choices. When nothing here fits, the AI can suggest one of your other store listings on the case itself, and you decide whether to add it.</p>
+      <p class="lede">What you can offer instead of a full refund. Each remedy names the damage it puts right, and is never offered for anything else. When a buyer reports that damage, AI compares their photos with the remedy's "when it fits" description, and only the ones that fit go on the list you approve, the best fit marked. A full refund is always one of the choices. When nothing here fits, the AI can suggest one of your other store listings on the case itself, and you decide whether to add it.</p>
       <div id="notice" class="notice hidden" role="status"></div>
       <div id="products"></div>
     </section>
@@ -48,6 +48,8 @@
       const narrow = matchMedia("(max-width: 619px)").matches;
       const columns = [
         { headerName: "On", field: "active", width: narrow ? 56 : 72, cellDataType: "boolean", editable: true },
+        // The shop's pick: highlighted to the buyer whenever it is eligible and fits. One per product.
+        { headerName: "Your pick", field: "featured", width: narrow ? 70 : 96, cellDataType: "boolean", editable: true },
         // The offer and its refund come first, so a phone shows them without scrolling sideways.
         { headerName: "Offer to the buyer", field: "title", width: narrow ? 150 : 240, editable: true, wrapText: true, autoHeight: true },
         { headerName: "Refund per item", field: "refundUnitCents", width: narrow ? 100 : 140, type: "rightAligned", editable: true,
@@ -55,6 +57,10 @@
         { headerName: "What you send", field: "item", flex: 1, minWidth: 220, editable: true, wrapText: true, autoHeight: true },
         { headerName: "When it fits (the AI reads this)", field: "fits", flex: 1.4, minWidth: 260, editable: true, wrapText: true, autoHeight: true,
           cellEditor: "agLargeTextCellEditor", cellEditorPopup: true, cellEditorParams: { maxLength: 400, rows: 6, cols: 50 } },
+        // Eligibility: the damage this remedy can put right. It is never offered for anything else,
+        // however well the AI thinks the photos fit its description.
+        { headerName: "Puts right", field: "damage", width: narrow ? 190 : 230, wrapText: true, autoHeight: true,
+          cellRenderer: (x) => fixesCell(p, x) },
         { headerName: "Kind", field: "kind", width: 140, editable: true, cellEditor: "agSelectCellEditor",
           cellEditorParams: { values: Object.keys(KIND) }, valueFormatter: (x) => KIND[x.value] ?? x.value },
       ];
@@ -67,13 +73,34 @@
           try {
             const saved = await api(`/api/merchant/remedies/${encodeURIComponent(e.data.id)}`, { method: "PATCH", merchant: true, body: { [e.colDef.field]: e.newValue } });
             e.node.setData(saved);
-            say(`Saved "${saved.title}".`, "ok");
+            // Picking one clears the others on this product, so show the server's view of all of them.
+            if (e.colDef.field === "featured" && saved.featured) e.api.forEachNode((n) => n.data.id !== saved.id && n.data.featured && n.setData({ ...n.data, featured: false }));
+            say(e.colDef.field === "featured" ? (saved.featured ? `"${saved.title}" is your pick: buyers see it highlighted whenever it fits their damage.` : `"${saved.title}" is no longer your pick.`) : `Saved "${saved.title}".`, "ok");
           } catch (err) {
             e.node.setDataValue(e.colDef.field, e.oldValue, "revert");
             say(err.message, "bad");
           }
         },
       });
+    }
+
+    // One toggle per damage type of this product; a click saves at once. A remedy saved before
+    // eligibility existed shows "Any damage" until the merchant picks.
+    function fixesCell(p, x) {
+      const el = document.createElement("div");
+      el.className = "fixes-cell";
+      const on = x.value ?? [];
+      el.innerHTML = (x.value ? "" : `<span class="small muted" style="display:block;margin-bottom:4px">Any damage (not set)</span>`) +
+        p.damageOptions.map((d) => `<button type="button" class="chip${on.includes(d.key) ? " on" : ""}" aria-pressed="${on.includes(d.key)}" data-k="${esc(d.key)}">${esc(d.label)}</button>`).join("");
+      el.querySelectorAll("button").forEach((b) => (b.onclick = async () => {
+        const next = p.damageOptions.map((d) => d.key).filter((k) => (k === b.dataset.k ? !on.includes(k) : on.includes(k)));
+        try {
+          const saved = await api(`/api/merchant/remedies/${encodeURIComponent(x.data.id)}`, { method: "PATCH", merchant: true, body: { damage: next } });
+          x.node.setData(saved);
+          say(`"${saved.title}" is offered only for ${saved.damage.map((k) => p.damageOptions.find((d) => d.key === k).label).join(", ")}.`, "ok");
+        } catch (err) { say(err.message, "bad"); }
+      }));
+      return el;
     }
 
     function addForm(p) {
@@ -83,6 +110,7 @@
         <input name="fits" placeholder="When it fits, e.g. Only the handle came off" required maxlength="400" aria-label="When it fits">
         <input name="refund" placeholder="Refund $" inputmode="decimal" required aria-label="Refund per item in dollars">
         <select name="kind" aria-label="Kind">${Object.entries(KIND).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select>
+        <fieldset class="fixes-pick"><legend class="small muted">Puts right</legend>${p.damageOptions.map((d) => `<label class="small"><input type="checkbox" name="damage" value="${esc(d.key)}"> ${esc(d.label)}</label>`).join("")}</fieldset>
         <button class="primary" type="submit">Add</button>
       </form>`;
     }
@@ -102,9 +130,10 @@
       document.querySelectorAll(".remedy-add").forEach((f) => (f.onsubmit = async (e) => {
         e.preventDefault();
         const v = Object.fromEntries(new FormData(f));
+        const damage = new FormData(f).getAll("damage");
         try {
           const made = await api("/api/merchant/remedies", { method: "POST", merchant: true, body: {
-            sku: f.dataset.sku, title: v.title, item: v.item, fits: v.fits, kind: v.kind,
+            sku: f.dataset.sku, title: v.title, item: v.item, fits: v.fits, kind: v.kind, damage,
             refundUnitCents: Math.round(Number(String(v.refund).replace(/[$,]/g, "")) * 100) } });
           say(`Added "${made.title}". The AI will consider it on the next report.`, "ok");
           await load();
