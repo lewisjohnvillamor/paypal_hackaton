@@ -1,0 +1,21 @@
+/* Fernway Glass: its own look, so it is plainly a different shop from Juniper Market. */
+:root { --ink: #1e2a2b; --muted: #5d6b6c; --line: #d6dfde; --bg: #f4f7f6; --card: #fff; }
+* { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.55 "Iowan Old Style", "Palatino Linotype", Georgia, serif; color: var(--ink); background: var(--bg); }
+.bar { padding: 18px 20px; border-bottom: 1px solid var(--line); background: var(--card); }
+.logo { font-size: 20px; letter-spacing: .04em; color: var(--ink); text-decoration: none; }
+main { max-width: 960px; margin: 0 auto; padding: 32px 20px 64px; }
+.product { display: grid; grid-template-columns: 1.1fr 1fr; gap: 40px; align-items: start; }
+.product img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; background: #e8eeed; }
+h1 { font-weight: 400; font-size: 34px; line-height: 1.15; margin: 0 0 8px; }
+h2 { font-weight: 400; font-size: 22px; margin: 32px 0 6px; }
+.price { font-size: 22px; margin: 0 0 16px; }
+.muted { color: var(--muted); font-size: 14px; }
+label { display: block; font-size: 14px; color: var(--muted); margin: 18px 0 6px; }
+select { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--card); min-width: 96px; }
+#paypal-buttons { margin-top: 20px; max-width: 360px; }
+#msg { min-height: 1.5em; }
+.confirm { max-width: 600px; }
+.sum { display: grid; grid-template-columns: 1fr auto; gap: 4px 24px; max-width: 320px; margin: 20px 0; }
+.sum dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 720px) { .product { grid-template-columns: 1fr; gap: 20px; } h1 { font-size: 28px; } }

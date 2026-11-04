@@ -46,6 +46,8 @@ Refund Relay is a hosted service, not a single shop. Juniper Market, the store i
 
 [`examples/acme-store`](examples/acme-store/server.js) is a second store with its own PayPal checkout that uses Refund Relay this way; the whole integration is about 20 lines. `npm run e2e:platform` runs it live against the PayPal sandbox: Acme Ceramics signs up, connects PayPal, creates a key, sells two mugs, the buyer clicks the button on Acme's confirmation page and reports a broken handle, and Acme approves a $24.00 refund that PayPal completes on Acme's capture. Screenshots are in [`hackathon/screenshots/platform`](hackathon/screenshots/platform).
 
+[`examples/fernway-glass`](examples/fernway-glass) is a third store, built only from the four dashboard steps, with the PayPal button, shipping and tax. `npm run e2e:fernway` runs it against the live site: on 2026-11-04 it sold two vases for $88.58, the buyer reported one cracked, and PayPal refunded $38.00 on Fernway's capture. Screenshots and notes are in its [README](examples/fernway-glass/README.md).
+
 Every connected store gets the photo check, its own refund policy, one-click approvals and its own refund agent (rules over the products it has sold, its own daily total, refunds through its own PayPal). So far the remedy library and remedy suggestions work on the demo store's catalog only. Product kinds are the four the photo check knows (`ceramic-mug`, `glass-vase`, `cotton-tee`, `headphones`); adding one is one entry in `src/kinds.js`.
 
 ## Agent-to-agent commerce
