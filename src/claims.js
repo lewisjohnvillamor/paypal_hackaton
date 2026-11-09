@@ -11,6 +11,7 @@ import { agentSpent } from "./agent/spend.js";
 import { TEMPLATE_VERSION } from "./ai/jev.js";
 import { IMAGE_CONCURRENCY, MAX_PHOTOS, SIMILAR_PHOTO_BITS, aiCopy, differenceHash, hashDistance, mapLimit } from "./images.js";
 import { anyNearOtherClaim } from "./photoIndex.js";
+import { isSharedDemoPhoto, sharedDemoHashes } from "./demoPhotos.js";
 import { pickForModel, tooManyTokens } from "./ai/select.js";
 import { PRODUCTS } from "./catalog.js";
 import { activeRemedies } from "./remedies.js";
@@ -94,11 +95,13 @@ export const readEvidence = (key) => readFile(join(uploadDir(), key));
 
 // Signals from the shop's own records. Like the model's findings, each one sends the case to a
 // person; none of them can deny or pay a claim.
-export function riskFlags(db, claim, evidence, catalogHash) {
+// `shared` lists the repo's sample photos on a hosted demo, where every judge sends the same files.
+export function riskFlags(db, claim, evidence, catalogHash, shared = []) {
   const flags = [];
+  const own = evidence.map((e) => e.phash).filter((h) => !isSharedDemoPhoto(h, shared));
   const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(claim.order_id);
   const near = (a, b) => a && b && hashDistance(a, b) <= SIMILAR_PHOTO_BITS;
-  if (anyNearOtherClaim(db, claim.id, evidence.map((e) => e.phash), SIMILAR_PHOTO_BITS)) flags.push("PHOTO_REUSED_FROM_OTHER_CLAIM");
+  if (anyNearOtherClaim(db, claim.id, own, SIMILAR_PHOTO_BITS)) flags.push("PHOTO_REUSED_FROM_OTHER_CLAIM");
   if (evidence.some((e) => near(e.phash, catalogHash))) flags.push("PHOTO_MATCHES_CATALOG");
   if (db.prepare("SELECT 1 FROM claims WHERE order_id = ? AND id != ? AND created_at <= ?").get(claim.order_id, claim.id, claim.created_at)) {
     flags.push("PRIOR_CLAIM_ON_ORDER");
@@ -158,7 +161,7 @@ export async function assessClaim(db, claimId, assess, actor = "system", suggest
   const demoStore = order.merchant_id === DEMO;
   if (!demoStore) suggest = null;
 
-  const flags = riskFlags(db, claim, evidence, catalogHash);
+  const flags = riskFlags(db, claim, evidence, catalogHash, await sharedDemoHashes());
   const remedies = demoStore ? activeRemedies(db, line.sku) : [];
 
   let result = null, error = null, sent = pickForModel(evidence), copies = [];
