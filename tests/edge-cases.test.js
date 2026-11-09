@@ -79,6 +79,22 @@ test("the same photo reused on another order's claim is flagged, even resized an
   } finally { t.close(); }
 });
 
+test("on a hosted demo, the repo's own sample photos are not flagged as reused; other photos still are", async () => {
+  process.env.PUBLIC_DEMO = "1";
+  const t = await setup({ pp: uniqueEmails(), assess: fakeAssess() });
+  try {
+    const sample = await readFile(new URL("../demo-photos/1-kit-chipped-mug.jpg", import.meta.url));
+    await purchaseAndClaim(t, { photos: [sample] });
+    const again = await purchaseAndClaim(t, { photos: [sample] });
+    const own = await testPhoto();
+    await purchaseAndClaim(t, { photos: [own] });
+    const ownAgain = await purchaseAndClaim(t, { photos: [own] });
+    await t.login();
+    assert.ok(!(await detail(t, again.claimId)).proposal.reasons.includes("PHOTO_REUSED_FROM_OTHER_CLAIM"));
+    assert.ok((await detail(t, ownAgain.claimId)).proposal.reasons.includes("PHOTO_REUSED_FROM_OTHER_CLAIM"));
+  } finally { delete process.env.PUBLIC_DEMO; t.close(); }
+});
+
 test("a buyer uploading the shop's own catalog photo is flagged", async () => {
   const catalog = await readFile(new URL("../public/assets/catalog-mug.jpg", import.meta.url));
   const { t, d } = await caseWith({}, { photos: [catalog] });
