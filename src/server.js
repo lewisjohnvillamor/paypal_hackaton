@@ -416,6 +416,9 @@ export function checkConfig(env = process.env) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
+  // Render sets RENDER_EXTERNAL_URL (https://<service>.onrender.com), so a Render deploy needs no
+  // APP_BASE_URL unless it uses a custom domain.
+  if (!process.env.APP_BASE_URL && process.env.RENDER_EXTERNAL_URL) process.env.APP_BASE_URL = process.env.RENDER_EXTERNAL_URL;
   checkConfig();
   const { app, db, queue, pay } = createApp();
   if (publicDemo() && seedDemoMandate(db)) console.log("Hosted demo: the refund agent's starter rules are on");
